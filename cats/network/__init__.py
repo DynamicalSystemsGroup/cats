@@ -191,7 +191,7 @@ class MeshClient(CoD):
             structure_filepath,
             endpoint='http://127.0.0.1:5000/cat/node/execute'
     ):
-        structure_cid, structure_name = self.cidFile(filepath=structure_filepath)
+        structure_cid, structure_name = self.cidDir(structure_filepath)
         data_cid, dir_name = self.cidDir(data_dirpath)
         function = {
             'ingress_subproc_cid': self.ipfsClient.add_pyobj(ingress_subproc),
@@ -231,6 +231,9 @@ class MeshClient(CoD):
             'invoice': invoice,
             'log': json.loads(
                 self.cat(bom_response["bom"]["log_cid"])
+            ),
+            'plant': json.loads(
+                self.cat(bom_response["bom"]["plant_cid"])
             )
         }
         return bom_response

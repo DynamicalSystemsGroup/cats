@@ -130,6 +130,7 @@ class Service:
 
         bom = {
             'log_cid': enhanced_bom['log_cid'],
+            'plant_cid': self.meshClient.ipfsClient.add_json(enhanced_bom['plant']),
             'invoice_cid': invoice['invoice_cid']
         }
         bom_response = {

@@ -11,16 +11,20 @@ class Structure:
     def __init__(self, service):
         self.service = service
         self.bom_json_cid = self.service.bom_json_cid
-        self.plant: Plant = Plant(service=self.service)
         self.infraStructure: InfraStructure = InfraStructure(service=self.service)
+        self.plant: Plant = self.infraStructure.compose()
 
     def redeploy(self):
         print()
         print()
         print('Re-Deploy Structure!')
-        self.infraStructure.destroy()
+        # `destroy` needs providers already installed to even load their
+        # schemas, same as `apply`/`plan` - so `initialize` must run first,
+        # not just before `apply` below.
         self.infraStructure.initialize()
+        self.infraStructure.destroy()
         self.infraStructure.apply()
+        self.plant.rebuilt = True
 
     def deploy(self):
         print()
@@ -28,6 +32,7 @@ class Structure:
         print('Deploy Structure!')
         self.infraStructure.initialize()
         self.infraStructure.apply()
+        self.plant.rebuilt = False
 
     def reconcile(self, structure_cid):
         """Materialize this CAT's Structure, skipping the destructive
@@ -41,6 +46,10 @@ class Structure:
         avoid elsewhere in CATs; `apply()` alone is Terraform's own
         declarative reconciliation, and it's a fast no-op when nothing
         changed.
+
+        Returns a snapshot of the resulting Plant (see `Plant.snapshot()`),
+        so callers can record what this Structure actually produced
+        alongside Function's output in the CAT's BOM.
         """
         structure_home = self.infraStructure.INPUT_STRUCTURE_HOME
         applied_cid = read_applied_structure_cid(structure_home)
@@ -51,6 +60,7 @@ class Structure:
             self.redeploy()
         if structure_cid:
             write_applied_structure_cid(structure_home, structure_cid)
+        return self.plant.snapshot()
 
 
 class Function:
