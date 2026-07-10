@@ -22,12 +22,87 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-import logging, json, traceback
+import logging, json, signal, socket, subprocess, time, traceback
 
 from flask import Flask, request, jsonify
 from cats import SERVICE
 
 catNode = Flask(__name__)
+
+# Overridable so multiple CAT Node peers can eventually run side-by-side
+# (e.g. simulating a local mesh) - callers/peers still need to know a
+# node's address out-of-band, since `cats/network/__init__.py`'s
+# MeshClient hardcodes `http://127.0.0.1:5000/cat/node/*` for now.
+HOST = os.environ.get('CAT_NODE_HOST', '127.0.0.1')
+PORT = int(os.environ.get('CAT_NODE_PORT', 5000))
+
+
+def _free_stale_port(host: str, port: int) -> None:
+    """Kill any leftover node.py still bound to our port.
+
+    Agent/chat sessions launch this server in the background and don't
+    always terminate it when the session ends, so a stale process can be
+    left holding the port for a future run to collide with. Only processes
+    whose command line matches this script are killed - other programs on
+    the port (e.g. macOS's AirPlay Receiver on 5000) are left alone.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.2)
+        if probe.connect_ex((host, port)) != 0:
+            return  # nothing listening, nothing to do
+
+    try:
+        pids = subprocess.run(
+            ['lsof', '-t', f'-i:{port}', '-sTCP:LISTEN'],
+            capture_output=True, text=True, timeout=5,
+        ).stdout.split()
+    except (OSError, subprocess.SubprocessError):
+        return
+
+    killed_any = False
+    for pid in pids:
+        try:
+            # Debug mode's reloader is a parent/child pair; the listener is
+            # usually the child, so its parent must be killed too or it
+            # will just respawn a new child on the same port.
+            info = subprocess.run(
+                ['ps', '-p', pid, '-o', 'ppid=,command='],
+                capture_output=True, text=True, timeout=5,
+            ).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            continue
+
+        if not info or 'node.py' not in info:
+            continue  # leave unrelated processes (e.g. AirPlay) alone
+
+        ppid = info.split(None, 1)[0]
+        for target in {pid, ppid}:
+            try:
+                parent_cmd = subprocess.run(
+                    ['ps', '-p', target, '-o', 'command='],
+                    capture_output=True, text=True, timeout=5,
+                ).stdout
+            except (OSError, subprocess.SubprocessError):
+                continue
+            if 'node.py' not in parent_cmd:
+                continue
+            logger.warning(
+                "Killing stale node.py process (pid %s) still bound to %s:%d",
+                target, host, port,
+            )
+            try:
+                os.kill(int(target), signal.SIGTERM)
+                killed_any = True
+            except (OSError, ValueError):
+                pass
+
+    if killed_any:
+        for _ in range(20):
+            time.sleep(0.1)
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                probe.settimeout(0.2)
+                if probe.connect_ex((host, port)) != 0:
+                    return  # port is free now
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)  # Set level to DEBUG for more detailed logging
@@ -61,5 +136,13 @@ def execute_init_cat():
 
 
 if __name__ == '__main__':
-    # Run the Flask application on http://127.0.0.1:5000/
-    catNode.run(debug=True)
+    # Debug mode's reloader re-executes this script for its worker process,
+    # inheriting the listening socket the monitor already created (via
+    # WERKZEUG_SERVER_FD) rather than opening its own. That worker run sets
+    # WERKZEUG_RUN_MAIN, so it's skipped here - otherwise the guard would
+    # mistake that legitimately-inherited socket for a stale leftover and
+    # kill its own monitor process out from under itself.
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        _free_stale_port(HOST, PORT)
+    # Run the Flask application, by default on http://127.0.0.1:5000/
+    catNode.run(host=HOST, port=PORT, debug=True)
