@@ -312,6 +312,15 @@ class Plant:
             self.infraStructure.service, self.infraStructure.INPUT_STRUCTURE_HOME, 'plant_ray_release_name'
         )
 
+    def ray_dashboard_address(self):
+        """Address of the Ray dashboard InfraFunction submits jobs to via
+        the Ray Job Submission API (see Processor.Integration() in
+        cats/executor/function/__init__.py) - exposed on a static NodePort
+        by module.plant, so this stays valid across reconciles."""
+        return _terraform_output(
+            self.infraStructure.service, self.infraStructure.INPUT_STRUCTURE_HOME, 'plant_ray_dashboard_address'
+        )
+
     def snapshot(self):
         """Plain dict describing what this Plant currently is, for
         recording into the CAT's BOM alongside Function's output (see
@@ -320,6 +329,7 @@ class Plant:
             'kind_cluster_name': self.kind_cluster_name(),
             'kubeconfig_context': self.kubeconfig_context(),
             'ray_release_name': self.ray_release_name(),
+            'ray_dashboard_address': self.ray_dashboard_address(),
             'applied_structure_cid': read_applied_structure_cid(self.infraStructure.INPUT_STRUCTURE_HOME),
             'rebuilt': self.rebuilt,
         }
@@ -338,6 +348,40 @@ class InfraStructure:
 
     def compose(self):
         return Plant(self)
+
+    def minio_endpoint_host(self):
+        """Host-reachable address of module.infrastructure's MinIO S3 API -
+        used by infrafunction_subproc's own (host) process to retrieve a
+        completed job's results (see infrafunction_subproc in
+        data/input/process.py)."""
+        return _terraform_output(self.service, self.INPUT_STRUCTURE_HOME, 'infrastructure_minio_endpoint_host')
+
+    def minio_endpoint_pod(self):
+        """Address of the same MinIO instance as reachable from inside a
+        Ray pod - via the kind Docker network's gateway IP, not any
+        in-cluster Service - used by the Ray job's own write tasks."""
+        return _terraform_output(self.service, self.INPUT_STRUCTURE_HOME, 'infrastructure_minio_endpoint_pod')
+
+    def minio_bucket(self):
+        return _terraform_output(self.service, self.INPUT_STRUCTURE_HOME, 'infrastructure_minio_bucket')
+
+    def minio_access_key(self):
+        return _terraform_output(self.service, self.INPUT_STRUCTURE_HOME, 'infrastructure_minio_access_key')
+
+    def minio_secret_key(self):
+        return _terraform_output(self.service, self.INPUT_STRUCTURE_HOME, 'infrastructure_minio_secret_key')
+
+    def minio_snapshot(self):
+        """Plain dict describing this module.infrastructure's MinIO, for
+        recording into the CAT's BOM (see Executor.execute() in
+        cats/factory/__init__.py) - deliberately excludes the access/
+        secret key, so credentials never end up content-addressed into
+        the BOM/Invoice graph."""
+        return {
+            'minio_endpoint_host': self.minio_endpoint_host(),
+            'minio_endpoint_pod': self.minio_endpoint_pod(),
+            'minio_bucket': self.minio_bucket(),
+        }
 
     def destroy(self):
         print('Destroy Structure!')

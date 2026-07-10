@@ -43,6 +43,7 @@ def _(mo):
 def _(INPUT_DATA_HOME, INPUT_STRUCTURE_HOME, meshClient, pprint):
     from data.input.process import (
         egress,
+        infrafunction_subproc,
         ingress,
         integration_cache,
         process_0,
@@ -54,12 +55,13 @@ def _(INPUT_DATA_HOME, INPUT_STRUCTURE_HOME, meshClient, pprint):
         integrated_subproc=process_0,
         egress_subproc=egress,
         integration_cache_subproc=integration_cache,
+        infrafunction_subproc=infrafunction_subproc,
         data_dirpath=INPUT_DATA_HOME,  # f'{INPUT_DATA_HOME}/iris.csv',
         structure_filepath=INPUT_STRUCTURE_HOME,
         endpoint="http://127.0.0.1:5000/cat/node/init",
     )
     pprint(cat_order_request_0)
-    return cat_order_request_0, egress, ingress, integration_cache, process_1
+    return cat_order_request_0, egress, infrafunction_subproc, ingress, integration_cache, process_1
 
 
 @app.cell(hide_code=True)
@@ -93,6 +95,7 @@ def _(
     INPUT_DATA_HOME,
     INPUT_STRUCTURE_HOME,
     egress,
+    infrafunction_subproc,
     ingress,
     integration_cache,
     meshClient,
@@ -104,6 +107,7 @@ def _(
         integrated_subproc=process_1,
         egress_subproc=egress,
         integration_cache_subproc=integration_cache,
+        infrafunction_subproc=infrafunction_subproc,
         data_dirpath=INPUT_DATA_HOME, # f'{INPUT_DATA_HOME}/iris.csv',
         structure_filepath=INPUT_STRUCTURE_HOME,
         endpoint='http://127.0.0.1:5000/cat/node/init'

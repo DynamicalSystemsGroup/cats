@@ -1,0 +1,22 @@
+services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: cats-minio
+      MINIO_ROOT_PASSWORD: cats-minio-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    # Docker scopes a published port's host-side reachability to the
+    # bridge network the container's own (primary) interface sits on -
+    # publishing alone does not make it reachable via every other Docker
+    # network's gateway. Attaching directly to "kind" (the same bridge
+    # kind's node container sits on) is what actually makes this port
+    # reachable from a Ray pod via that network's gateway IP.
+    networks:
+      - kind
+
+networks:
+  kind:
+    external: true

@@ -45,6 +45,7 @@ class catDataVerification:
             integrated_subproc=process_0,
             egress_subproc=egress,
             integration_cache_subproc=integration_cache,
+            infrafunction_subproc=infrafunction_subproc,
             data_dirpath=INPUT_DATA_HOME,  # f'{INPUT_DATA_HOME}/iris.csv',
             structure_filepath=INPUT_STRUCTURE_HOME,
             endpoint='http://127.0.0.1:5000/cat/node/init'
@@ -59,6 +60,7 @@ class catDataVerification:
             integrated_subproc=process_1,
             egress_subproc=egress,
             integration_cache_subproc=integration_cache,
+            infrafunction_subproc=infrafunction_subproc,
             data_dirpath=INPUT_DATA_HOME,  # f'{INPUT_DATA_HOME}/iris.csv',
             structure_filepath=INPUT_STRUCTURE_HOME,
             endpoint='http://127.0.0.1:5000/cat/node/init'

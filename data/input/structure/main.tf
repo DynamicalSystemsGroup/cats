@@ -67,9 +67,27 @@ module "plant" {
 
   kubeconfig_path = local.k8s_config_path
 
-  depends_on = [
-    module.infrastructure
-  ]
+  # module.plant declares its own local "kubernetes" provider config (so it
+  # can be deferred until kind_cluster.default is created - see its
+  # main.tf), which makes it a "legacy module" that Terraform forbids
+  # calling with depends_on. Threading this otherwise-unused output through
+  # as an input variable creates the same ordering via normal data-flow
+  # dependency instead.
+  infrastructure_ready = module.infrastructure.docker_compose_ipfs_transport_id
+}
+
+# module.infrastructure's MinIO publishes its S3 port straight to the
+# host; Ray pods reach it via the kind Docker network's gateway IP
+# through ordinary pod egress routing (verified empirically against a
+# live cluster: a raw TCP connect from inside a Ray pod to that gateway
+# on an arbitrary port returned ECONNREFUSED, not a routing failure - the
+# packet reached the Docker host), not through any in-cluster Service.
+# That gateway only exists once module.plant has created the "kind"
+# network, so depends_on defers this data source even though it
+# references no attribute of module.plant directly.
+data "docker_network" "kind" {
+  name       = "kind"
+  depends_on = [module.plant]
 }
 
 # Preserves existing Terraform state (no destroy/recreate) for anyone who

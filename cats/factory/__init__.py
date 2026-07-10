@@ -41,18 +41,28 @@ class Executor:
         Path(self.service.EGRESS_INPUT_DATA).mkdir(parents=True, exist_ok=True)
         Path(self.service.PROCESS_HOME).mkdir(parents=True, exist_ok=True)
 
-    def execute(self, enhanced_bom=None):
+    def execute(self, order_request):
         self.catStore()
-        if enhanced_bom is not None:
-            self.enhanced_bom = enhanced_bom
 
         self.invoiceCID = self.enhanced_bom['invoice_cid']
         self.orderCID = self.enhanced_bom['invoice']['order_cid']
         plant_snapshot = self.structure.reconcile(self.enhanced_bom['order'].get('structure_cid'))
+        self.service.RAY_DASHBOARD_ADDRESS = plant_snapshot['ray_dashboard_address']
+        self.service.MINIO_ENDPOINT_HOST = self.structure.infraStructure.minio_endpoint_host()
+        self.service.MINIO_ENDPOINT_POD = self.structure.infraStructure.minio_endpoint_pod()
+        self.service.MINIO_BUCKET = self.structure.infraStructure.minio_bucket()
+        self.service.MINIO_ACCESS_KEY = self.structure.infraStructure.minio_access_key()
+        self.service.MINIO_SECRET_KEY = self.structure.infraStructure.minio_secret_key()
         self.ingress_job_id, self.integration_s3_output, self.egress_job_id = self.function.execute()
 
+        # function_cid -> {process_cid, infrafunction_cid}; structure_cid ->
+        # {plant_cid, infrastructure_cid} - surfaced here alongside the
+        # Plant snapshot so the BOM records both what Structure/Function
+        # were specified (as Code) and what Plant was actually observed.
         self.enhanced_bom['function'] = json.loads(self.service.meshClient.cat(self.enhanced_bom['order']['function_cid']))
+        self.enhanced_bom['structure'] = json.loads(self.service.meshClient.cat(self.enhanced_bom['order']['structure_cid']))
         self.enhanced_bom['plant'] = plant_snapshot
+        self.enhanced_bom['infrastructure'] = self.structure.infraStructure.minio_snapshot()
         self.enhanced_bom['log'] = {
             'ingress_job_id': self.ingress_job_id,
             'integration_output_cid': self.integration_s3_output,
@@ -62,9 +72,23 @@ class Executor:
         self.enhanced_bom['invoice']['data_cid'] = self.function.invoice_data_cid
         self.enhanced_bom['log_cid'] = self.service.meshClient.ipfsClient.add_json(self.enhanced_bom['log'])
 
+        # Invoice CID: produced here (by the Executor), not by
+        # Service.execute() - so "Invoice CIDs are produced by the
+        # Executor" holds at the class level. Backfilling order_cid with
+        # the CID of the actually-submitted order_request['order'] (as
+        # opposed to the bootstrap init_order fetched into
+        # self.enhanced_bom['order'] by getEnhancedBom()) is what makes
+        # the Invoice point at the real Order that produced it.
+        self.enhanced_bom['invoice']['order_cid'] = self.service.meshClient.ipfsClient.add_str(
+            json.dumps(order_request['order'])
+        )
+        invoice_cid = self.service.meshClient.ipfsClient.add_str(
+            json.dumps(self.enhanced_bom['invoice'])
+        )
+
         del self.enhanced_bom['bom_json_cid']
         del self.enhanced_bom['init_data_cid']
-        return self.enhanced_bom, None
+        return self.enhanced_bom, invoice_cid
 
 
 class Factory:

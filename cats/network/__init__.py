@@ -123,29 +123,38 @@ class MeshClient(CoD):
     ):
         flattened_bom = self.flatten_bom(cat_response)
         flat_bom = deepcopy(flattened_bom['flat_bom'])
-        function_cids = flat_bom['invoice']['order']['flat']['function']
-        function = {}
+        prev_function = flat_bom['invoice']['order']['flat']['function']
+        prev_process = json.loads(self.cat(prev_function['process_cid']))
+        prev_infrafunction = json.loads(self.cat(prev_function['infrafunction_cid']))
+
+        process = {}
         if ingress_subproc is not None:
-            function['ingress_subproc_cid'] = self.ipfsClient.add_pyobj(ingress_subproc)
+            process['ingress_subproc_cid'] = self.ipfsClient.add_pyobj(ingress_subproc)
         else:
-            function['ingress_subproc_cid'] = function_cids['ingress_subproc_cid']
+            process['ingress_subproc_cid'] = prev_process['ingress_subproc_cid']
         if integrated_subproc is not None:
-            function['integrated_subproc_cid'] = self.ipfsClient.add_pyobj(integrated_subproc)
+            process['integrated_subproc_cid'] = self.ipfsClient.add_pyobj(integrated_subproc)
         else:
-            function['integrated_subproc_cid'] = function_cids['integrated_subproc_cid']
+            process['integrated_subproc_cid'] = prev_process['integrated_subproc_cid']
         if egress_subproc is not None:
-            function['egress_subproc_cid'] = self.ipfsClient.add_pyobj(egress_subproc)
+            process['egress_subproc_cid'] = self.ipfsClient.add_pyobj(egress_subproc)
         else:
-            function['egress_subproc_cid'] = function_cids['egress_subproc_cid']
+            process['egress_subproc_cid'] = prev_process['egress_subproc_cid']
         if integration_cache_subproc is not None:
-            function['integration_cache_subproc_cid'] = self.ipfsClient.add_pyobj(integration_cache_subproc)
+            process['integration_cache_subproc_cid'] = self.ipfsClient.add_pyobj(integration_cache_subproc)
         else:
-            function['integration_cache_subproc_cid'] = function_cids['integration_cache_subproc_cid']
+            process['integration_cache_subproc_cid'] = prev_process['integration_cache_subproc_cid']
+
+        infrafunction = {}
         if infrafunction_subproc is not None:
-            function['infrafunction_subproc_cid'] = self.ipfsClient.add_pyobj(infrafunction_subproc)
+            infrafunction['infrafunction_subproc_cid'] = self.ipfsClient.add_pyobj(infrafunction_subproc)
         else:
-            function['infrafunction_subproc_cid'] = function_cids['infrafunction_subproc_cid']
-        new_function_cid = self.ipfsClient.add_str(json.dumps(function))
+            infrafunction['infrafunction_subproc_cid'] = prev_infrafunction['infrafunction_subproc_cid']
+
+        new_function_cid = self.ipfsClient.add_str(json.dumps({
+            'process_cid': self.ipfsClient.add_str(json.dumps(process)),
+            'infrafunction_cid': self.ipfsClient.add_str(json.dumps(infrafunction)),
+        }))
 
         invoice = flat_bom['invoice']
         input_invoice = {'data_cid': invoice['data_cid']}
@@ -187,18 +196,40 @@ class MeshClient(CoD):
             integrated_subproc,
             egress_subproc,
             integration_cache_subproc,
+            infrafunction_subproc,
             data_dirpath,
             structure_filepath,
             endpoint='http://127.0.0.1:5000/cat/node/execute'
     ):
-        structure_cid, structure_name = self.cidDir(structure_filepath)
+        structure_name = os.path.basename(structure_filepath.rstrip('/'))
+        # Plant (SaaS): modules/plant - the kind cluster + Helm releases
+        # that constitute the dynamically scaled execution environment.
+        plant_cid, _ = self.cidDir(os.path.join(structure_filepath, 'modules', 'plant'))
+        # InfraStructure (IaaS): modules/infrastructure - the IPFS/Docker
+        # transport layer used to move content-addressed data in and out
+        # of the Plant.
+        infrastructure_cid, _ = self.cidDir(os.path.join(structure_filepath, 'modules', 'infrastructure'))
+        structure_cid = self.ipfsClient.add_str(json.dumps({
+            'plant_cid': plant_cid,
+            'infrastructure_cid': infrastructure_cid,
+        }))
         data_cid, dir_name = self.cidDir(data_dirpath)
-        function = {
+        # Process (FaaS): the Functional Data Processors themselves.
+        process = {
             'ingress_subproc_cid': self.ipfsClient.add_pyobj(ingress_subproc),
             'integrated_subproc_cid': self.ipfsClient.add_pyobj(integrated_subproc),
             'egress_subproc_cid': self.ipfsClient.add_pyobj(egress_subproc),
             'integration_cache_subproc_cid': self.ipfsClient.add_pyobj(integration_cache_subproc),
-            'infrafunction_subproc_cid': None
+        }
+        # InfraFunction (FaaS): the orchestrator that dispatches Process
+        # onto the Plant (see Processor.Integration() in
+        # cats/executor/function/__init__.py).
+        infrafunction = {
+            'infrafunction_subproc_cid': self.ipfsClient.add_pyobj(infrafunction_subproc),
+        }
+        function = {
+            'process_cid': self.ipfsClient.add_str(json.dumps(process)),
+            'infrafunction_cid': self.ipfsClient.add_str(json.dumps(infrafunction)),
         }
         invoice = {
             "data_cid": data_cid
@@ -225,6 +256,7 @@ class MeshClient(CoD):
         )
         invoice['order']['flat'] = {
             'function': json.loads(self.cat(invoice['order']["function_cid"])),
+            'structure': json.loads(self.cat(invoice['order']["structure_cid"])),
             'invoice': json.loads(self.cat(invoice['order']["invoice_cid"]))
         }
         bom_response["flat_bom"] = {
@@ -233,7 +265,7 @@ class MeshClient(CoD):
                 self.cat(bom_response["bom"]["log_cid"])
             ),
             'plant': json.loads(
-                self.cat(bom_response["bom"]["plant_cid"])
+                self.cat(bom_response["bom"]["plant_snapshot_cid"])
             )
         }
         return bom_response
@@ -361,9 +393,19 @@ class MeshClient(CoD):
         self.get(cid=enhanced_bom['invoice']['order_cid'], output=INPUT_HOME, filepath='order.json')
         enhanced_bom['order'] = json.loads(open(f'{INPUT_HOME}/order.json', 'r').read())
 
+        # structure_cid nests plant_cid (module.plant) and infrastructure_cid
+        # (module.infrastructure) - see create_order_request() - so each is
+        # fetched into its corresponding modules/ subdirectory rather than
+        # structure_cid itself being a single directory CID.
+        structure = json.loads(self.cat(enhanced_bom['order']['structure_cid']))
+        structure_filepath = enhanced_bom['order']['structure_filepath']
         self.get(
-            cid=enhanced_bom['order']['structure_cid'], output=INPUT_HOME,
-            filepath=enhanced_bom['order']['structure_filepath']
+            cid=structure['plant_cid'], output=INPUT_HOME,
+            filepath=os.path.join(structure_filepath, 'modules', 'plant')
+        )
+        self.get(
+            cid=structure['infrastructure_cid'], output=INPUT_HOME,
+            filepath=os.path.join(structure_filepath, 'modules', 'infrastructure')
         )
         return deepcopy(enhanced_bom), bom
 

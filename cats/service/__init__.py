@@ -58,6 +58,20 @@ class Service:
         self.EGRESS_HOME = None
         self.EGRESS_EXIT_CODE = None
         self.EGRESS_JOB_STATUS = None
+        # Set by Executor.execute() from Structure.reconcile()'s Plant
+        # snapshot, before Function.execute() runs - lets InfraFunction
+        # dispatch Processing onto the Plant actually deployed for this CAT
+        # (see Processor.Integration() in cats/executor/function/__init__.py).
+        self.RAY_DASHBOARD_ADDRESS = None
+        # Set by Executor.execute() from InfraStructure's MinIO accessors,
+        # alongside RAY_DASHBOARD_ADDRESS - lets InfraFunction write Ray
+        # Data results to (and retrieve them from) a filesystem every Ray
+        # node actually shares, instead of gathering to one node's disk.
+        self.MINIO_ENDPOINT_HOST = None
+        self.MINIO_ENDPOINT_POD = None
+        self.MINIO_BUCKET = None
+        self.MINIO_ACCESS_KEY = None
+        self.MINIO_SECRET_KEY = None
 
         self.init_bom_json_cid = None
         self.bom_json_cid = None
@@ -117,21 +131,22 @@ class Service:
 
     def execute(self, catFactory, order_request):
         executor = catFactory.produce()
-        enhanced_bom, _ = executor.execute()
-
-        invoice = {}
-        enhanced_bom['invoice']['order_cid'] = self.meshClient.ipfsClient.add_str(
-            json.dumps(order_request['order'])
-        )
-        invoice['invoice_cid'] = self.meshClient.ipfsClient.add_str(
-            json.dumps(enhanced_bom['invoice'])
-        )
-        invoice['invoice'] = enhanced_bom['invoice']
+        # invoice_cid (and the order_cid backfill it depends on) is
+        # produced by Executor.execute() itself now - Service.execute()
+        # just assembles it alongside the Plant/InfraStructure snapshot
+        # CIDs into the final bom/bom_cid.
+        enhanced_bom, invoice_cid = executor.execute(order_request)
 
         bom = {
             'log_cid': enhanced_bom['log_cid'],
-            'plant_cid': self.meshClient.ipfsClient.add_json(enhanced_bom['plant']),
-            'invoice_cid': invoice['invoice_cid']
+            # Distinct from order.structure_cid.plant_cid (the input-side
+            # Terraform module CID) - this is the output-side snapshot of
+            # what Plant.snapshot() actually observed after reconcile().
+            'plant_snapshot_cid': self.meshClient.ipfsClient.add_json(enhanced_bom['plant']),
+            # Output-side counterpart to order.structure_cid.infrastructure_cid,
+            # mirroring plant_snapshot_cid above.
+            'infrastructure_snapshot_cid': self.meshClient.ipfsClient.add_json(enhanced_bom['infrastructure']),
+            'invoice_cid': invoice_cid
         }
         bom_response = {
             'bom': bom,

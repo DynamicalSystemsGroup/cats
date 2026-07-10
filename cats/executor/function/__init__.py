@@ -53,9 +53,20 @@ class Processor:
                 "so Ray reads only this run's ingress folder."
             )
         wait_for_directory(process_input, check_interval=1)
-        self.infraFunction.integrated_subproc(
+        # InfraFunction orchestrating Plant: dispatches Process
+        # (integrated_subproc) as a Ray job on the deployed Plant's Ray
+        # cluster via the Job Submission API, rather than running it in
+        # this (ephemeral executor) process.
+        self.infraFunction.infrafunction_subproc(
+            self.infraFunction.integrated_subproc,
             process_input,
-            self.infraFunction.service.INTEGRATION_HOME
+            self.infraFunction.service.INTEGRATION_HOME,
+            dashboard_address=self.infraFunction.service.RAY_DASHBOARD_ADDRESS,
+            minio_endpoint_pod=self.infraFunction.service.MINIO_ENDPOINT_POD,
+            minio_endpoint_host=self.infraFunction.service.MINIO_ENDPOINT_HOST,
+            minio_bucket=self.infraFunction.service.MINIO_BUCKET,
+            minio_access_key=self.infraFunction.service.MINIO_ACCESS_KEY,
+            minio_secret_key=self.infraFunction.service.MINIO_SECRET_KEY,
         )
         wait_for_directory(self.infraFunction.service.INTEGRATION_HOME, check_interval=1)
         self.integration_data_cid, _ = \
@@ -99,16 +110,29 @@ class InfraFunction:
         self.enhanced_bom = self.service.enhanced_bom
         self.function_cid = self.enhanced_bom['order']['function_cid']
         self.function = json.loads(self.service.meshClient.cat(self.function_cid))
-        self.ingress_subproc_cid = self.function['ingress_subproc_cid']
-        self.integrated_subproc_cid = self.function['integrated_subproc_cid']
-        self.egress_subproc_cid = self.function['egress_subproc_cid']
-        self.integration_cache_subproc_cid = self.function['integration_cache_subproc_cid']
+
+        # Process (FaaS): the Functional Data Processors.
+        self.process_cid = self.function['process_cid']
+        self.process = json.loads(self.service.meshClient.cat(self.process_cid))
+        self.ingress_subproc_cid = self.process['ingress_subproc_cid']
+        self.integrated_subproc_cid = self.process['integrated_subproc_cid']
+        self.egress_subproc_cid = self.process['egress_subproc_cid']
+        self.integration_cache_subproc_cid = self.process['integration_cache_subproc_cid']
+
+        # InfraFunction (FaaS): the orchestrator that dispatches Process
+        # onto the Plant (SaaS) - see Processor.Integration().
+        self.infrafunction_cid = self.function['infrafunction_cid']
+        self.infrafunction = json.loads(self.service.meshClient.cat(self.infrafunction_cid))
+        self.infrafunction_subproc_cid = self.infrafunction['infrafunction_subproc_cid']
 
         self.ingress_subproc = pickle.loads(self.service.meshClient.catObj(self.ingress_subproc_cid))
         self.integrated_subproc = pickle.loads(self.service.meshClient.catObj(self.integrated_subproc_cid))
         self.egress_subproc = pickle.loads(self.service.meshClient.catObj(self.egress_subproc_cid))
         self.integration_cache_subproc = pickle.loads(
             self.service.meshClient.catObj(self.integration_cache_subproc_cid)
+        )
+        self.infrafunction_subproc = pickle.loads(
+            self.service.meshClient.catObj(self.infrafunction_subproc_cid)
         )
 
     def compose(self):
