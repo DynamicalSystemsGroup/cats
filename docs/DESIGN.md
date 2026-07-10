@@ -17,6 +17,16 @@ a product. Data Products use the Architectural Quantum domain-driven design prin
 structural elements required for its function” 
 ([“Data Mesh Principles and Logical Architecture”](https://martinfowler.com/articles/data-mesh-principles.html#:~:text=smallest%20unit%20of%20architecture%20that%20can%20be%20independently%20deployed%20with%20high%20functional%20cohesion%2C%20and%20includes%20all%20the%20structural%20elements%20required%20for%20its%20function.) - Zhamak Dehghani, et al.).
 
+### How the Architectural Quantum is realized as content-addressed CIDs:
+
+The Quantum's "smallest unit of architecture... with high functional cohesion" is realized concretely as a single content-addressed **Order CID**, consumed by the **Factory** to produce a fresh, ephemeral **Executor** per CAT execution - the Quantum's independently-deployable unit, instantiated anew for every Order rather than kept as standing infrastructure:
+
+- `order_cid` resolves to `{invoice_cid, function_cid, structure_cid}` - the Order's Input Invoice, Function (as Code), and Structure (as Code), each independently content-addressed.
+- `structure_cid` resolves to `{plant_cid, infrastructure_cid}` - Structure (**PaaS** as **IaC**) is CID-ed as the pairing of the Plant (SaaS) it provisions and the InfraStructure (IaaS) that provisions it.
+- `function_cid` resolves to `{process_cid, infrafunction_cid}` - Function (FaaS) is CID-ed as the pairing of the Process (FaaS) it executes and the InfraFunction (FaaS) that orchestrates it.
+
+The Factory's Executor reconstitutes this Quantum at runtime with the same composition it was CID-ed with: `Structure` composes its `Plant` from its `InfraStructure`, and `Function` composes its `Processor` from its `InfraFunction` - so Function (FaaS) executes on Structure (PaaS) by InfraFunction (FaaS) orchestrating Plant (SaaS), exactly as the Quantum's applied disciplines describe below. The Executor itself - not a layer above it - is what produces the resulting **Invoice CID**, so the whole Order-in/Invoice-out cycle stays within the one independently-deployable, functionally-cohesive unit the Quantum principle calls for. (* **[CID-level details](BOM.md)**, * **[Lineage-of-Provenance context](LineageOfProvenance.md)**)
+
 ### Collaborative value of CATs Architectural Quantum:
 The operation and maintenance of CATs’ Data Products on a Data Mesh can occur between independent teams that will 
 operate, contribute, and maintain different portions of the entire cloud-service model in adherence to CATs' 

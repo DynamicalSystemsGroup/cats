@@ -19,3 +19,7 @@ This composition gives the Mesh three properties:
 - The lineage chain composed by BOMs is what allows a **CAT Order** to be updated and re-verified as its constituent Functions (FaaS), Structure (PaaS), and Infrastructure (IaaS) mutate over the CAT's lifecycle (see the [Architectural Quantum](../README.md#cats-architectural-quantum) description in the README).
 
 See also: [README: How are CATs workloads processed as Data Provenance Records?](../README.md#how-are-cats-workloads-processed-as-data-provenance-records) and [CAT Mesh: CATs Data Mesh platform with Data Provenance](../README.md#cat-mesh-cats-data-mesh-platform-with-data-provenance).
+
+## What's inside a BOM's CIDs
+
+See **[`BOM.md`](BOM.md)** for exactly what each of an Order's and BOM's CIDs resolves to: how `order.function_cid`/`order.structure_cid` nest their Process/InfraFunction and Plant/InfraStructure pairs (with concrete example payloads pulled live from IPFS), and how the output-side `bom.plant_snapshot_cid`/`bom.infrastructure_snapshot_cid` differ from those input-side, specified-as-code CIDs.
