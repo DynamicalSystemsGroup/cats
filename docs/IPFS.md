@@ -19,7 +19,7 @@ Two places already start the host daemon automatically and idempotently, so you 
   ```hcl
   resource "shell_script" "host_ipfs_daemon" { ... }
   ```
-  (`data/input/structure/main.tf`)
+  (`data/input/structure/modules/infrastructure/main.tf`)
 
 Both probe with `ipfs id` (the daemon's live API) before starting anything, so they never try to start a second
 daemon on top of one that's already running — whether it was started by you, by the other auto-starter, or from a
@@ -53,7 +53,7 @@ auto-starters use, and the quickest way to tell whether you need to do anything 
 
 #### Docker transport peering
 
-Once the daemon (host or Terraform-started) is up, `data/input/structure/main.tf`'s
+Once the daemon (host or Terraform-started) is up, `data/input/structure/modules/infrastructure/main.tf`'s
 `shell_script.docker_compose_ipfs_transport` resource runs `ipfs_connect_peers.sh` to peer the host daemon with the
 `ipfs_migration`/`ipfs_integration` Docker Compose transport containers (and peer those containers with each other).
 If the host daemon isn't up yet when that runs, peering with the host is skipped gracefully — it isn't required for
