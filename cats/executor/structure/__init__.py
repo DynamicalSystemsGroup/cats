@@ -1,18 +1,19 @@
 import os
 import re
+import stat
 
 from cats.utils import subproc_run
 from cats.network.ipfs_docker import MIGRATION_CONTAINER, INTEGRATION_CONTAINER
 
 KIND_CLUSTER_NAME = "cats"
-KIND_CLUSTER_RESOURCE = "kind_cluster.default"
-# Resources in main.tf that depend on kind_cluster.default and thus can't
-# be reconciled (or even refreshed) once its cluster is gone from the host.
+KIND_CLUSTER_RESOURCE = "module.plant.kind_cluster.default"
+# Resources in module.plant that depend on kind_cluster.default and thus
+# can't be reconciled (or even refreshed) once its cluster is gone from the host.
 KIND_DEPENDENT_RESOURCES = (
-    "helm_release.ray-cluster",
-    "helm_release.kuberay-operator",
+    "module.plant.helm_release.ray-cluster",
+    "module.plant.helm_release.kuberay-operator",
 )
-DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE = "shell_script.docker_compose_ipfs_transport"
+DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE = "module.infrastructure.shell_script.docker_compose_ipfs_transport"
 APPLIED_STRUCTURE_MARKER = '.applied-structure.cid'
 
 
@@ -44,11 +45,42 @@ def terraform_bin(service):
     return path if os.path.isfile(path) else 'terraform'
 
 
+def _add_exec_bit(path):
+    if os.access(path, os.X_OK):
+        return
+    mode = os.stat(path).st_mode
+    os.chmod(path, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def ensure_provider_binaries_executable(tf_data_dir):
+    """Terraform provider binaries (and, occasionally, the directories
+    extracted alongside them) have been observed to lose their executable
+    bit under this workspace (root cause not fully understood - not
+    reproducible when the same `terraform init` extracts outside the
+    project directory), which makes every subsequent `plan`/`apply`/
+    `destroy`/`init` fail with "permission denied". Directories need
+    +x to even be traversed into, so fix each directory just before
+    `os.walk` descends into it - fixing only leaf files isn't enough
+    if an ancestor directory also lost +x.
+    """
+    providers_dir = os.path.join(tf_data_dir, 'providers')
+    if not os.path.isdir(providers_dir):
+        return
+    _add_exec_bit(providers_dir)
+    for root, dirs, files in os.walk(providers_dir, topdown=True):
+        for name in dirs:
+            _add_exec_bit(os.path.join(root, name))
+        for name in files:
+            if 'terraform-provider' in name:
+                _add_exec_bit(os.path.join(root, name))
+
+
 def configure_terraform_data_dir(structure_home):
     # TF_DATA_DIR must not equal the module root; that breaks backend state loading.
     tf_data_dir = os.path.join(structure_home, '.terraform-data')
     os.makedirs(tf_data_dir, exist_ok=True)
     os.environ['TF_DATA_DIR'] = tf_data_dir
+    ensure_provider_binaries_executable(tf_data_dir)
     return tf_data_dir
 
 
@@ -241,14 +273,56 @@ def cleanup_stale_docker_compose_ipfs_transport_state(service, structure_home):
         print(proc.stdout.strip())
 
 
+def _terraform_output(service, structure_home, name):
+    proc = subproc_run(
+        f'{terraform_bin(service)} output -raw {name}',
+        cwd=structure_home,
+    )
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip() or None
+
+
 class Plant:
-    def __init__(self, service):
-        self.service = service
-        self.INPUT_STRUCTURE_HOME = self.service.INPUT_STRUCTURE_HOME
-        tf_data_dir = configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
-        cache_dir = ensure_integration_cache_env(self.service)
-        print(f"export TF_DATA_DIR={tf_data_dir}")
-        print(f"export INTEGRATION_INPUT_DATA_CACHE={cache_dir}")
+    """Composed, read-only accessor over the deployed Plant (`module.plant`
+    in main.tf): the kind cluster + Helm releases that constitute the
+    dynamically scaled execution environment InfraStructure provisions and
+    maintains. Always obtained via `InfraStructure.compose()`, mirroring
+    how `InfraFunction.compose()` produces a `Processor`."""
+
+    def __init__(self, infraStructure):
+        self.infraStructure = infraStructure
+        # Set by Structure.deploy()/redeploy() after each reconcile(), so
+        # snapshot() can record whether this reconciliation reused the
+        # existing Plant or destroyed and rebuilt it.
+        self.rebuilt = None
+
+    def kind_cluster_name(self):
+        return _terraform_output(
+            self.infraStructure.service, self.infraStructure.INPUT_STRUCTURE_HOME, 'plant_kind_cluster_name'
+        )
+
+    def kubeconfig_context(self):
+        return _terraform_output(
+            self.infraStructure.service, self.infraStructure.INPUT_STRUCTURE_HOME, 'plant_kubeconfig_context'
+        )
+
+    def ray_release_name(self):
+        return _terraform_output(
+            self.infraStructure.service, self.infraStructure.INPUT_STRUCTURE_HOME, 'plant_ray_release_name'
+        )
+
+    def snapshot(self):
+        """Plain dict describing what this Plant currently is, for
+        recording into the CAT's BOM alongside Function's output (see
+        Executor.execute() in cats/factory/__init__.py)."""
+        return {
+            'kind_cluster_name': self.kind_cluster_name(),
+            'kubeconfig_context': self.kubeconfig_context(),
+            'ray_release_name': self.ray_release_name(),
+            'applied_structure_cid': read_applied_structure_cid(self.infraStructure.INPUT_STRUCTURE_HOME),
+            'rebuilt': self.rebuilt,
+        }
 
 
 class InfraStructure:
@@ -262,8 +336,12 @@ class InfraStructure:
             os.environ["INTEGRATION_INPUT_DATA_CACHE"]
         )
 
+    def compose(self):
+        return Plant(self)
+
     def destroy(self):
         print('Destroy Structure!')
+        configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
         self.service.executeCMD(
             f'{terraform_bin(self.service)} destroy --auto-approve',
             cwd=self.INPUT_STRUCTURE_HOME
@@ -273,6 +351,7 @@ class InfraStructure:
 
     def plan(self):
         print('Plan Structure!')
+        configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
         self.service.executeCMD(
             f'{terraform_bin(self.service)} plan',
             cwd=self.INPUT_STRUCTURE_HOME
@@ -282,7 +361,7 @@ class InfraStructure:
 
     def initialize(self):
         print('Initialize Structure!')
-        configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
+        tf_data_dir = configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
         if providers_cached(self.INPUT_STRUCTURE_HOME):
             print('Terraform providers already cached; skipping init.')
             print()
@@ -291,6 +370,9 @@ class InfraStructure:
             f'{terraform_bin(self.service)} init -input=false',
             cwd=self.INPUT_STRUCTURE_HOME
         )
+        # `init` just (re)extracted provider binaries; make sure they're
+        # actually executable before anything tries to run them.
+        ensure_provider_binaries_executable(tf_data_dir)
         print()
         print()
 
@@ -305,7 +387,9 @@ class InfraStructure:
             f'{terraform_bin(self.service)} apply --auto-approve',
             cwd=self.INPUT_STRUCTURE_HOME
         )
-        peer_script = os.path.join(self.INPUT_STRUCTURE_HOME, 'ipfs_connect_peers.sh')
+        peer_script = os.path.join(
+            self.INPUT_STRUCTURE_HOME, 'modules', 'infrastructure', 'ipfs_connect_peers.sh'
+        )
         if os.path.isfile(peer_script):
             print('Connect IPFS transport peers...')
             proc = subproc_run(f'bash {peer_script}', cwd=self.INPUT_STRUCTURE_HOME)

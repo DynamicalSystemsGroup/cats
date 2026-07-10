@@ -55,7 +55,7 @@ def _(INPUT_DATA_HOME, INPUT_STRUCTURE_HOME, meshClient, pprint):
         egress_subproc=egress,
         integration_cache_subproc=integration_cache,
         data_dirpath=INPUT_DATA_HOME,  # f'{INPUT_DATA_HOME}/iris.csv',
-        structure_filepath=f"{INPUT_STRUCTURE_HOME}/main.tf",
+        structure_filepath=INPUT_STRUCTURE_HOME,
         endpoint="http://127.0.0.1:5000/cat/node/init",
     )
     pprint(cat_order_request_0)
@@ -105,7 +105,7 @@ def _(
         egress_subproc=egress,
         integration_cache_subproc=integration_cache,
         data_dirpath=INPUT_DATA_HOME, # f'{INPUT_DATA_HOME}/iris.csv',
-        structure_filepath=f'{INPUT_STRUCTURE_HOME}/main.tf',
+        structure_filepath=INPUT_STRUCTURE_HOME,
         endpoint='http://127.0.0.1:5000/cat/node/init'
     )
     pprint(cat_order_request_1)

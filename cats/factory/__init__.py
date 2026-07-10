@@ -48,14 +48,16 @@ class Executor:
 
         self.invoiceCID = self.enhanced_bom['invoice_cid']
         self.orderCID = self.enhanced_bom['invoice']['order_cid']
-        self.structure.reconcile(self.enhanced_bom['order'].get('structure_cid'))
+        plant_snapshot = self.structure.reconcile(self.enhanced_bom['order'].get('structure_cid'))
         self.ingress_job_id, self.integration_s3_output, self.egress_job_id = self.function.execute()
 
         self.enhanced_bom['function'] = json.loads(self.service.meshClient.cat(self.enhanced_bom['order']['function_cid']))
+        self.enhanced_bom['plant'] = plant_snapshot
         self.enhanced_bom['log'] = {
             'ingress_job_id': self.ingress_job_id,
             'integration_output_cid': self.integration_s3_output,
-            'egress_job_id': self.egress_job_id
+            'egress_job_id': self.egress_job_id,
+            'plant_rebuilt': plant_snapshot['rebuilt']
         }
         self.enhanced_bom['invoice']['data_cid'] = self.function.invoice_data_cid
         self.enhanced_bom['log_cid'] = self.service.meshClient.ipfsClient.add_json(self.enhanced_bom['log'])
