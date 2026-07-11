@@ -1,4 +1,5 @@
-data/input/process.py
+data/input/function/process.py
+data/input/function/infrafunction.py
 data/input/data/iris.csv
 data/input/structure/main.tf
 data/input/structure/ipfs_transport_compose.yaml

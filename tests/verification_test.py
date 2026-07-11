@@ -8,7 +8,8 @@ from cats import DATA_HOME, MESH_CLIENT as meshClient
 from cats import INPUT_STRUCTURE_HOME, INPUT_DATA_HOME
 
 ##### Compose Initial CAT Order request for CAT Node
-from data.input.process import *
+from data.input.function.process import *
+from data.input.function.infrafunction import infrafunction_subproc
 
 def files_to_pandasDF(output, format):
     # Get the files from the path provided

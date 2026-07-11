@@ -1,172 +1,6 @@
-import json, os, shutil, subprocess, sys, tempfile, time, uuid, ray
-from typing import Dict
-
-import numpy as np
+import json, os, shutil, sys, tempfile, time, uuid, ray
 import pyarrow.fs
 from ray.job_submission import JobStatus, JobSubmissionClient
-
-from cats.network.ipfs_docker import (
-    IPFS_GET_TIMEOUT,
-    MIGRATION_CONTAINER,
-    INTEGRATION_CONTAINER,
-    ensure_docker_ipfs_peers,
-)
-
-STRUCTURE_HOME = os.path.join(os.path.dirname(__file__), 'structure')
-
-
-def docker_ipfs_cmd(container, input_dir_cid, output_dir):
-    return (
-        f"docker exec {container} sh -c '"
-        f'ipfs get {input_dir_cid} -o {output_dir} && '
-        f'cd {output_dir} && '
-        f"rm -f api config datastore_spec gateway repo.lock version && "
-        f"ipfs add -r ."
-        f"'"
-    )
-
-
-def _run_docker_ipfs(cmd, cwd=None):
-    ensure_docker_ipfs_peers()
-    return subprocess.run(
-        cmd,
-        shell=True,
-        capture_output=True,
-        text=True,
-        cwd=cwd or STRUCTURE_HOME,
-        timeout=IPFS_GET_TIMEOUT,
-    )
-
-
-def ipfs_migration(input_dir_cid, container=MIGRATION_CONTAINER):
-    unix_ts = int(time.time())
-    output_dir = f'/outputs/data_{unix_ts}'
-    cmd = docker_ipfs_cmd(container, input_dir_cid, output_dir)
-    try:
-        result = _run_docker_ipfs(cmd)
-
-        if result.returncode == 0:
-            output_lines = result.stdout.splitlines()
-            for line in output_lines:
-                print(line)
-                if line.startswith('added') and line.endswith(f'data_{unix_ts}'):
-                    cid = line.split()[1]
-                    return cid, f'data_{unix_ts}'
-            return "CID not found in the output."
-        return f"Command failed with error: {result.stderr}"
-
-    except subprocess.TimeoutExpired:
-        return (
-            f"Command timed out after {IPFS_GET_TIMEOUT}s fetching CID {input_dir_cid}. "
-            "Ensure `ipfs daemon` is running on the host and Docker IPFS nodes are peered."
-        )
-    except Exception as e:
-        return f"An error occurred: {str(e)}"
-
-
-def ingress(input_dir_cid):
-    return ipfs_migration(input_dir_cid=input_dir_cid)
-
-
-def egress(input_dir_cid):
-    result = ipfs_migration(input_dir_cid=input_dir_cid)
-    if isinstance(result, tuple):
-        return result[0]
-    return result
-
-
-def integration_cache(
-    input_dir_cid: str,
-    cwd: str,
-    container=INTEGRATION_CONTAINER,
-):
-    print("Integration Cache:")
-    exec_cmd = (
-        f"docker exec {container} "
-        f"sh -c 'ipfs get {input_dir_cid} -o outputs && "
-        f"rm -f api config datastore_spec gateway repo.lock version && chmod -R 777 .'"
-    )
-    print(exec_cmd)
-    try:
-        result = _run_docker_ipfs(exec_cmd, cwd=cwd)
-
-        if result.returncode == 0:
-            output_lines = result.stdout.splitlines()
-            for line in output_lines:
-                if line.startswith('added') and line.endswith('data'):
-                    cid = line.split()[1]
-                    return cid
-            return "CID not found in the output."
-        return f"Command failed with error: {result.stderr}"
-
-    except subprocess.TimeoutExpired:
-        return (
-            f"Command timed out after {IPFS_GET_TIMEOUT}s fetching CID {input_dir_cid}. "
-            "Ensure `ipfs daemon` is running on the host and Docker IPFS nodes are peered."
-        )
-    except Exception as e:
-        return f"An error occurred: {str(e)}"
-
-
-def function_0(batch: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
-    vec_a = batch["petal length (cm)"].astype('double')
-    vec_b = batch["petal width (cm)"].astype('double')
-    batch["petal area (cm^2)"] = vec_a * vec_b
-    return batch
-
-
-def function_1(batch: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
-    vec_a = batch["petal length (cm)"].astype('double')
-    vec_b = batch["petal width (cm)"].astype('double')
-    batch["DUPLICATE petal area (cm^2)"] = vec_a * vec_b
-    return batch
-
-
-def _run_ray_batches(input, output, batch_fn, zip_with_range, minio_fs=None, minio_output_key=None):
-    """Ray Data work for a single CAT process invocation.
-
-    Dispatched by infrafunction_subproc as its own Ray Job against the
-    deployed Plant, so - unlike when this ran locally in the long-lived
-    CAT node process - it's already isolated in its own OS process by Ray
-    Job Submission; no local `ray.shutdown()`/subprocess wrapper needed
-    (and `ray.init()` here connects to that job's cluster rather than
-    starting a new one, since one is already running).
-    """
-    ray.init(ignore_reinit_error=True)
-    ds_in = ray.data.read_csv(input)
-    print(ds_in.schema())
-    print()
-    ds_out = ds_in.map_batches(batch_fn)
-    if zip_with_range:
-        ds_out = ds_out.materialize()
-        ds_out = ray.data.range(ds_out.count()).zip(ds_out)
-    print(ds_out.show(limit=1))
-    if minio_fs is not None:
-        # Every node writes its own blocks directly to the shared MinIO
-        # bucket, so this stays genuinely distributed regardless of how
-        # many nodes participate - unlike the local-gather fallback
-        # below, which forces the whole result set through one node.
-        ds_out.write_csv(minio_output_key, filesystem=minio_fs)
-    else:
-        # Fallback for direct/local invocation outside the full
-        # infrafunction_subproc dispatch path (e.g. no Plant deployed).
-        # ds_out.write_csv(output) would have Ray Data write each output
-        # block directly from whichever worker node executes that
-        # block's write task - on a multi-node cluster those nodes don't
-        # share a filesystem, so a block written on a different node
-        # than this one would be invisible here. Gathering to the driver
-        # first keeps the write on this process/node.
-        os.makedirs(output, exist_ok=True)
-        ds_out.to_pandas().to_csv(os.path.join(output, 'part-00000.csv'), index=False)
-    return output
-
-
-def process_0(input, output, minio_fs=None, minio_output_key=None):
-    return _run_ray_batches(input, output, function_0, True, minio_fs, minio_output_key)
-
-
-def process_1(input, output, minio_fs=None, minio_output_key=None):
-    return _run_ray_batches(input, output, function_1, False, minio_fs, minio_output_key)
 
 
 # InfraFunction (FaaS): orchestrates Process (FaaS) onto the Plant (SaaS)
@@ -185,11 +19,14 @@ def process_1(input, output, minio_fs=None, minio_output_key=None):
 # remote Ray cluster can't resolve since it doesn't have this repo
 # installed. cloudpickle instead serializes the function by value.
 #
-# Builds its own S3FileSystem against MinIO (reachable from inside this
-# job's pod via the kind Docker network's gateway IP, not any in-cluster
-# Service - see minio_endpoint_pod) and has `integrated_subproc` write
-# directly to it, so each of the job's write tasks can run on whichever
-# node executes it rather than all needing to land on this node's disk.
+# `integrated_subproc` (Process [FaaS]) is a pure transfer function - it
+# just returns the transformed Dataset. Delivering that Dataset into the
+# shared MinIO bucket is this actuator's own responsibility, kept here
+# rather than in Process, so each of the job's write tasks can run on
+# whichever node executes it rather than all needing to land on this
+# node's disk. Builds its own S3FileSystem against MinIO (reachable from
+# inside this job's pod via the kind Docker network's gateway IP, not any
+# in-cluster Service - see minio_endpoint_pod).
 _INFRAFUNCTION_ENTRYPOINT_SCRIPT = '''\
 import json
 import ray.cloudpickle as cloudpickle
@@ -209,7 +46,11 @@ minio_fs = S3FileSystem(
 )
 minio_output_key = "{}/{}/result".format(minio_config["bucket"], minio_config["prefix"])
 
-subproc("input", "result", minio_fs=minio_fs, minio_output_key=minio_output_key)
+# Every node writes its own blocks directly to the shared MinIO bucket, so
+# this stays genuinely distributed regardless of how many nodes
+# participate in producing the Dataset that `subproc` (Process) returns.
+ds_out = subproc("input")
+ds_out.write_csv(minio_output_key, filesystem=minio_fs)
 '''
 
 
@@ -218,7 +59,8 @@ def _write_infrafunction_job_dir(
     minio_endpoint_pod, minio_bucket, minio_access_key, minio_secret_key, job_prefix,
 ):
     # Named "input", not "data", so it can't collide with the "data"
-    # top-level package (e.g. data.input.process) some subprocs live in.
+    # top-level package (e.g. data.input.function.process) some subprocs
+    # live in.
     shutil.copytree(input, os.path.join(job_dir, 'input'), dirs_exist_ok=True)
 
     # By default cloudpickle, like pickle, serializes a plain top-level

@@ -84,11 +84,11 @@ resource "shell_script" "docker_compose_ipfs_transport" {
 # Shared S3-compatible object store Ray Data's write tasks and
 # infrafunction_subproc's result retrieval use instead of a local
 # filesystem (see cats/executor/function's Processor.Integration() and
-# data/input/process.py's infrafunction_subproc). Published straight to
-# the host, like the IPFS transport containers' pattern above - reachable
-# from the host at 127.0.0.1, and from Ray pods via the kind Docker
-# network's gateway IP (see the root-level data.docker_network.kind
-# lookup in ../../main.tf).
+# data/input/function/infrafunction.py's infrafunction_subproc).
+# Published straight to the host, like the IPFS transport containers'
+# pattern above - reachable from the host at 127.0.0.1, and from Ray pods
+# via the kind Docker network's gateway IP (see the root-level
+# data.docker_network.kind lookup in ../../main.tf).
 resource "shell_script" "docker_compose_minio" {
   lifecycle_commands {
     create = <<-EOF

@@ -353,7 +353,7 @@ class InfraStructure:
         """Host-reachable address of module.infrastructure's MinIO S3 API -
         used by infrafunction_subproc's own (host) process to retrieve a
         completed job's results (see infrafunction_subproc in
-        data/input/process.py)."""
+        data/input/function/infrafunction.py)."""
         return _terraform_output(self.service, self.INPUT_STRUCTURE_HOME, 'infrastructure_minio_endpoint_host')
 
     def minio_endpoint_pod(self):

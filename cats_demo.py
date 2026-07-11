@@ -41,14 +41,14 @@ def _(mo):
 
 @app.cell
 def _(INPUT_DATA_HOME, INPUT_STRUCTURE_HOME, meshClient, pprint):
-    from data.input.process import (
+    from data.input.function.process import (
         egress,
-        infrafunction_subproc,
         ingress,
         integration_cache,
         process_0,
         process_1,
     )
+    from data.input.function.infrafunction import infrafunction_subproc
 
     cat_order_request_0 = meshClient.create_order_request(
         ingress_subproc=ingress,
