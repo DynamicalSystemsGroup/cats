@@ -12,12 +12,6 @@ __marimo__/**
 .obsidian
 .env
 
-# --- Project ephemeral (repo root) ---
-bom.car
-bom.json
-invoice.json
-order.json
-
 # --- Terraform (local state & cache; lock file is committed) ---
 **/.terraform/
 **/.terraform-data/
@@ -30,22 +24,20 @@ order.json
 data/cache/
 data/jobs/
 data/output/
-data/online/
 data/deprecated/
 data/testing/
 
-# data/input — unused or downloaded at runtime
-data/input/main.tf
+# data/input — downloaded/written at runtime
 data/input/order.json
 data/input/__pycache__/
+data/input/function/__pycache__/
 data/input/.terraform/
 
 # data/input/structure — runtime artifacts
 # Committed: main.tf, ipfs_transport_compose.yaml, ipfs_connect_peers.sh, .terraform.lock.hcl
-data/input/structure/outputs/**
-data/input/structure/data/*
-data/input/structure/ipfs_cluster/
-data/input/structure/providers/
 data/input/structure/.applied-structure.cid
 data/input/structure/.host-ipfs-daemon.pid
 data/input/structure/.host-ipfs-daemon.log
+
+# local artifacts
+local_artifacts/
