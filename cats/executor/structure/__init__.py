@@ -336,8 +336,9 @@ class Plant:
 
 
 class InfraStructure:
-    def __init__(self, service):
+    def __init__(self, service, structure_cid):
         self.service = service
+        self.structure_cid = structure_cid
         self.INPUT_STRUCTURE_HOME = self.service.INPUT_STRUCTURE_HOME
         configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
         ensure_integration_cache_env(self.service)

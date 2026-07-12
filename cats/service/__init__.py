@@ -101,13 +101,20 @@ class Service:
             structure_filepath=order_request['order']['structure_filepath'],
             function_cid=order_request['order']['function_cid'],
             init_data_cid=ipfs_uri,
-            init_bom_filename=f"{self.OUTPUT_HOME}/bom.car"
+            init_bom_filename=f"{self.OUTPUT_HOME}/bom.car",
+            # Real, already-submitted Order CID - already known before any
+            # BOM/Order processing happens. Threading it straight through
+            # (rather than letting initBOMjson mint its own placeholder
+            # Order) is what makes the locally-materialized order.json and
+            # the order_cid Executor.execute() later backfills into the
+            # final Invoice the exact same CID (see docs/NodeProductFlow.md#2b).
+            order_cid=order_request['order_cid'],
         )
-        return Factory(self), order_request
+        return Factory(self, order_request), order_request
 
     def initBOMcar(self,
         function_cid, init_data_cid, init_bom_filename,
-        structure_cid=None, structure_filepath=None
+        structure_cid=None, structure_filepath=None, order_cid=None
     ):
         if init_bom_filename is None:
             init_bom_filename = self.meshClient.CAR_HOME
@@ -117,7 +124,8 @@ class Service:
             structure_filepath=structure_filepath,
             function_cid=function_cid,
             init_data_cid=init_data_cid,
-            init_bom_filename=init_bom_filename
+            init_bom_filename=init_bom_filename,
+            order_cid=order_cid,
         )
         self.enhanced_bom, init_bom = self.meshClient.getEnhancedBom(
             bom_json_cid=self.init_bom_json_cid,

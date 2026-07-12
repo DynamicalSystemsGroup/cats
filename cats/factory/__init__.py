@@ -6,13 +6,13 @@ from cats.executor import Structure, Function
 
 class Executor:
     def __init__(self,
-        service
+        service, structure, function
     ):
         self.service = service
         self.CAT_HOME = None
 
-        self.structure: Structure = Structure(self.service)
-        self.function: Function = Function(self.service)
+        self.structure: Structure = structure
+        self.function: Function = function
         self.bom_json_cid: str = self.service.bom_json_cid
         self.enhanced_bom, self.bom = self.service.meshClient.getEnhancedBom(
             self.bom_json_cid, self.service.INPUT_HOME, self.service.OUTPUT_HOME
@@ -46,7 +46,7 @@ class Executor:
 
         self.invoiceCID = self.enhanced_bom['invoice_cid']
         self.orderCID = self.enhanced_bom['invoice']['order_cid']
-        plant_snapshot = self.structure.reconcile(self.enhanced_bom['order'].get('structure_cid'))
+        plant_snapshot = self.structure.reconcile()
         self.service.RAY_DASHBOARD_ADDRESS = plant_snapshot['ray_dashboard_address']
         self.service.MINIO_ENDPOINT_HOST = self.structure.infraStructure.minio_endpoint_host()
         self.service.MINIO_ENDPOINT_POD = self.structure.infraStructure.minio_endpoint_pod()
@@ -75,13 +75,16 @@ class Executor:
         # Invoice CID: produced here (by the Executor), not by
         # Service.execute() - so "Invoice CIDs are produced by the
         # Executor" holds at the class level. Backfilling order_cid with
-        # the CID of the actually-submitted order_request['order'] (as
-        # opposed to the bootstrap init_order fetched into
-        # self.enhanced_bom['order'] by getEnhancedBom()) is what makes
-        # the Invoice point at the real Order that produced it.
-        self.enhanced_bom['invoice']['order_cid'] = self.service.meshClient.ipfsClient.add_str(
-            json.dumps(order_request['order'])
-        )
+        # the real, already-submitted order_request['order_cid'] directly
+        # (as opposed to the placeholder order_cid getEnhancedBom() may
+        # have fetched into self.enhanced_bom['order']) is what makes the
+        # Invoice point at "the original CID-ed Order" (see
+        # docs/NodeProductFlow.md#2b) - Service.initFactory() now threads
+        # this same order_cid into the bootstrap Invoice too (see
+        # MeshClient.initBOMjson), so the locally materialized order.json
+        # and this final Invoice's order_cid are the exact same CID for
+        # every execution, not just a re-hash that happens to match it.
+        self.enhanced_bom['invoice']['order_cid'] = order_request['order_cid']
         invoice_cid = self.service.meshClient.ipfsClient.add_str(
             json.dumps(self.enhanced_bom['invoice'])
         )
@@ -94,10 +97,15 @@ class Executor:
 class Factory:
     def __init__(self,
         service,
-        order=None
+        order_request
     ):
-        self.Executor = Executor(service=service)
-        self.order = order
+        self.service = service
+        self.order_request = order_request
+
+        order = order_request['order']
+        self.structure: Structure = Structure(service, order['structure_cid'])
+        self.function: Function = Function(service, order['function_cid'])
+        self.Executor = Executor(service, self.structure, self.function)
 
     def initCAT(self,
         function_cid, ipfs_uri,

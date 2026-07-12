@@ -105,10 +105,10 @@ class Processor:
 
 
 class InfraFunction:
-    def __init__(self, service):
+    def __init__(self, service, function_cid):
         self.service = service
         self.enhanced_bom = self.service.enhanced_bom
-        self.function_cid = self.enhanced_bom['order']['function_cid']
+        self.function_cid = function_cid
         self.function = json.loads(self.service.meshClient.cat(self.function_cid))
 
         # Process (FaaS): the Functional Data Processors.

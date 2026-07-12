@@ -1,6 +1,6 @@
 import json, subprocess
 import os
-from copy import copy, deepcopy
+from copy import deepcopy
 from pprint import pprint
 import pickle
 
@@ -272,26 +272,31 @@ class MeshClient(CoD):
 
     def initBOMjson(self,
         structure_cid: str, structure_filepath: str, function_cid: str, init_data_cid: str,
-        seed_cid=None
+        order_cid: str = None, seed_cid=None
     ):
-        init_invoice = {
-            'order_cid': None,
-            # 'data_cid': None,
-            'seed_cid': seed_cid,
-        }
-        init_order = {
-            'invoice_cid': None,
-            'function_cid': function_cid,
-            'structure_cid': structure_cid,
-            'structure_filepath': structure_filepath
-        }
+        if order_cid is not None:
+            # Reuse the real, already-submitted Order's own CID directly, so
+            # the order.json materialized by getEnhancedBom() and the
+            # order_cid Executor.execute() later backfills into the final
+            # Invoice both refer to the exact same CID for this execution -
+            # rather than each independently minting their own "equivalent
+            # but not identical" copy of the Order (see docs/NodeProductFlow.md#2b's
+            # "the original CID-ed Order").
+            resolved_order_cid = order_cid
+        else:
+            # No real Order to reference yet (e.g. Factory.initCAT's
+            # from-scratch bootstrapping) - mint a standalone placeholder.
+            placeholder_invoice = {'order_cid': None, 'seed_cid': seed_cid}
+            placeholder_invoice_cid = self.ipfsClient.add_json(placeholder_invoice)
+            placeholder_order = {
+                'invoice_cid': placeholder_invoice_cid,
+                'function_cid': function_cid,
+                'structure_cid': structure_cid,
+                'structure_filepath': structure_filepath
+            }
+            resolved_order_cid = self.ipfsClient.add_json(placeholder_order)
 
-        init_invoice_cid = self.ipfsClient.add_json(init_invoice)
-        init_order['invoice_cid'] = init_invoice_cid
-        init_order_cid = self.ipfsClient.add_json(init_order)
-
-        invoice = copy(init_invoice)
-        invoice['order_cid'] = init_order_cid
+        invoice = {'order_cid': resolved_order_cid, 'seed_cid': seed_cid}
         invoice_cid = self.ipfsClient.add_json(invoice)
 
         init_bom = {
@@ -304,9 +309,12 @@ class MeshClient(CoD):
 
     def initBOMcar(self,
             structure_cid: str, structure_filepath: str, function_cid: str, init_data_cid: str,
-            init_bom_filename: str, seed_cid=None
+            init_bom_filename: str, order_cid: str = None, seed_cid=None
         ):
-        init_bom_json_cid = self.initBOMjson(structure_cid, structure_filepath, function_cid, init_data_cid)
+        init_bom_json_cid = self.initBOMjson(
+            structure_cid, structure_filepath, function_cid, init_data_cid,
+            order_cid=order_cid, seed_cid=seed_cid,
+        )
         car_bom_cid, init_bom_json_cid = self.convertBOMtoCAR(init_bom_json_cid, init_bom_filename)
         return car_bom_cid, init_bom_json_cid
 

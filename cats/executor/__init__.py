@@ -8,10 +8,10 @@ from cats.executor.structure import (
 
 
 class Structure:
-    def __init__(self, service):
+    def __init__(self, service, structure_cid):
         self.service = service
         self.bom_json_cid = self.service.bom_json_cid
-        self.infraStructure: InfraStructure = InfraStructure(service=self.service)
+        self.infraStructure: InfraStructure = InfraStructure(service=self.service, structure_cid=structure_cid)
         self.plant: Plant = self.infraStructure.compose()
 
     def redeploy(self):
@@ -34,7 +34,7 @@ class Structure:
         self.infraStructure.apply()
         self.plant.rebuilt = False
 
-    def reconcile(self, structure_cid):
+    def reconcile(self):
         """Materialize this CAT's Structure, skipping the destructive
         rebuild when the incoming (content-addressed) structure_cid
         matches what's already applied.
@@ -51,6 +51,7 @@ class Structure:
         so callers can record what this Structure actually produced
         alongside Function's output in the CAT's BOM.
         """
+        structure_cid = self.infraStructure.structure_cid
         structure_home = self.infraStructure.INPUT_STRUCTURE_HOME
         applied_cid = read_applied_structure_cid(structure_home)
         if structure_cid and applied_cid == structure_cid:
@@ -64,10 +65,10 @@ class Structure:
 
 
 class Function:
-    def __init__(self, service):
+    def __init__(self, service, function_cid):
         self.service = service
         self.CAT_HOME = None
-        self.infraFunction: InfraFunction = InfraFunction(service=self.service)
+        self.infraFunction: InfraFunction = InfraFunction(service=self.service, function_cid=function_cid)
         self.processor: Processor = self.infraFunction.compose()
         self.ingress_job_id = None
         self.integration_output = None
