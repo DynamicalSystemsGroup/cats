@@ -74,29 +74,29 @@ The Action Plane is the Analytical Data Processing interface. The Action Plane o
 #### Quantum Architecture Description as a [Minimal Federated Operating Model](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/)
 
 - **Function** is a FaaS for scalable Data Processing and analytics executed as CAT **Processes**. Functions (FaaS) are deployed 
-on Structure (PaaS) to execute Processes orchestrated by InfraFunctions (FaaS) 
-  - **Process (FaaS)** is composed of the **Functional Data Processors** that InfraFunction (FaaS) executes on Structure (PaaS), and 
-  contextualizes with pre and post processed data. Process (FaaS) is executed with and made 
-  orchestratable by InfraFunction (FaaS) to support the following use-cases
-    - The CAT Order is updated with the inclusion of resulting mutated Functions (FaaS) for execution processed by CATs 
-    Factory Client.
+on Structure (PaaS) to execute Processes orchestrated by InfraFunctions (FaaS); mutating either updates the CAT Order in 
+alignment with CATs Architectural Quantum’s Functionality
+  - **Process (FaaS)** is composed of the **Functional Data Processors** that InfraFunction (FaaS) executes on Structure (PaaS), and contextualizes with pre and post processed data. Process (FaaS) is executed with and made orchestratable by InfraFunction (FaaS) to support the following use-cases
+    - With the inclusion of resulting mutated Functions (FaaS): mutating a Function (FaaS)'s Process produces a new 
+    Order whose `function_cid` reflects that update, for the Node's Factory to process on the next execution (*)
   - **InfraFunction (FaaS) is a Data Processing orchestrator** that composes Process and dispatches its 
   configurable execution onto the Plant (SaaS)
-    - The CAT Order is updated in alignment CATs Architectural Quantum’s Functionality. This Order will include the 
-    resulting updated of Structure (PaaS) with respect to the updated Plant (SaaS) and an updated Function (FaaS) with 
-    updated Ingress and Egress subProcesses (FaaS)
+    - Mutating InfraFunction (FaaS)'s dispatch configuration produces a new Order whose updated `function_cid` 
+    carries the updated Ingress and Egress subProcesses (FaaS), alongside any resulting `structure_cid` update 
+    reflecting the Plant (SaaS) it now targets (*)
 - **Structure** (**PaaS** as **IaC**) provisions and maintains the Plant (SaaS) as Function’s (FaaS) scalable execution environment. 
   - **Plant (SaaS)** is composed from **InfraStructure (IaaS)** as Structure's dynamically scaled execution environment of 
   **Function (FaaS)**
-    - The web application codebase is Content Addressed within CAT Orders as Data Contract metadata for Order registration.
+    - An Order is composed and submitted to the Node's Factory for processing via REPL UI as an interface for triggering the resulting Function [FaaS] execution - i.e. REPL UI similar to the [`cats_demo.py`](cats_demo.py) Marimo notebook
   - **InfraStructure (IaaS)** provisions and maintains the dynamically scaled infrastructure that composes a Plant (SaaS).
-    - The CAT Order is updated in alignment with event-driven functionality and operations with the resulting mutation 
-    of Structure (PaaS).
+    - The CAT Order is updated in alignment with event-driven functionality and operations: mutating InfraStructure 
+    (IaaS)'s provisioning produces a new Order with an updated `structure_cid` (*)
 
-Each of these components is content-addressed and reconstituted at runtime with the same composition it was CID-ed with: the 
-Factory consumes a single **Order CID** - resolving to Input Invoice, Function, and Structure CIDs - to produce a fresh, 
-ephemeral **Executor** per CAT execution, which composes Structure's Plant from its InfraStructure and Function's Process 
-from its InfraFunction, and itself (not a layer above it) produces the resulting **Invoice CID**. 
+(* Each of these Order mutations produces the next Order a subsequent CAT execution processes - see 
+**[NodeProductFlow.md](docs/NodeProductFlow.md)**, whose step 0 note documents how that next Order is (once the 
+not-yet-built registry exists) meant to be discovered rather than supplied out-of-band.)
+
+Each of these components is content-addressed and reconstituted at runtime with the same composition it was CID-ed with: the Factory consumes a single **Order CID** - resolving to Input Invoice, Function, and Structure CIDs - composes `Function` and constructs `Structure` from those CIDs, then instantiates a fresh, ephemeral **Executor** per CAT execution with them as its dependencies - `Structure` in turn composing its `Plant` from its `InfraStructure`, and `Function` its `Process` from its `InfraFunction` - and the Executor itself (not a layer above it) produces the resulting **Invoice CID**. 
 (* **[Quantum-as-CIDs details](docs/DESIGN.md#how-the-architectural-quantum-is-realized-as-content-addressed-cids)**)
 
 ### CAT Mesh: CATs Data Mesh platform with Data Provenance
