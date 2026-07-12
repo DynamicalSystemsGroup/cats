@@ -11,6 +11,7 @@ __marimo__/**
 .venv
 .obsidian
 .env
+*.zip
 
 # --- Terraform (local state & cache; lock file is committed) ---
 **/.terraform/
@@ -41,3 +42,4 @@ data/input/structure/.host-ipfs-daemon.log
 
 # local artifacts
 local_artifacts/
+docs/TODO.md
