@@ -1,2 +1,2 @@
-### [Demos:](../cats_demo.ipynb) Execute a CATs on a single node Data (CAT) Mesh
-### [Test:](../tests/verification_test.py) `python -m pytest -s testing/tests/initCAT.py`
+### [Demos:](../cats_demo.py) Execute a CATs on a single node Data (CAT) Mesh
+### [Test:](../tests/verification_test.py) `uv run pytest -s tests/verification_test.py`
