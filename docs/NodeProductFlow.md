@@ -1,5 +1,51 @@
-# CAT Node Product Flow:
+# CAT Node's Product Control-Feedback Loop:
 
+## Activity Diagram:
+
+```mermaid
+flowchart LR
+    subgraph Order["Order (CID)"]
+        InputInvoice[("(input) Invoice (CID)")]
+        FunctionCID[("Function (FaaS) CID")]
+        StructureCID[("Structure (PaaS) CID")]
+    end
+
+    subgraph Node
+        InfraFunctionFaaS["InfraFunction (FaaS)"]:::factory
+        ProcessFaaS["Process (FaaS)"]:::factory
+        InfraStructureIaaS["InfraStructure (IaaS)"]:::factory
+        PlantSaaS["Plant (SaaS)"]:::factory
+        Instantiate["instantiate Executor<br/>with Function (FaaS) &amp; Structure (PaaS)<br/>as dependencies / parameters"]:::factory
+        Execute["execute Function (FaaS) on Structure (PaaS)<br/>via InfraFunction (FaaS) orchestrating<br/>Process(es) (FaaS) on Plant (SaaS)<br/>deployed on InfraStructure (IaaS)"]:::executor
+        ProduceInvoice["Invoice the ephemeral execution:<br/>produce Invoice (CID)"]:::executor
+
+        InfraFunctionFaaS -->|executes| ProcessFaaS
+        InfraStructureIaaS -->|deploys| PlantSaaS
+        InfraFunctionFaaS -.->|orchestrates| PlantSaaS
+        ProcessFaaS --> Instantiate
+        PlantSaaS --> Instantiate
+        Instantiate -->|"Function (FaaS) &amp; Structure (PaaS)<br/>as dependencies / parameters"| Execute
+        Execute --> ProduceInvoice
+    end
+
+    subgraph BOM["BOM (CID)"]
+        Invoice[("Invoice (CID)<br/>Order CID + output Data CID + Seed")]
+        ExecutorLog[("Executor Log (CID)")]
+    end
+
+    FunctionCID -->|"compose Function (FaaS) — step 0"| InfraFunctionFaaS
+    StructureCID -->|"construct Structure (PaaS) — step 0"| InfraStructureIaaS
+    InputInvoice -->|"process Invoiced data — step 2a"| Execute
+    ProduceInvoice -->|"Executor Invoices the ephemeral<br/>execution — step 2b"| Invoice
+    ProduceInvoice -->|"Node produces BOM — step 3"| ExecutorLog
+    BOM -.->|"next Order discovered via<br/>BOM.invoice.order_cid<br/>(registry lookup - not yet implemented)"| Order
+
+    classDef factory fill:#dbe9ff,stroke:#5b7fbd;
+    classDef executor fill:#ffe8d6,stroke:#c97a3f;
+    linkStyle 2 stroke:#c0392b,stroke-width:2px;
+```
+
+## Control-Feedback Loop:
 0. the "Node" consumes an "Order" containing an input "Invoice" of input data to be processed as well as the "Architectural Quantum's" functional domain components that process Invoiced data; The content of the Order CID to be processed by the Node's "Factory" consists of the following: (*)
     0A. the CID-ed input Invoice as is within `data/input/data/*`
     0B. the CID-ed Architectural Quantum's functional domain components:
