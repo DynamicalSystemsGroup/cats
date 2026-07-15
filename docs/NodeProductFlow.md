@@ -4,27 +4,18 @@
 
 ![CAT Node's Product Control-Feedback Loop](../images/NodeProductFlow.png)
 
-0. The "Architectural Quantum" is a Minimal Federated Operating Model that adheres to Domain-Driven Design 
-   principles
-1. The "Node" consumes an "Order" containing an input "Invoice" of input data to be processed as well as the 
-   Architectural Quantum's functional domain components that process Invoiced data; The content of the Order CID to be processed by the Node's "Factory" consists of the following: (*)
-   A. the CID-ed input Invoice as is within `data/input/data/*`
-   B. the CID-ed Architectural Quantum's functional domain components:
-      a. "Function [FaaS]" consists of "Process [FaaS]" and Process' "InfraFunction [FaaS]" processing dependency
-         - Function [FaaS] (as Code) is CID-ed for which the contents consist of CIDs for Procces [FaaS] and   
-           InfraFunction [FaaS]
-      b. "Structure [PaaS]" is Function's infrastructure dependency and consists of "Plant [SaaS]" and Plant's 
-         "InfraStructure [IaaS]" infrastructure dependency
-         - Structure [PaaS] (as Code) is CID-ed for which the contents consist of Plant [SaaS] and InfraStructure 
-           [IaaS] CIDs
-2. The Node's "Factory" processes an Order to produce "Executor" of an Architectural Quantum by composing Function 
-   [FaaS], constructing Structure [PaaS], then instantiating Executors with Function [FaaS] & Structure [PaaS] as its dependencies / parameters
-3. The Executor is a composition of Architectural Quantum execution that executes and Invoices the ephemeral 
-   execution of the Architectural Quantum.
-      A. the Executor executes the aforemention composition as a Function [FaaS] executing on Structure [PaaS] via 
-         InfraFunction [FaaS] orchestrating the execution of Process(es) [FaaS] on the Plant [SaaS] deployed on InfraStructure [IaaS]
-      B. the Executor Invoices the ephemeral execution of the Architectural Quantum by prodcuing a CID-ed Invoice 
-         containing the original CID-ed Order, an the CID-ed output Data, and a (non-deterministic proccessing) Seed (dictionary for Proccess(es) [FaaS])
+0. The "Architectural Quantum" is a Minimal Federated Operating Model that adheres to Domain-Driven Design principles
+1. The "Node" consumes an "Order" containing an input "Invoice" of input data to be processed as well as the Architectural Quantum's functional domain components that process Invoiced data; The content of the Order CID to be processed by the Node's "Factory" consists of the following: (*)
+    A. the CID-ed input Invoice as is within `data/input/data/*`
+    B. the CID-ed Architectural Quantum's functional domain components:
+        a. "Function [FaaS]" consists of "Process [FaaS]" and Process' "InfraFunction [FaaS]" processing dependency
+            - Function [FaaS] (as Code) is CID-ed for which the contents consist of CIDs for Procces [FaaS] and InfraFunction [FaaS]
+        b. "Structure [PaaS]" is Function's infrastructure dependency and consists of "Plant [SaaS]" and Plant's "InfraStructure [IaaS]" infrastructure dependency
+            - Structure [PaaS] (as Code) is CID-ed for which the contents consist of Plant [SaaS] and InfraStructure [IaaS] CIDs
+2. The Node's "Factory" processes an Order to produce "Executor" of an Architectural Quantum by composing Function [FaaS], constructing Structure [PaaS], then instantiating Executors with Function [FaaS] & Structure [PaaS] as its dependencies / parameters
+3. The Executor is a composition of Architectural Quantum execution that executes and Invoices the ephemeral execution of the Architectural Quantum.
+    A. the Executor executes the aforemention composition as a Function [FaaS] executing on Structure [PaaS] via InfraFunction [FaaS] orchestrating the execution of Process(es) [FaaS] on the Plant [SaaS] deployed on InfraStructure [IaaS]
+    B. the Executor Invoices the ephemeral execution of the Architectural Quantum by prodcuing a CID-ed Invoice containing the original CID-ed Order, an the CID-ed output Data, and a (non-deterministic proccessing) Seed (dictionary for Proccess(es) [FaaS])
 4. The Node produces a CID-ed BOM containing an CID-ed Invoice and CID-ed Executor execution "logs" (*)
 
 Notes (*):
