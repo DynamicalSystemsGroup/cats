@@ -73,21 +73,13 @@ The Action Plane is the Analytical Data Processing interface. The Action Plane o
 
 #### Quantum Architecture Description as a [Minimal Federated Operating Model](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/)
 
-- **Function** is a FaaS for scalable Data Processing and analytics executed as CAT **Processes**. Functions (FaaS) are deployed 
-on Structure (PaaS) to execute Processes orchestrated by InfraFunctions (FaaS); mutating either updates the CAT Order in 
-alignment with CATs Architectural Quantum’s Functionality
-  - **Process (FaaS)** is composed of the **Functional Data Processors** that InfraFunction (FaaS) executes on Structure (PaaS), and contextualizes with pre and post processed data. Process (FaaS) is executed with and made orchestratable by InfraFunction (FaaS) to support the following use-cases
-    - With the inclusion of resulting mutated Functions (FaaS): mutating a Function (FaaS)'s Process produces a new 
-    Order whose `function_cid` reflects that update, for the Node's Factory to process on the next execution (*)
-  - **InfraFunction (FaaS) is a Data Processing orchestrator** that composes Process and dispatches its 
-  configurable execution onto the Plant (SaaS)
-    - Mutating InfraFunction (FaaS)'s dispatch configuration produces a new Order whose updated `function_cid` 
-    carries the updated Ingress and Egress subProcesses (FaaS), alongside any resulting `structure_cid` update 
-    reflecting the Plant (SaaS) it now targets (*)
-- **Structure** (**PaaS** as **IaC**) provisions and maintains the Plant (SaaS) as Function’s (FaaS) scalable execution environment. 
-  - **Plant (SaaS)** is composed from **InfraStructure (IaaS)** as Structure's dynamically scaled execution environment of 
-  **Function (FaaS)**
-    - An Order is composed and submitted to the Node's Factory for processing via REPL UI as an interface for triggering the resulting Function [FaaS] execution - i.e. REPL UI similar to the [`cats_demo.py`](cats_demo.py) Marimo notebook
+- **Function [FaaS]** is a Function-as-a-Service for scalable Data Processing and analytics whose **Process [REPL(aC)]** composes and submits transport callables plus a Transfer Higher-Order Function (tHOF) for **InfraFunction [FaaS]** to dispatch. *Functions* are deployed on **Structure [PaaS]**; mutating either *Process* or *InfraFunction* updates the CAT **Order** in alignment with CATs *Architectural Quantum’s* Functionality
+  - **Process [REPL(aC)]** is a *Read-Eval-Print Loop as Code* (such as a Marimo notebook UI, e.g. [`cats_demo.py`](cats_demo.py)) that composes **ingress / integration_cache / egress** (transport) and **`integrated_subproc`** — the tHOF, i.e. the input→output data transform ([transfer function](https://en.wikipedia.org/wiki/Transfer_function)), often higher-order because it applies a batch function (e.g. via Ray `map_batches`). Process is the composer/submitter, not itself a tHOF. Mutating a ***Function's* Process [REPL(aC)]** composition produces a new **Order** whose `function_cid` reflects that update, for the Node's Factory to process on the next execution (*)
+  - **InfraFunction [FaaS]** is the actuator / Data Processing Orchestrator that receives the tHOF **Process [REPL(aC)]** submits and dispatches it onto the Plant (SaaS); transport callables run locally around that dispatch, not as Plant jobs
+    - Mutating InfraFunction (FaaS)'s dispatch configuration produces a new Order whose updated `function_cid` carries the updated actuator, alongside any Process-composed callable CIDs and any resulting `structure_cid` update reflecting the **Plant [SaaS]** it now targets (*)
+- **Structure [PaaS(as IaC)]** provisions and maintains the **Plant [SaaS]** as **Function’s [FaaS]** scalable execution environment. 
+  - **Plant [SaaS]** is composed from **InfraStructure [IaaS]** as **Structure's** dynamically scaled execution environment of 
+  **Function [FaaS]** — the runtime onto which **InfraFunction [FaaS]** dispatches the tHOF (`integrated_subproc`) submitted by **Process [REPL(aC)]**
   - **InfraStructure (IaaS)** provisions and maintains the dynamically scaled infrastructure that composes a Plant (SaaS).
     - The CAT Order is updated in alignment with event-driven functionality and operations: mutating InfraStructure 
     (IaaS)'s provisioning produces a new Order with an updated `structure_cid` (*)
