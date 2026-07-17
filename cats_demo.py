@@ -61,7 +61,14 @@ def _(INPUT_DATA_HOME, INPUT_STRUCTURE_HOME, meshClient, pprint):
         endpoint="http://127.0.0.1:5000/cat/node/init",
     )
     pprint(cat_order_request_0)
-    return cat_order_request_0, egress, infrafunction_subproc, ingress, integration_cache, process_1
+    return (
+        cat_order_request_0,
+        egress,
+        infrafunction_subproc,
+        ingress,
+        integration_cache,
+        process_1,
+    )
 
 
 @app.cell(hide_code=True)

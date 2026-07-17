@@ -214,16 +214,19 @@ class MeshClient(CoD):
             'infrastructure_cid': infrastructure_cid,
         }))
         data_cid, dir_name = self.cidDir(data_dirpath)
-        # Process (FaaS): the Functional Data Processors themselves.
+        # Process [REPL(aC)]: composes transport callables (ingress,
+        # integration_cache, egress) plus the tHOF (integrated_subproc —
+        # input→output data transform). Process is the composer, not a tHOF.
         process = {
             'ingress_subproc_cid': self.ipfsClient.add_pyobj(ingress_subproc),
             'integrated_subproc_cid': self.ipfsClient.add_pyobj(integrated_subproc),
             'egress_subproc_cid': self.ipfsClient.add_pyobj(egress_subproc),
             'integration_cache_subproc_cid': self.ipfsClient.add_pyobj(integration_cache_subproc),
         }
-        # InfraFunction (FaaS): the orchestrator that dispatches Process
-        # onto the Plant (see Processor.Integration() in
-        # cats/executor/function/__init__.py).
+        # InfraFunction (FaaS): actuator that dispatches the tHOF
+        # (integrated_subproc) onto the Plant (see Processor.Integration() in
+        # cats/executor/function/__init__.py). Transport callables are not
+        # Plant jobs.
         infrafunction = {
             'infrafunction_subproc_cid': self.ipfsClient.add_pyobj(infrafunction_subproc),
         }

@@ -3,10 +3,12 @@ import pyarrow.fs
 from ray.job_submission import JobStatus, JobSubmissionClient
 
 
-# InfraFunction (FaaS): orchestrates Process (FaaS) onto the Plant (SaaS)
-# via the Ray Job Submission API, dispatching `integrated_subproc` as a
-# real Ray job against the deployed KubeRay cluster instead of running it
-# in an ephemeral, local Ray session.
+# InfraFunction (FaaS): actuator that receives the Transfer Higher-Order Function
+# (tHOF) — Process [REPL(aC)]'s `integrated_subproc` — and dispatches it onto
+# the Plant (SaaS) via the Ray Job Submission API as a real Ray job against the
+# deployed KubeRay cluster instead of running it in an ephemeral, local Ray
+# session. Ingress / integration_cache / egress are transport callables and are
+# not dispatched here.
 #
 # Runs inside the Ray cluster (the job's working_dir becomes its cwd).
 # `ray.init()` inside `integrated_subproc` (e.g. process_0/process_1)
@@ -19,14 +21,14 @@ from ray.job_submission import JobStatus, JobSubmissionClient
 # remote Ray cluster can't resolve since it doesn't have this repo
 # installed. cloudpickle instead serializes the function by value.
 #
-# `integrated_subproc` (Process [FaaS]) is a pure transfer function - it
-# just returns the transformed Dataset. Delivering that Dataset into the
-# shared MinIO bucket is this actuator's own responsibility, kept here
-# rather than in Process, so each of the job's write tasks can run on
-# whichever node executes it rather than all needing to land on this
-# node's disk. Builds its own S3FileSystem against MinIO (reachable from
-# inside this job's pod via the kind Docker network's gateway IP, not any
-# in-cluster Service - see minio_endpoint_pod).
+# `integrated_subproc` is the pure transfer function / tHOF - it returns the
+# transformed Dataset only. Delivering that Dataset into the shared MinIO
+# bucket is this actuator's responsibility, kept here rather than in Process,
+# so each of the job's write tasks can run on whichever node executes it
+# rather than all needing to land on this node's disk. Builds its own
+# S3FileSystem against MinIO (reachable from inside this job's pod via the
+# kind Docker network's gateway IP, not any in-cluster Service - see
+# minio_endpoint_pod).
 _INFRAFUNCTION_ENTRYPOINT_SCRIPT = '''\
 import json
 import ray.cloudpickle as cloudpickle

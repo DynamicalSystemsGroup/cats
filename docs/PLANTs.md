@@ -42,11 +42,11 @@ The CAT Node doesn't reduce to one single type from the "Heavy industry and engi
 **composite** that spans three of the six categories, each operating at a different structural layer:
 
 
-| Layer                                                   | Type match                            |
-| ------------------------------------------------------- | ------------------------------------- |
-| Factory (assembles the Executor from Order components)  | **Manufacturing plant**               |
-| Function [FaaS] (Process + InfraFunction)               | **Plant (control theory)**            |
-| Structure [PaaS] (Plant [SaaS] + InfraStructure [IaaS]) | **Power plant** (Power Station sense) |
+| Layer                                                          | Type match                            |
+| -------------------------------------------------------------- | ------------------------------------- |
+| Factory (assembles the Executor from Order components)         | **Manufacturing Plant**               |
+| Function [FaaS] (Process [REPL(aC)] + InfraFunction [FaaS])    | **Plant (control theory)**            |
+| Structure [PaaS] (Plant [SaaS] + InfraStructure [IaaS])        | **Power Plant** (Power Station sense) |
 
 
 No single Node-level component is a **Chemical plant** or **Heavy equipment** - those two categories have no
@@ -70,11 +70,10 @@ Per `[NodeProductFlow.md](NodeProductFlow.md)` step 0B, the Architectural Quantu
 `Structure [PaaS]`. It isn't a single type; it's the *union* of the next two rows, since it's defined as
 Function's dependency on Structure, not a standalone facility:
 
-- **Function [FaaS]** (`Process [FaaS]` + `InfraFunction [FaaS]`) -> **Plant (control theory)** as a whole -
-"the combination of process and actuator" is verbatim Function's own composition (Process = the functional
-data processor = the "process"; InfraFunction = the orchestrator dispatching it onto compute = the
-"actuator").
-  - `Process [FaaS]` alone -> the **process** half of Plant (control theory)
+- **Function [FaaS]** (`Process [REPL(aC)]` + `InfraFunction [FaaS]`) -> **Plant (control theory)** as a whole -
+"the combination of process and actuator" is verbatim Function's own composition (Process [REPL(aC)] = the
+Read-Eval-Print Loop as Code that composes and submits transport callables plus a tHOF = the "process"; InfraFunction = the actuator dispatching that tHOF onto compute).
+  - `Process [REPL(aC)]` alone -> the **process** half of Plant (control theory)
   - `InfraFunction [FaaS]` alone -> the **actuator** half of Plant (control theory)
 - **Structure [PaaS]** (`Plant [SaaS]` + `InfraStructure [IaaS]`) -> **Power plant**, specifically the Power
 Station generation+transmission/distribution model (per the caveat above).
@@ -102,7 +101,7 @@ the Manufacturing-plant output (a composed Function+Structure pair) and those co
 | CAT Node (whole)      | ✓ (via Function)       | ✓ (via Factory)     | -              | ✓ (via Structure)   | -              | -               |
 | Factory               | -                      | **✓**               | -              | -                   | -              | -               |
 | Architectural Quantum | ✓ (Function half)      | -                   | -              | ✓ (Structure half)  | -              | -               |
-| Process [FaaS]        | ✓ ("process" half)     | -                   | -              | -                   | -              | -               |
+| Process [REPL(aC)]    | ✓ ("process" half)     | -                   | -              | -                   | -              | -               |
 | InfraFunction [FaaS]  | ✓ ("actuator" half)    | -                   | -              | -                   | -              | -               |
 | Structure [PaaS]      | -                      | -                   | -              | **✓**               | -              | -               |
 | Plant [SaaS]          | -                      | -                   | -              | ✓ (generation half) | -              | -               |

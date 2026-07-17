@@ -18,7 +18,7 @@ pandas for the mesh workflow. `uv run` (below) uses this environment automatical
 uv run python cats/node.py
 ```
 ##### 4. Establish Data (CAT) Mesh *in Terminal B*: [Demo](../cats_demo.py)
-Execute a CATs on a single node Mesh via Marimo Notebook.
+Execute CATs on a single-node Mesh via Marimo notebook — this is Process [REPL(aC)]: a Read-Eval-Print Loop as Code that composes and submits transport callables plus a Transfer Higher-Order Function (tHOF, `integrated_subproc`) for InfraFunction [FaaS] to dispatch onto Plant [SaaS].
 ```bash
 uv run marimo edit cats_demo.py
 ```
