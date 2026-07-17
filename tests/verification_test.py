@@ -89,6 +89,9 @@ class catDataVerification:
         self.cat_output_data_cid = flat_cat_invoiced_response['flat_bom']['invoice']['data_cid']
         print(self.cat_output_data_cid)
         print()
+        invoice = flat_cat_invoiced_response['flat_bom']['invoice']
+        assert invoice.get('ingress_data_cid'), "invoice.ingress_data_cid should be set"
+        assert invoice.get('integration_data_cid'), "invoice.integration_data_cid should be set"
 
         cat_input_df = cid_to_pandasDF(
             cid=self.cat_input_data_cid,

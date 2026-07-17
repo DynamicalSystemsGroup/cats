@@ -70,12 +70,13 @@ class Function:
         self.CAT_HOME = None
         self.infraFunction: InfraFunction = InfraFunction(service=self.service, function_cid=function_cid)
         self.processor: Processor = self.infraFunction.compose()
-        self.ingress_job_id = None
-        self.integration_output = None
-        self.egress_job_id = None
+        self.ingress_data_cid = None
+        self.integration_data_cid = None
+        self.egress_data_cid = None
         self.invoice_data_cid = None
 
     def execute(self):
-        self.ingress_job_id, self.integration_output, self.egress_job_id = self.processor.process()
+        self.ingress_data_cid, self.integration_data_cid, self.egress_data_cid = \
+            self.processor.process()
         self.invoice_data_cid = self.processor.invoice_data_cid
-        return self.ingress_job_id, self.integration_output, self.egress_job_id
+        return self.ingress_data_cid, self.integration_data_cid, self.egress_data_cid

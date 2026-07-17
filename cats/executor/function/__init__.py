@@ -13,24 +13,16 @@ class Processor:
         self.egress_data_cid = None
 
     def Ingress(self):
+        # Lineage CID product; Plant input path comes from integration_cache.
         ingress_result = self.infraFunction.ingress_subproc(
             input_dir_cid=self.ingress_input_data_cid
         )
         if not isinstance(ingress_result, tuple):
-            # ingress_subproc failed and returned its error message as a
-            # plain string instead of the expected (cid, data_dir) tuple.
-            # Raise it here, with the real reason, rather than leaving
-            # INGRESS_DATA_PATH unset for Integration() to fail on later
-            # with a generic "unset" error that hides the actual cause.
+            # Older pickled ingress may still return an error string.
             raise RuntimeError(f"Ingress failed: {ingress_result}")
-        self.ingress_data_cid, ingress_data_dir = ingress_result
+        self.ingress_data_cid, _ingress_data_dir = ingress_result
 
         self.infraFunction.service.INGRESS_DATA_HOME = self.ingress_data_cid
-        self.infraFunction.service.INGRESS_DATA_PATH = os.path.join(
-            self.infraFunction.service.INTEGRATION_INPUT_DATA_CACHE,
-            ingress_data_dir,
-        )
-
         self.infraFunction.service.INGRESS_JOB_STATUS = "Completed"
         self.infraFunction.service.INGRESS_EXIT_CODE = "0"
         return self.ingress_data_cid
@@ -38,23 +30,22 @@ class Processor:
     def Integration(self):
         self.infraFunction.service.INTEGRATION_HOME = \
             self.infraFunction.service.meshClient.INTEGRATION_HOME + "/outputs"
-        # Path(self.infraFunction.service.INTEGRATION_INPUT_CACHE).mkdir(parents=True, exist_ok=True)
-        # Path(self.infraFunction.service.INTEGRATION_INPUT_DATA_CACHE).mkdir(parents=True, exist_ok=True)
-        self.infraFunction.integration_cache_subproc(
+        # Structure staging: Ray process_input is the host path returned by
+        # integration_cache (Plant-facing mount), not Ingress's former
+        # INGRESS_DATA_PATH side channel.
+        process_input = self.infraFunction.integration_cache_subproc(
             input_dir_cid=self.infraFunction.service.INGRESS_DATA_HOME,
-            cwd=self.infraFunction.service.INTEGRATION_INPUT_CACHE
-            # cwd=self.infraFunction.service.INTEGRATION_INPUT_DATA_CACHE
-            # v_output_dir=self.infraFunction.service.INTEGRATION_INPUT_DATA_CACHE
+            cwd=self.infraFunction.service.INTEGRATION_INPUT_CACHE,
+            data_cache=self.infraFunction.service.INTEGRATION_INPUT_DATA_CACHE,
         )
-        process_input = self.infraFunction.service.INGRESS_DATA_PATH
-        if not process_input:
+        if not process_input or not isinstance(process_input, str):
             raise RuntimeError(
-                "INGRESS_DATA_PATH is unset; ingress must return (cid, data_dir) "
-                "so Ray reads only this run's ingress folder."
+                "integration_cache must return the host staging path under "
+                "INTEGRATION_INPUT_DATA_CACHE for Ray to read."
             )
         wait_for_directory(process_input, check_interval=1)
-        # InfraFunction orchestrating Plant: dispatches Process
-        # (integrated_subproc) as a Ray job on the deployed Plant's Ray
+        # InfraFunction actuator: dispatches the tHOF from Process [REPL(aC)]
+        # (integrated_subproc only) as a Ray job on the deployed Plant's Ray
         # cluster via the Job Submission API, rather than running it in
         # this (ephemeral executor) process.
         self.infraFunction.infrafunction_subproc(
@@ -71,19 +62,16 @@ class Processor:
         wait_for_directory(self.infraFunction.service.INTEGRATION_HOME, check_interval=1)
         self.integration_data_cid, _ = \
             self.infraFunction.service.meshClient.cidDir(self.infraFunction.service.INTEGRATION_HOME)
-        # print(self.infraFunction.service.INGRESS_DATA_HOME)
-        # print(self.infraFunction.service.INTEGRATION_INPUT_DATA_CACHE)
-        # print(self.infraFunction.service.INTEGRATION_HOME)
-        # print(self.integration_data_cid)
-        # exit()
         return self.integration_data_cid
 
     def Egress(self):
+        egress_result = self.infraFunction.egress_subproc(
+            input_dir_cid=self.integration_data_cid
+        )
+        if not isinstance(egress_result, str) or not egress_result:
+            raise RuntimeError(f"Egress failed: {egress_result}")
         self.infraFunction.service.meshClient.EGRESS_HOME = \
-            self.egress_data_cid = self.invoice_data_cid = \
-            self.infraFunction.egress_subproc(
-                input_dir_cid=self.integration_data_cid
-            )
+            self.egress_data_cid = self.invoice_data_cid = egress_result
         self.infraFunction.service.EGRESS_JOB_STATUS = "Completed"
         self.infraFunction.service.EGRESS_EXIT_CODE = "0"
         return self.egress_data_cid
@@ -111,7 +99,9 @@ class InfraFunction:
         self.function_cid = function_cid
         self.function = json.loads(self.service.meshClient.cat(self.function_cid))
 
-        # Process (FaaS): the Functional Data Processors.
+        # Process [REPL(aC)]: transport callables (ingress, integration_cache,
+        # egress) plus the tHOF (integrated_subproc) a REPL as Code composes
+        # and submits. Process is the composer, not itself a tHOF.
         self.process_cid = self.function['process_cid']
         self.process = json.loads(self.service.meshClient.cat(self.process_cid))
         self.ingress_subproc_cid = self.process['ingress_subproc_cid']
@@ -119,8 +109,8 @@ class InfraFunction:
         self.egress_subproc_cid = self.process['egress_subproc_cid']
         self.integration_cache_subproc_cid = self.process['integration_cache_subproc_cid']
 
-        # InfraFunction (FaaS): the orchestrator that dispatches Process
-        # onto the Plant (SaaS) - see Processor.Integration().
+        # InfraFunction (FaaS): actuator that dispatches the tHOF
+        # (integrated_subproc) onto the Plant (SaaS) - see Integration().
         self.infrafunction_cid = self.function['infrafunction_cid']
         self.infrafunction = json.loads(self.service.meshClient.cat(self.infrafunction_cid))
         self.infrafunction_subproc_cid = self.infrafunction['infrafunction_subproc_cid']

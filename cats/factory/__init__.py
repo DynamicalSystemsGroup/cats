@@ -20,9 +20,9 @@ class Executor:
         self.orderCID = None
         self.invoiceCID = None
 
-        self.ingress_job_id = None
-        self.integration_s3_output = None
-        self.egress_job_id = None
+        self.ingress_data_cid = None
+        self.integration_data_cid = None
+        self.egress_data_cid = None
 
     def catStore(self):
         self.CAT_HOME = self.service.CAT_HOME = self.service.meshClient.CAT_HOME = \
@@ -53,7 +53,8 @@ class Executor:
         self.service.MINIO_BUCKET = self.structure.infraStructure.minio_bucket()
         self.service.MINIO_ACCESS_KEY = self.structure.infraStructure.minio_access_key()
         self.service.MINIO_SECRET_KEY = self.structure.infraStructure.minio_secret_key()
-        self.ingress_job_id, self.integration_s3_output, self.egress_job_id = self.function.execute()
+        self.ingress_data_cid, self.integration_data_cid, self.egress_data_cid = \
+            self.function.execute()
 
         # function_cid -> {process_cid, infrafunction_cid}; structure_cid ->
         # {plant_cid, infrastructure_cid} - surfaced here alongside the
@@ -64,12 +65,16 @@ class Executor:
         self.enhanced_bom['plant'] = plant_snapshot
         self.enhanced_bom['infrastructure'] = self.structure.infraStructure.minio_snapshot()
         self.enhanced_bom['log'] = {
-            'ingress_job_id': self.ingress_job_id,
-            'integration_output_cid': self.integration_s3_output,
-            'egress_job_id': self.egress_job_id,
+            'ingress_data_cid': self.ingress_data_cid,
+            'integration_data_cid': self.integration_data_cid,
+            'egress_data_cid': self.egress_data_cid,
             'plant_rebuilt': plant_snapshot['rebuilt']
         }
+        # Invoice feedback (Seed deferred / #187): stage CIDs on Invoice until
+        # Seed holds the Process replay dictionary.
         self.enhanced_bom['invoice']['data_cid'] = self.function.invoice_data_cid
+        self.enhanced_bom['invoice']['ingress_data_cid'] = self.ingress_data_cid
+        self.enhanced_bom['invoice']['integration_data_cid'] = self.integration_data_cid
         self.enhanced_bom['log_cid'] = self.service.meshClient.ipfsClient.add_json(self.enhanced_bom['log'])
 
         # Invoice CID: produced here (by the Executor), not by
