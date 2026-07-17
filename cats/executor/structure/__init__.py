@@ -12,8 +12,13 @@ KIND_CLUSTER_RESOURCE = "module.plant.kind_cluster.default"
 KIND_DEPENDENT_RESOURCES = (
     "module.plant.helm_release.ray-cluster",
     "module.plant.helm_release.kuberay-operator",
+    "module.plant.kubernetes_service.ray_dashboard_nodeport",
 )
 DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE = "module.infrastructure.shell_script.docker_compose_ipfs_transport"
+DOCKER_COMPOSE_MINIO_RESOURCE = "module.infrastructure.shell_script.docker_compose_minio"
+# Compose project "structure" + service "minio" → container name from
+# modules/infrastructure/main.tf local.minio_container_name.
+MINIO_CONTAINER = "structure-minio-1"
 APPLIED_STRUCTURE_MARKER = '.applied-structure.cid'
 
 
@@ -199,17 +204,15 @@ def cleanup_orphan_kind_cluster(service, structure_home):
 
 
 def cleanup_stale_kind_cluster_state(service, structure_home):
-    """Remove state entries for the kind cluster (and Helm releases that
-    depend on it) when Terraform state believes the cluster still exists
-    but the host does not have it - e.g. after a Docker Desktop restart or
-    reset wiped its containers out from under Terraform. Left alone, the
-    next `apply` fails during its automatic refresh with something like
-    "could not locate any control plane nodes for cluster named 'cats'"
-    before it ever gets a chance to recreate anything."""
-    state = _terraform_state_resources(service, structure_home)
-    if KIND_CLUSTER_RESOURCE not in state:
-        return
+    """Remove state entries for the kind cluster (and Plant resources that
+    depend on it) when the host has no kind cluster - e.g. after a Docker
+    Desktop restart wiped containers out from under Terraform.
 
+    Covers both (a) cluster still listed in state and (b) only dependents
+    left in state after a partial cleanup. Left alone, the next `apply`
+    fails during refresh (e.g. kubernetes_service dialing [::1]:80) before it
+    can recreate the Plant."""
+    state = _terraform_state_resources(service, structure_home)
     clusters = _kind_cluster_names()
     if KIND_CLUSTER_NAME in clusters:
         return
@@ -218,10 +221,12 @@ def cleanup_stale_kind_cluster_state(service, structure_home):
         resource for resource in (*KIND_DEPENDENT_RESOURCES, KIND_CLUSTER_RESOURCE)
         if resource in state
     ]
+    if not stale_resources:
+        return
+
     print(
-        f'Terraform state has "{KIND_CLUSTER_RESOURCE}" but no kind cluster named '
-        f'"{KIND_CLUSTER_NAME}" exists on the host; removing stale state for: '
-        f'{", ".join(stale_resources)}'
+        f'No kind cluster named "{KIND_CLUSTER_NAME}" on the host; removing '
+        f'stale Terraform Plant state for: {", ".join(stale_resources)}'
     )
     proc = subproc_run(
         f'{terraform_bin(service)} state rm {" ".join(stale_resources)}',
@@ -268,6 +273,37 @@ def cleanup_stale_docker_compose_ipfs_transport_state(service, structure_home):
         raise RuntimeError(
             f'Failed to remove stale Terraform state for '
             f'"{DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE}": {proc.stderr.strip()}'
+        )
+    if proc.stdout.strip():
+        print(proc.stdout.strip())
+
+
+def cleanup_stale_docker_compose_minio_state(service, structure_home):
+    """Remove the state entry for MinIO when Terraform believes it's up but
+    the container is gone - same scottwinkler/shell drift as IPFS transport.
+
+    Left alone, InfraFunction's Ray job hangs/fails on write_csv to MinIO
+    (e.g. AWS NETWORK_CONNECTION / connection refused on :9000)."""
+    state = _terraform_state_resources(service, structure_home)
+    if DOCKER_COMPOSE_MINIO_RESOURCE not in state:
+        return
+
+    if _docker_container_running(MINIO_CONTAINER):
+        return
+
+    print(
+        f'Terraform state has "{DOCKER_COMPOSE_MINIO_RESOURCE}" but container '
+        f'"{MINIO_CONTAINER}" is not running on the host; removing stale state '
+        f'so apply recreates it'
+    )
+    proc = subproc_run(
+        f'{terraform_bin(service)} state rm {DOCKER_COMPOSE_MINIO_RESOURCE}',
+        cwd=structure_home,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f'Failed to remove stale Terraform state for '
+            f'"{DOCKER_COMPOSE_MINIO_RESOURCE}": {proc.stderr.strip()}'
         )
     if proc.stdout.strip():
         print(proc.stdout.strip())
@@ -428,6 +464,7 @@ class InfraStructure:
         cleanup_orphan_kind_cluster(self.service, self.INPUT_STRUCTURE_HOME)
         cleanup_stale_kind_cluster_state(self.service, self.INPUT_STRUCTURE_HOME)
         cleanup_stale_docker_compose_ipfs_transport_state(self.service, self.INPUT_STRUCTURE_HOME)
+        cleanup_stale_docker_compose_minio_state(self.service, self.INPUT_STRUCTURE_HOME)
         self.service.executeCMD(
             f'{terraform_bin(self.service)} apply --auto-approve',
             cwd=self.INPUT_STRUCTURE_HOME
