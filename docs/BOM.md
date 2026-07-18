@@ -37,9 +37,9 @@ After `Executor.execute()` (`cats/factory/__init__.py`), the Invoice records sta
 
 - `invoice.data_cid` — egress / output data CID (existing)
 - `invoice.ingress_data_cid` — CID produced by ingress transport
-- `invoice.integration_data_cid` — CID of Plant integration outputs after the tHOF runs
+- `invoice.integration_data_cid` — CID of Plant integration outputs after the tHOF runs (durable IPFS copy of data downloaded from MinIO scratch)
 - `invoice.seed_cid` — still `null` until Seed is populated
 
-The BOM `log` mirrors those stage CIDs as `ingress_data_cid` / `integration_data_cid` / `egress_data_cid` (plus `plant_rebuilt`). Plant input for the tHOF is the host path returned by `integration_cache` under `INTEGRATION_INPUT_DATA_CACHE`, not an Ingress side-channel path.
+The BOM `log` mirrors those stage CIDs as `ingress_data_cid` / `integration_data_cid` / `egress_data_cid` (plus `plant_rebuilt`), and records `minio_result_uri` (`s3://cats-scratch/jobs/<uuid>/result`) as a non-secret correlator for Structure-lifetime MinIO scratch — not a substitute for `integration_data_cid`. MinIO objects are retained until Structure destroy; optional CAT Node read access is off by default (`CAT_MINIO_JOBS_API`, see [`MinIO.md`](./MinIO.md) / [`STORAGE.md`](./STORAGE.md)). Plant input for the tHOF is the host path returned by `integration_cache` under `INTEGRATION_INPUT_DATA_CACHE`, not an Ingress side-channel path.
 
 See also: [Design: How the Architectural Quantum is realized as content-addressed CIDs](DESIGN.md#how-the-architectural-quantum-is-realized-as-content-addressed-cids) and [Lineage of Provenance: How are CATs composed as a Lineage of Data Provenance on a Data Mesh?](LineageOfProvenance.md#how-are-cats-composed-as-a-lineage-of-data-provenance-on-a-data-mesh).

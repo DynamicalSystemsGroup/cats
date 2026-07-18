@@ -24,6 +24,10 @@ these links keep working for the lifetime of the Structure.
 - Web console for the shared MinIO bucket (`cats-scratch`) that Ray Data's distributed write tasks and
   `infrafunction_subproc`'s result retrieval use instead of a local filesystem — browse objects, buckets,
   and access policies (`data/input/structure/modules/infrastructure/minio_compose.yaml`).
+- MinIO is Structure-lifetime **parallel-write scratch** (`jobs/<uuid>/result`); durable integration
+  outputs are on IPFS as `invoice.integration_data_cid`. The BOM `log` may record `minio_result_uri`
+  for correlation. Opt-in CAT Node job access (`CAT_MINIO_JOBS_API=1`; **default off**) is documented in
+  [`MinIO.md`](./MinIO.md). Roles: [`STORAGE.md`](./STORAGE.md).
 - See [`LineageOfProvenance.md`](./LineageOfProvenance.md#whats-inside-a-boms-cids) for how this bucket's
   observed state is recorded as `bom.infrastructure_snapshot_cid`.
 
