@@ -8,6 +8,8 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+    volumes:
+      - structure_minio_data:/data
     # Docker scopes a published port's host-side reachability to the
     # bridge network the container's own (primary) interface sits on -
     # publishing alone does not make it reachable via every other Docker
@@ -20,3 +22,6 @@ services:
 networks:
   kind:
     external: true
+
+volumes:
+  structure_minio_data:

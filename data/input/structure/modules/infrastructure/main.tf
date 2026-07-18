@@ -110,7 +110,9 @@ resource "shell_script" "docker_compose_minio" {
     EOF
     delete = <<-EOF
       #!/bin/bash
-      docker-compose -p ${local.compose_project_name} -f ${local.minio_compose} down || true
+      # -v removes the named structure_minio_data volume so Structure
+      # destroy clears parallel-write scratch with the rest of InfraStructure.
+      docker-compose -p ${local.compose_project_name} -f ${local.minio_compose} down -v || true
     EOF
   }
 }
