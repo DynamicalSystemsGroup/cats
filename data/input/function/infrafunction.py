@@ -171,6 +171,9 @@ def infrafunction_subproc(
         _download_infrafunction_job_result(
             minio_endpoint_host, minio_bucket, minio_access_key, minio_secret_key, job_prefix, output,
         )
-        return output
+        # job_prefix correlates this run's MinIO scratch objects
+        # (cats-scratch/jobs/<uuid>/result) with the BOM log's
+        # minio_result_uri; durable retrieval remains integration_data_cid.
+        return output, job_prefix
     finally:
         shutil.rmtree(job_dir, ignore_errors=True)

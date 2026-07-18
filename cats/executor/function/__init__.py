@@ -48,7 +48,7 @@ class Processor:
         # (integrated_subproc only) as a Ray job on the deployed Plant's Ray
         # cluster via the Job Submission API, rather than running it in
         # this (ephemeral executor) process.
-        self.infraFunction.infrafunction_subproc(
+        _output, job_prefix = self.infraFunction.infrafunction_subproc(
             self.infraFunction.integrated_subproc,
             process_input,
             self.infraFunction.service.INTEGRATION_HOME,
@@ -58,6 +58,10 @@ class Processor:
             minio_bucket=self.infraFunction.service.MINIO_BUCKET,
             minio_access_key=self.infraFunction.service.MINIO_ACCESS_KEY,
             minio_secret_key=self.infraFunction.service.MINIO_SECRET_KEY,
+        )
+        bucket = self.infraFunction.service.MINIO_BUCKET
+        self.infraFunction.service.MINIO_RESULT_URI = (
+            f's3://{bucket}/{job_prefix}/result' if bucket and job_prefix else None
         )
         wait_for_directory(self.infraFunction.service.INTEGRATION_HOME, check_interval=1)
         self.integration_data_cid, _ = \

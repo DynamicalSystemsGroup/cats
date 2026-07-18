@@ -72,6 +72,10 @@ class Service:
         self.MINIO_BUCKET = None
         self.MINIO_ACCESS_KEY = None
         self.MINIO_SECRET_KEY = None
+        # Set by Processor.Integration() after infrafunction_subproc returns
+        # its job_prefix — non-secret s3:// URI for Structure-lifetime
+        # correlation (see docs/STORAGE.md / docs/MinIO.md).
+        self.MINIO_RESULT_URI = None
 
         self.init_bom_json_cid = None
         self.bom_json_cid = None
