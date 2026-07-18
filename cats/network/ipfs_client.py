@@ -1,6 +1,22 @@
 import pickle
 
 import ipfshttpclient
+from ipfshttpclient.requests_wrapper import HTTPAdapter
+from urllib3 import PoolManager
+
+
+# ipfshttpclient still passes strict=True (a Python 2 leftover) into
+# urllib3.PoolManager; urllib3 2.x emits FutureWarning and will error in v3.
+def _init_poolmanager(self, connections, maxsize, block=False, **pool_kwargs):
+    self._pool_connections = connections
+    self._pool_maxsize = maxsize
+    self._pool_block = block
+    self.poolmanager = PoolManager(
+        num_pools=connections, maxsize=maxsize, block=block, **pool_kwargs
+    )
+
+
+HTTPAdapter.init_poolmanager = _init_poolmanager
 
 
 def connect(host='127.0.0.1', port=5001, validate=False):
