@@ -68,7 +68,10 @@ class Executor:
             'ingress_data_cid': self.ingress_data_cid,
             'integration_data_cid': self.integration_data_cid,
             'egress_data_cid': self.egress_data_cid,
-            'plant_rebuilt': plant_snapshot['rebuilt']
+            'plant_rebuilt': plant_snapshot['rebuilt'],
+            # Non-secret MinIO scratch URI for Structure-lifetime correlation;
+            # durable retrieval remains integration_data_cid (IPFS).
+            'minio_result_uri': self.service.MINIO_RESULT_URI,
         }
         # Invoice feedback (Seed deferred / #187): stage CIDs on Invoice until
         # Seed holds the Process replay dictionary.
