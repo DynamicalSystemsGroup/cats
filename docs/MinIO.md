@@ -8,8 +8,10 @@ MinIO access is **InfraStructure-as-Code** (directory model): the module under
 `data/input/structure/modules/infrastructure/` is what `create_order_request()` CIDs as
 `infrastructure_cid`. Object-store config is resolved at runtime as `ObjectStore` via
 `InfraStructure.obj_store_context()` (importlib seam into `obj_store_utils.py`) — it is **not** a
-Service field. There is **no CAT Node HTTP API** for job scratch — use the Console, S3 API, or the
-module’s local CLI (`obj_store_utils.py`).
+Service field. Ray-job scratch write/download (`ObjectStore.write_ray_job_scratch`,
+`download_job_result`) and the Order-submitted `ray_job_result_entrypoint.py` live in that
+module tree so InfraFunction only orchestrates Plant dispatch. There is **no CAT Node HTTP API**
+for job scratch — use the Console, S3 API, or the module’s local CLI (`obj_store_utils.py`).
 
 #### Automatic lifecycle — usually nothing to do
 
