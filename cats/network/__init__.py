@@ -22,7 +22,13 @@ class MeshClient(CoD):
         if CATS_HOME is not None:
             self.catStore(CATS_HOME)
         # ipfs(cwd=self.CATS_HOME).shutdown()
-        ipfs(cwd=self.CATS_HOME).daemon()
+        # Probe/start uses the Kubo HTTP API (not bare `ipfs id`, which can
+        # succeed offline). Failure here must not block package import for
+        # unit tests; node operators still see the error and can start Kubo.
+        try:
+            ipfs(cwd=self.CATS_HOME).daemon()
+        except RuntimeError as exc:
+            print(f'WARNING: host IPFS daemon not ready: {exc}', flush=True)
 
         self.INGRESS_HOME = None
         self.INTEGRATION_HOME = None

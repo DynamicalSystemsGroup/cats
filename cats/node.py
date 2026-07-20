@@ -24,10 +24,12 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
+import atexit
 import logging, json, signal, socket, subprocess, time, traceback
 
 from flask import Flask, request, jsonify
 from cats import SERVICE
+from cats.network.clients import shutdown_owned_daemon
 
 catNode = Flask(__name__)
 
@@ -137,6 +139,12 @@ def execute_init_cat():
         return response
 
 
+def _handle_stop_signal(signum, frame):
+    """Shut down an owned host Kubo daemon, then exit cleanly."""
+    shutdown_owned_daemon()
+    raise SystemExit(0)
+
+
 if __name__ == '__main__':
     # Debug mode's reloader re-executes this script for its worker process,
     # inheriting the listening socket the monitor already created (via
@@ -146,5 +154,10 @@ if __name__ == '__main__':
     # kill its own monitor process out from under itself.
     if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         _free_stale_port(HOST, PORT)
+    # MeshClient already ensured Kubo at import time; only stop it on exit
+    # when this process owns the host daemon (_host_daemon_owned).
+    atexit.register(shutdown_owned_daemon)
+    signal.signal(signal.SIGINT, _handle_stop_signal)
+    signal.signal(signal.SIGTERM, _handle_stop_signal)
     # Run the Flask application, by default on http://127.0.0.1:5000/
-    catNode.run(host=HOST, port=PORT, debug=True)
+    catNode.run(host=HOST, port=PORT, debug=True, use_reloader=False)
