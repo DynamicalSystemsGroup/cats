@@ -3,7 +3,10 @@ import re
 import stat
 
 from cats.utils import subproc_run
-from cats.network.ipfs_docker import MIGRATION_CONTAINER, INTEGRATION_CONTAINER
+from cats.network.docker_ipfs_transport_peering import (
+    MIGRATION_CONTAINER,
+    INTEGRATION_CONTAINER,
+)
 
 DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE = "module.infrastructure.shell_script.docker_compose_ipfs_transport"
 APPLIED_STRUCTURE_MARKER = '.applied-structure.cid'

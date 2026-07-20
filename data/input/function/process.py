@@ -14,7 +14,7 @@ from typing import Dict
 
 import numpy as np
 
-from cats.network.ipfs_docker import (
+from cats.network.docker_ipfs_transport_peering import (
     IPFS_GET_TIMEOUT,
     MIGRATION_CONTAINER,
     INTEGRATION_CONTAINER,

@@ -2,7 +2,7 @@ import os
 from os.path import dirname, abspath
 
 from cats.network import MeshClient
-from cats.network.ipfs_client import connect as connect_ipfs
+from cats.network.clients.ipfs_client import connect as connect_ipfs
 from cats.service import Service
 
 CWD = os.getcwd()
