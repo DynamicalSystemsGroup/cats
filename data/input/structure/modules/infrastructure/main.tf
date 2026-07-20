@@ -27,8 +27,9 @@ locals {
 }
 
 resource "shell_script" "host_ipfs_daemon" {
-  # Idempotent: probes with `ipfs id` (the daemon's live API) rather than
-  # the repo.lock file, since a stale lock can outlive a crashed daemon.
+  # Idempotent: probes the Kubo HTTP API (POST :5001/api/v0/id), not bare
+  # `ipfs id` — modern Kubo answers `ipfs id` from the local repo with the
+  # daemon down (Addresses null), which would skip starting the API.
   # Only starts `ipfs daemon` - and only ever kills it again on destroy -
   # when this resource is the one that started it, so a daemon already
   # running from outside Terraform is never disturbed and never hit with
@@ -38,14 +39,17 @@ resource "shell_script" "host_ipfs_daemon" {
     create = <<-EOF
       #!/bin/bash
       set -e
-      if ipfs id >/dev/null 2>&1; then
+      ipfs_api_ready() {
+        curl -sf -X POST http://127.0.0.1:5001/api/v0/id >/dev/null 2>&1
+      }
+      if ipfs_api_ready; then
         echo "Host IPFS daemon already running; not starting another one."
         exit 0
       fi
       nohup ipfs daemon >"${local.host_ipfs_daemon_logfile}" 2>&1 &
       echo $! > "${local.host_ipfs_daemon_pidfile}"
       for i in $(seq 1 30); do
-        ipfs id >/dev/null 2>&1 && exit 0
+        ipfs_api_ready && exit 0
         sleep 1
       done
       echo "Timed out waiting for host IPFS daemon to become ready" >&2

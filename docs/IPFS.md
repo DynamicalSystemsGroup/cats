@@ -2,7 +2,8 @@
 
 CATs relies on a host [IPFS (Kubo)](https://docs.ipfs.tech/install/command-line/#system-requirements) daemon for
 content-addressed storage across the [Demo](./DEMO.md) and [Test](./TEST.md) workflows. See [`DEPS.md`](./DEPS.md)
-for installing Kubo itself.
+for installing Kubo itself. The Python side talks to that daemon with a thin sync Kubo HTTP RPC client
+(`cats/network/ipfs_client.py` → `http://127.0.0.1:5001/api/v0/*` via `requests`), not `ipfshttpclient`.
 
 #### Automatic startup — usually nothing to do
 
@@ -21,9 +22,15 @@ Two places already start the host daemon automatically and idempotently, so you 
   ```
   (`data/input/structure/modules/infrastructure/main.tf`)
 
-Both probe with `ipfs id` (the daemon's live API) before starting anything, so they never try to start a second
-daemon on top of one that's already running — whether it was started by you, by the other auto-starter, or from a
-previous session.
+Both probe the Kubo **HTTP API** (`POST http://127.0.0.1:5001/api/v0/id`) before starting anything — not bare
+`ipfs id`, which modern Kubo can answer from the local repo with the daemon down. That way they never skip
+startup when `:5001` is dead, and never start a second daemon on top of one that's already serving.
+
+The Python helper (`cats/network/clients/__init__.py` → `ipfs.daemon()`) also heals a common stuck state:
+API down with a held `~/.ipfs/repo.lock` (often a hung Kubo that still holds the flock / swarm sockets while
+`:5001` is dead — `ipfs shutdown` cannot clear that because it talks to the API). Heal best-effort runs
+`ipfs shutdown`, terminates lock-holder / `ipfs daemon` PIDs, removes the stale lock, then starts Kubo. If
+the API is already up, it reuses that daemon and does **not** take ownership.
 
 #### Manual start (optional)
 
@@ -43,13 +50,17 @@ This is expected and harmless — it just means a daemon is already up and servi
 ipfs shutdown
 ```
 
+`cats/node.py` registers `atexit` / `SIGINT` / `SIGTERM` handlers that call `shutdown_owned_daemon()` — that
+runs `ipfs shutdown` **only** when this process started the host daemon (`_host_daemon_owned`). A
+pre-existing healthy daemon (manual `ipfs daemon`, another process, or Terraform) is left alone.
+
 #### Checking status
 
 ```bash
-ipfs id
+curl -sf -X POST http://127.0.0.1:5001/api/v0/id
 ```
-Succeeds (prints your peer info) if a daemon is up and responsive; fails otherwise. This is the same check both
-auto-starters use, and the quickest way to tell whether you need to do anything at all.
+Succeeds (HTTP 200 + JSON peer info) if the daemon API is up; fails otherwise. This is the same check both
+auto-starters use. Bare `ipfs id` is **not** sufficient — it can succeed offline without `:5001` listening.
 
 #### Docker transport peering
 
