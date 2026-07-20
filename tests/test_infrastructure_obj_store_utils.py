@@ -104,6 +104,44 @@ def test_cli_list_jobs_help():
     assert exc.value.code == 0
 
 
+def test_write_ray_job_scratch_writes_config_and_entrypoint(tmp_path):
+    store = obj_store_utils.ObjectStore(
+        endpoint_host='http://127.0.0.1:9000',
+        endpoint_pod='http://172.19.0.1:9000',
+        bucket='cats-scratch',
+        access_key='cats-minio',
+        secret_key='cats-minio-secret',
+    )
+    job_dir = tmp_path / 'job'
+    job_dir.mkdir()
+    prefix = 'jobs/11111111-2222-3333-4444-555555555555'
+    store.write_ray_job_scratch(str(job_dir), prefix)
+
+    config_path = job_dir / 'object_store_config.json'
+    entry_path = job_dir / 'entrypoint.py'
+    assert config_path.is_file()
+    assert entry_path.is_file()
+
+    import json
+    config = json.loads(config_path.read_text(encoding='utf-8'))
+    assert config['endpoint'] == 'http://172.19.0.1:9000'
+    assert config['bucket'] == 'cats-scratch'
+    assert config['prefix'] == prefix
+    assert 'access_key' in config
+    assert 'object_store_config.json' in entry_path.read_text(encoding='utf-8')
+    assert 'write_csv' in entry_path.read_text(encoding='utf-8')
+    source = (
+        REPO_ROOT
+        / 'data'
+        / 'input'
+        / 'structure'
+        / 'modules'
+        / 'infrastructure'
+        / 'ray_job_result_entrypoint.py'
+    )
+    assert entry_path.read_text(encoding='utf-8') == source.read_text(encoding='utf-8')
+
+
 def test_load_obj_store_utils_from_structure_home():
     structure_home = str(
         REPO_ROOT / 'data' / 'input' / 'structure'

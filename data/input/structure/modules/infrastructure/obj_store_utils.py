@@ -2,9 +2,10 @@
 
 Ships inside `modules/infrastructure` so it is part of `infrastructure_cid`
 (directory model). Owns ObjectStore resolution, credential-free snapshots,
-stale Terraform/compose cleanup, and a local CLI. There is no CAT Node HTTP
-API — operators use the MinIO Console / S3 API, or this module's CLI.
-Durable retrieval remains IPFS `integration_data_cid`.
+Ray-job scratch write/download (entrypoint + host retrieval), stale
+Terraform/compose cleanup, and a local CLI. There is no CAT Node HTTP API —
+operators use the MinIO Console / S3 API, or this module's CLI. Durable
+retrieval remains IPFS `integration_data_cid`.
 
 See docs/MinIO.md and docs/STORAGE.md.
 """
@@ -12,8 +13,10 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -38,6 +41,8 @@ _JOB_UUID_RE = re.compile(
 _SAFE_NAME_RE = re.compile(r'^[A-Za-z0-9._-]+$')
 
 UTILS_FILENAME = 'obj_store_utils.py'
+ENTRYPOINT_FILENAME = 'ray_job_result_entrypoint.py'
+JOB_ENTRYPOINT_NAME = 'entrypoint.py'
 
 
 @dataclass(frozen=True)
@@ -66,6 +71,26 @@ class ObjectStore:
             'access_key': self.access_key,
             'secret_key': self.secret_key,
         }
+
+    def write_ray_job_scratch(self, job_dir: str, job_prefix: str) -> None:
+        """Write pod-reachable object-store config + Ray job result entrypoint.
+
+        InfraFunction supplies subproc.pkl / input/; this owns MinIO scratch
+        mechanics so Function does not embed S3FileSystem / key layout.
+        """
+        write_job_object_store_config(
+            job_dir,
+            endpoint=self.endpoint_pod,
+            access_key=self.access_key,
+            secret_key=self.secret_key,
+            bucket=self.bucket,
+            prefix=job_prefix,
+        )
+        write_job_result_entrypoint(job_dir)
+
+    def download_job_result(self, job_prefix: str, output: str) -> None:
+        """Host-side download of a completed job's result prefix."""
+        download_job_result_prefix(self.as_cli_config(), job_prefix, output)
 
     @classmethod
     def from_terraform_outputs(cls, get_output) -> 'ObjectStore':
@@ -98,7 +123,7 @@ class ObjectStore:
         )
 
 
-def load_minIO_utils(structure_home: str):
+def load_obj_store_utils(structure_home: str):
     """importlib-load this module from a materialized Structure tree."""
     path = os.path.join(
         structure_home, 'modules', 'infrastructure', UTILS_FILENAME
@@ -106,7 +131,7 @@ def load_minIO_utils(structure_home: str):
     if not os.path.isfile(path):
         raise FileNotFoundError(path)
     spec = importlib.util.spec_from_file_location(
-        'infrastructure_minIO_utils', path
+        'infrastructure_obj_store_utils', path
     )
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -114,6 +139,59 @@ def load_minIO_utils(structure_home: str):
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+# Back-compat alias used by older call sites / drafts.
+load_minIO_utils = load_obj_store_utils
+
+
+def write_job_object_store_config(
+    job_dir,
+    *,
+    endpoint,
+    access_key,
+    secret_key,
+    bucket,
+    prefix,
+):
+    """Write object_store_config.json for the Ray job (pod-reachable endpoint)."""
+    path = os.path.join(job_dir, 'object_store_config.json')
+    with open(path, 'w', encoding='utf-8') as config_file:
+        json.dump({
+            'endpoint': endpoint,
+            'access_key': access_key,
+            'secret_key': secret_key,
+            'bucket': bucket,
+            'prefix': prefix,
+        }, config_file)
+
+
+def write_job_result_entrypoint(job_dir):
+    """Copy Order-submitted ray_job_result_entrypoint.py into the job working_dir.
+
+    Ray submits `python entrypoint.py`; the source file ships beside this module
+    in `modules/infrastructure` so it is part of `infrastructure_cid`.
+    """
+    source = os.path.join(os.path.dirname(os.path.abspath(__file__)), ENTRYPOINT_FILENAME)
+    if not os.path.isfile(source):
+        raise FileNotFoundError(source)
+    shutil.copyfile(source, os.path.join(job_dir, JOB_ENTRYPOINT_NAME))
+
+
+def download_job_result_prefix(config, job_prefix, output):
+    """Download all files under bucket/job_prefix/result to output/."""
+    fs = _s3_fs(config)
+    os.makedirs(output, exist_ok=True)
+    result_key = f"{config['bucket']}/{job_prefix}/result"
+    for file_info in fs.get_file_info(
+        pyarrow.fs.FileSelector(result_key, recursive=True)
+    ):
+        if file_info.type != pyarrow.fs.FileType.File:
+            continue
+        name = os.path.basename(file_info.path)
+        with fs.open_input_stream(file_info.path) as src_file, \
+                open(os.path.join(output, name), 'wb') as dst_file:
+            dst_file.write(src_file.read())
 
 
 def default_minio_config():
