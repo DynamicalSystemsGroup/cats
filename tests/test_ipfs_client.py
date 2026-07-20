@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import requests
 
-from cats.network.ipfs_client import CatsIPFSClient, KuboRpcClient, connect
+from cats.network.clients.ipfs_client import CatsIPFSClient, KuboRpcClient, connect
 
 
 def _kubo_up() -> bool:

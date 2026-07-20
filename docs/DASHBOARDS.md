@@ -43,6 +43,6 @@ the Structure's lifetime.
 
 - **URL:** http://127.0.0.1:5001/webui
 - Host Kubo daemon UI — pinned content, peers, repo stats for BOM / Invoice / Order CIDs.
-  Python talks to the same daemon via `cats/network/ipfs_client.py` (Kubo HTTP RPC). See
+  Python talks to the same daemon via `cats/network/clients/ipfs_client.py` (Kubo HTTP RPC). See
   [`IPFS.md`](./IPFS.md) for how/when the daemon starts.
 - Gateway: `http://127.0.0.1:8080/ipfs/<cid>` for raw CID bytes without the WebUI.

@@ -3,7 +3,7 @@
 CATs relies on a host [IPFS (Kubo)](https://docs.ipfs.tech/install/command-line/#system-requirements) daemon for
 content-addressed storage across the [Demo](./DEMO.md) and [Test](./TEST.md) workflows. See [`DEPS.md`](./DEPS.md)
 for installing Kubo itself. The Python side talks to that daemon with a thin sync Kubo HTTP RPC client
-(`cats/network/ipfs_client.py` → `http://127.0.0.1:5001/api/v0/*` via `requests`), not `ipfshttpclient`.
+(`cats/network/clients/ipfs_client.py` → `http://127.0.0.1:5001/api/v0/*` via `requests`), not `ipfshttpclient`.
 
 #### Automatic startup — usually nothing to do
 
