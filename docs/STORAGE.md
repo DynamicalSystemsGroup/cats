@@ -1,6 +1,6 @@
 # CAT Node Storage
 
-A CAT Node's Structure deploys **InfraStructure [IaaS]** as the transmission/distribution substrate for Plant
+A CAT Node's Structure deploys **InfraStructure [IaaS]** as the Transmission & Distribution (T&D) substrate for Plant
 execution and provenance. That substrate includes both **IPFS** and **MinIO** (plus Docker Compose transport).
 They are not separate Architectural Quantum components — they are two operational stores inside
 **InfraStructure [IaaS]**. See [`PLANTs.md`](./PLANTs.md) and [`BOM.md`](./BOM.md).
@@ -37,10 +37,14 @@ use after the run (`integration_data_cid` and related Invoice/BOM CIDs).
 3. The host downloads that prefix into `…/integration/outputs/`.
 4. `cidDir` adds that directory to IPFS → `invoice.integration_data_cid` (and the BOM `log` mirror).
 
-Post-run retrieval of integration outputs is via **IPFS** and that CID — not by reading MinIO. MinIO’s
-observed endpoints (without credentials) are recorded on `bom.infrastructure_snapshot_cid` so verifiers can
-see which shared store the distributed write landed in. See [`BOM.md`](./BOM.md) (Invoice stage CIDs and
-infrastructure snapshot).
+Post-run retrieval of integration outputs is via **IPFS** and that CID — not by reading MinIO. MinIO’s observed endpoints (without credentials) come from `ObjectStore.snapshot()` after `InfraStructure.obj_store_context()` and are recorded on `bom.infrastructure_snapshot_cid` so verifiers can see which shared store the distributed write landed in. Object-store and Plant config are **not** Service fields — Executor passes `object_store` and `plant` (`Plant.context()` / `PlantContext`) into Integration. Structure-lifetime scratch inspection uses the MinIO Console / S3 API or InfraStructure’s directory-model CLI (`obj_store_utils.py`) — not a CAT Node HTTP API:
+
+```bash
+# from repo root, with Structure MinIO up
+uv run python data/input/structure/modules/infrastructure/obj_store_utils.py list-jobs
+```
+
+See [`MinIO.md`](./MinIO.md) for `list-files` / `get-file`, and [`BOM.md`](./BOM.md) for Invoice stage CIDs.
 
 ## Related docs
 
