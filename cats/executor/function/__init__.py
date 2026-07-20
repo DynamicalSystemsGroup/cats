@@ -6,6 +6,7 @@ class Processor:
     def __init__(self, infraFunction):
         self.infraFunction = infraFunction
         self.invoice_data_cid = None
+        self.object_store_result_uri = None
 
         self.ingress_input_data_cid = self.infraFunction.enhanced_bom['init_data_cid']
         self.ingress_data_cid = None
@@ -27,10 +28,10 @@ class Processor:
         self.infraFunction.service.INGRESS_EXIT_CODE = "0"
         return self.ingress_data_cid
 
-    def Integration(self):
+    def Integration(self, object_store, plant):
         self.infraFunction.service.INTEGRATION_HOME = \
             self.infraFunction.service.meshClient.INTEGRATION_HOME + "/outputs"
-        # Structure staging: Ray process_input is the host path returned by
+        # Structure staging: process_input is the host path returned by
         # integration_cache (Plant-facing mount), not Ingress's former
         # INGRESS_DATA_PATH side channel.
         process_input = self.infraFunction.integration_cache_subproc(
@@ -41,27 +42,23 @@ class Processor:
         if not process_input or not isinstance(process_input, str):
             raise RuntimeError(
                 "integration_cache must return the host staging path under "
-                "INTEGRATION_INPUT_DATA_CACHE for Ray to read."
+                "INTEGRATION_INPUT_DATA_CACHE for the Plant to read."
             )
         wait_for_directory(process_input, check_interval=1)
         # InfraFunction actuator: dispatches the tHOF from Process [REPL(aC)]
-        # (integrated_subproc only) as a Ray job on the deployed Plant's Ray
-        # cluster via the Job Submission API, rather than running it in
-        # this (ephemeral executor) process.
+        # (integrated_subproc only) onto the deployed Plant, rather than
+        # running it in this (ephemeral executor) process. Plant dispatch
+        # surface and object-store come from Plant.context() /
+        # InfraStructure.obj_store_context(), not Service fields.
         _output, job_prefix = self.infraFunction.infrafunction_subproc(
             self.infraFunction.integrated_subproc,
             process_input,
             self.infraFunction.service.INTEGRATION_HOME,
-            dashboard_address=self.infraFunction.service.RAY_DASHBOARD_ADDRESS,
-            minio_endpoint_pod=self.infraFunction.service.MINIO_ENDPOINT_POD,
-            minio_endpoint_host=self.infraFunction.service.MINIO_ENDPOINT_HOST,
-            minio_bucket=self.infraFunction.service.MINIO_BUCKET,
-            minio_access_key=self.infraFunction.service.MINIO_ACCESS_KEY,
-            minio_secret_key=self.infraFunction.service.MINIO_SECRET_KEY,
+            object_store=object_store,
+            plant=plant,
         )
-        bucket = self.infraFunction.service.MINIO_BUCKET
-        self.infraFunction.service.MINIO_RESULT_URI = (
-            f's3://{bucket}/{job_prefix}/result' if bucket and job_prefix else None
+        self.object_store_result_uri = (
+            object_store.result_uri(job_prefix) if job_prefix else None
         )
         wait_for_directory(self.infraFunction.service.INTEGRATION_HOME, check_interval=1)
         self.integration_data_cid, _ = \
@@ -80,12 +77,15 @@ class Processor:
         self.infraFunction.service.EGRESS_EXIT_CODE = "0"
         return self.egress_data_cid
 
-    def process(self):
+    def process(self, object_store, plant):
         print("CAT Executing")
         print("CAT Ingress")
         self.ingress_data_cid = self.Ingress()
         print("CAT Integration")
-        self.integration_data_cid = self.Integration()
+        self.integration_data_cid = self.Integration(
+            object_store=object_store,
+            plant=plant,
+        )
         print("CAT Egress")
         self.egress_data_cid = self.Egress()
         print("...")

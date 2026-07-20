@@ -92,6 +92,17 @@ class catDataVerification:
         invoice = flat_cat_invoiced_response['flat_bom']['invoice']
         assert invoice.get('ingress_data_cid'), "invoice.ingress_data_cid should be set"
         assert invoice.get('integration_data_cid'), "invoice.integration_data_cid should be set"
+        log = flat_cat_invoiced_response['flat_bom']['log']
+        object_store_result_uri = log.get('object_store_result_uri')
+        assert object_store_result_uri, "log.object_store_result_uri should be set"
+        assert object_store_result_uri.startswith('s3://cats-scratch/jobs/'), (
+            f"log.object_store_result_uri should be under cats-scratch/jobs/: "
+            f"{object_store_result_uri}"
+        )
+        assert object_store_result_uri.endswith('/result'), (
+            f"log.object_store_result_uri should end with /result: "
+            f"{object_store_result_uri}"
+        )
 
         cat_input_df = cid_to_pandasDF(
             cid=self.cat_input_data_cid,

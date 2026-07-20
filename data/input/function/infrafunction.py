@@ -120,10 +120,10 @@ def _download_infrafunction_job_result(
             dst_file.write(src_file.read())
 
 
-def _connect_job_submission_client(dashboard_address, timeout=60, poll_interval=1):
-    """Retries connecting to the Plant's Ray dashboard.
+def _connect_job_submission_client(job_endpoint, timeout=60, poll_interval=1):
+    """Retries connecting to the Plant's job submission endpoint.
 
-    Right after Structure redeploys the Plant, the dashboard Service/pod
+    Right after Structure redeploys the Plant, the control-plane Service/pod
     can report Ready slightly before the Ray head process inside it is
     actually accepting job submission API calls - an immediate
     JobSubmissionClient(...) can fail with "Failed to connect to Ray at
@@ -132,7 +132,7 @@ def _connect_job_submission_client(dashboard_address, timeout=60, poll_interval=
     deadline = time.time() + timeout
     while True:
         try:
-            return JobSubmissionClient(dashboard_address)
+            return JobSubmissionClient(job_endpoint)
         except Exception:
             if time.time() >= deadline:
                 raise
@@ -140,9 +140,21 @@ def _connect_job_submission_client(dashboard_address, timeout=60, poll_interval=
 
 
 def infrafunction_subproc(
-    integrated_subproc, input, output, dashboard_address,
-    minio_endpoint_pod, minio_endpoint_host, minio_bucket, minio_access_key, minio_secret_key,
+    integrated_subproc, input, output, object_store, plant,
 ):
+    """Dispatch tHOF onto Plant; object_store supplies shared S3 scratch endpoints.
+
+    `object_store` is an ObjectStore (or duck-type) with endpoint_host,
+    endpoint_pod, bucket, access_key, secret_key — from
+    InfraStructure.obj_store_context(). `plant` is a PlantContext (or
+    duck-type) with job_endpoint — from Plant.context(). Must not read Service.
+    """
+    job_endpoint = getattr(plant, 'job_endpoint', None)
+    if not job_endpoint:
+        raise RuntimeError(
+            'PlantContext.job_endpoint is required for this InfraFunction'
+        )
+
     job_dir = tempfile.mkdtemp(prefix='infrafunction_job_')
     # Namespaces this job's writes within the shared bucket so concurrent
     # or successive jobs never collide.
@@ -150,10 +162,11 @@ def infrafunction_subproc(
     try:
         _write_infrafunction_job_dir(
             job_dir, input, integrated_subproc,
-            minio_endpoint_pod, minio_bucket, minio_access_key, minio_secret_key, job_prefix,
+            object_store.endpoint_pod, object_store.bucket,
+            object_store.access_key, object_store.secret_key, job_prefix,
         )
 
-        client = _connect_job_submission_client(dashboard_address)
+        client = _connect_job_submission_client(job_endpoint)
         job_id = client.submit_job(
             entrypoint='python entrypoint.py',
             runtime_env={'working_dir': job_dir},
@@ -166,14 +179,18 @@ def infrafunction_subproc(
 
         if status != JobStatus.SUCCEEDED:
             logs = client.get_job_logs(job_id)
-            raise RuntimeError(f'Ray job {job_id} on Plant dashboard {dashboard_address} ended in {status}:\n{logs}')
+            raise RuntimeError(
+                f'Ray job {job_id} on Plant job_endpoint {job_endpoint} '
+                f'ended in {status}:\n{logs}'
+            )
 
         _download_infrafunction_job_result(
-            minio_endpoint_host, minio_bucket, minio_access_key, minio_secret_key, job_prefix, output,
+            object_store.endpoint_host, object_store.bucket,
+            object_store.access_key, object_store.secret_key, job_prefix, output,
         )
         # job_prefix correlates this run's MinIO scratch objects
         # (cats-scratch/jobs/<uuid>/result) with the BOM log's
-        # minio_result_uri; durable retrieval remains integration_data_cid.
+        # object_store_result_uri; durable retrieval remains integration_data_cid.
         return output, job_prefix
     finally:
         shutil.rmtree(job_dir, ignore_errors=True)

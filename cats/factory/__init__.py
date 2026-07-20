@@ -47,14 +47,13 @@ class Executor:
         self.invoiceCID = self.enhanced_bom['invoice_cid']
         self.orderCID = self.enhanced_bom['invoice']['order_cid']
         plant_snapshot = self.structure.reconcile()
-        self.service.RAY_DASHBOARD_ADDRESS = plant_snapshot['ray_dashboard_address']
-        self.service.MINIO_ENDPOINT_HOST = self.structure.infraStructure.minio_endpoint_host()
-        self.service.MINIO_ENDPOINT_POD = self.structure.infraStructure.minio_endpoint_pod()
-        self.service.MINIO_BUCKET = self.structure.infraStructure.minio_bucket()
-        self.service.MINIO_ACCESS_KEY = self.structure.infraStructure.minio_access_key()
-        self.service.MINIO_SECRET_KEY = self.structure.infraStructure.minio_secret_key()
+        object_store = self.structure.infraStructure.obj_store_context()
+        plant = self.structure.plant.context()
         self.ingress_data_cid, self.integration_data_cid, self.egress_data_cid = \
-            self.function.execute()
+            self.function.execute(
+                object_store=object_store,
+                plant=plant,
+            )
 
         # function_cid -> {process_cid, infrafunction_cid}; structure_cid ->
         # {plant_cid, infrastructure_cid} - surfaced here alongside the
@@ -63,15 +62,15 @@ class Executor:
         self.enhanced_bom['function'] = json.loads(self.service.meshClient.cat(self.enhanced_bom['order']['function_cid']))
         self.enhanced_bom['structure'] = json.loads(self.service.meshClient.cat(self.enhanced_bom['order']['structure_cid']))
         self.enhanced_bom['plant'] = plant_snapshot
-        self.enhanced_bom['infrastructure'] = self.structure.infraStructure.minio_snapshot()
+        self.enhanced_bom['infrastructure'] = object_store.snapshot()
         self.enhanced_bom['log'] = {
             'ingress_data_cid': self.ingress_data_cid,
             'integration_data_cid': self.integration_data_cid,
             'egress_data_cid': self.egress_data_cid,
             'plant_rebuilt': plant_snapshot['rebuilt'],
-            # Non-secret MinIO scratch URI for Structure-lifetime correlation;
-            # durable retrieval remains integration_data_cid (IPFS).
-            'minio_result_uri': self.service.MINIO_RESULT_URI,
+            # Non-secret object-store scratch URI for Structure-lifetime
+            # correlation; durable retrieval remains integration_data_cid (IPFS).
+            'object_store_result_uri': self.function.processor.object_store_result_uri,
         }
         # Invoice feedback (Seed deferred / #187): stage CIDs on Invoice until
         # Seed holds the Process replay dictionary.

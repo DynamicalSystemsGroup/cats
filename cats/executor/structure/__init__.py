@@ -5,20 +5,7 @@ import stat
 from cats.utils import subproc_run
 from cats.network.ipfs_docker import MIGRATION_CONTAINER, INTEGRATION_CONTAINER
 
-KIND_CLUSTER_NAME = "cats"
-KIND_CLUSTER_RESOURCE = "module.plant.kind_cluster.default"
-# Resources in module.plant that depend on kind_cluster.default and thus
-# can't be reconciled (or even refreshed) once its cluster is gone from the host.
-KIND_DEPENDENT_RESOURCES = (
-    "module.plant.helm_release.ray-cluster",
-    "module.plant.helm_release.kuberay-operator",
-    "module.plant.kubernetes_service.ray_dashboard_nodeport",
-)
 DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE = "module.infrastructure.shell_script.docker_compose_ipfs_transport"
-DOCKER_COMPOSE_MINIO_RESOURCE = "module.infrastructure.shell_script.docker_compose_minio"
-# Compose project "structure" + service "minio" → container name from
-# modules/infrastructure/main.tf local.minio_container_name.
-MINIO_CONTAINER = "structure-minio-1"
 APPLIED_STRUCTURE_MARKER = '.applied-structure.cid'
 
 
@@ -166,79 +153,11 @@ def _terraform_state_resources(service, structure_home):
     return {line.strip() for line in proc.stdout.splitlines() if line.strip()}
 
 
-def _kind_cluster_names():
-    proc = subproc_run('kind get clusters')
-    if proc.returncode != 0:
-        return set()
-    return {line.strip() for line in proc.stdout.splitlines() if line.strip()}
-
-
 def _docker_container_running(container):
     proc = subproc_run(
         f"docker ps --format '{{{{.Names}}}}' | grep -qx '{container}'"
     )
     return proc.returncode == 0
-
-
-def cleanup_orphan_kind_cluster(service, structure_home):
-    """Remove a leftover kind cluster when it exists on the host but not in state."""
-    clusters = _kind_cluster_names()
-    if KIND_CLUSTER_NAME not in clusters:
-        return
-
-    state = _terraform_state_resources(service, structure_home)
-    if KIND_CLUSTER_RESOURCE in state:
-        return
-
-    print(
-        f'Removing orphan kind cluster "{KIND_CLUSTER_NAME}" '
-        f'({KIND_CLUSTER_RESOURCE} is not in Terraform state)'
-    )
-    proc = subproc_run(f'kind delete cluster --name {KIND_CLUSTER_NAME}')
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f'Failed to delete orphan kind cluster "{KIND_CLUSTER_NAME}": {proc.stderr.strip()}'
-        )
-    if proc.stdout.strip():
-        print(proc.stdout.strip())
-
-
-def cleanup_stale_kind_cluster_state(service, structure_home):
-    """Remove state entries for the kind cluster (and Plant resources that
-    depend on it) when the host has no kind cluster - e.g. after a Docker
-    Desktop restart wiped containers out from under Terraform.
-
-    Covers both (a) cluster still listed in state and (b) only dependents
-    left in state after a partial cleanup. Left alone, the next `apply`
-    fails during refresh (e.g. kubernetes_service dialing [::1]:80) before it
-    can recreate the Plant."""
-    state = _terraform_state_resources(service, structure_home)
-    clusters = _kind_cluster_names()
-    if KIND_CLUSTER_NAME in clusters:
-        return
-
-    stale_resources = [
-        resource for resource in (*KIND_DEPENDENT_RESOURCES, KIND_CLUSTER_RESOURCE)
-        if resource in state
-    ]
-    if not stale_resources:
-        return
-
-    print(
-        f'No kind cluster named "{KIND_CLUSTER_NAME}" on the host; removing '
-        f'stale Terraform Plant state for: {", ".join(stale_resources)}'
-    )
-    proc = subproc_run(
-        f'{terraform_bin(service)} state rm {" ".join(stale_resources)}',
-        cwd=structure_home,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f'Failed to remove stale Terraform state for "{KIND_CLUSTER_NAME}": '
-            f'{proc.stderr.strip()}'
-        )
-    if proc.stdout.strip():
-        print(proc.stdout.strip())
 
 
 def cleanup_stale_docker_compose_ipfs_transport_state(service, structure_home):
@@ -278,37 +197,6 @@ def cleanup_stale_docker_compose_ipfs_transport_state(service, structure_home):
         print(proc.stdout.strip())
 
 
-def cleanup_stale_docker_compose_minio_state(service, structure_home):
-    """Remove the state entry for MinIO when Terraform believes it's up but
-    the container is gone - same scottwinkler/shell drift as IPFS transport.
-
-    Left alone, InfraFunction's Ray job hangs/fails on write_csv to MinIO
-    (e.g. AWS NETWORK_CONNECTION / connection refused on :9000)."""
-    state = _terraform_state_resources(service, structure_home)
-    if DOCKER_COMPOSE_MINIO_RESOURCE not in state:
-        return
-
-    if _docker_container_running(MINIO_CONTAINER):
-        return
-
-    print(
-        f'Terraform state has "{DOCKER_COMPOSE_MINIO_RESOURCE}" but container '
-        f'"{MINIO_CONTAINER}" is not running on the host; removing stale state '
-        f'so apply recreates it'
-    )
-    proc = subproc_run(
-        f'{terraform_bin(service)} state rm {DOCKER_COMPOSE_MINIO_RESOURCE}',
-        cwd=structure_home,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f'Failed to remove stale Terraform state for '
-            f'"{DOCKER_COMPOSE_MINIO_RESOURCE}": {proc.stderr.strip()}'
-        )
-    if proc.stdout.strip():
-        print(proc.stdout.strip())
-
-
 def _terraform_output(service, structure_home, name):
     proc = subproc_run(
         f'{terraform_bin(service)} output -raw {name}',
@@ -333,42 +221,51 @@ class Plant:
         # existing Plant or destroyed and rebuilt it.
         self.rebuilt = None
 
-    def kind_cluster_name(self):
-        return _terraform_output(
-            self.infraStructure.service, self.infraStructure.INPUT_STRUCTURE_HOME, 'plant_kind_cluster_name'
+    def _load_plant_utils(self):
+        """Load Order-submitted modules/plant context utils."""
+        path = os.path.join(
+            self.infraStructure.INPUT_STRUCTURE_HOME,
+            'modules',
+            'plant',
+            'plant_utils.py',
         )
+        if not os.path.isfile(path):
+            raise FileNotFoundError(path)
+        import importlib.util
+        import sys
+        spec = importlib.util.spec_from_file_location(
+            'plant_plant_utils', path
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        # Required before exec_module so @dataclass can resolve cls.__module__.
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module
 
-    def kubeconfig_context(self):
-        return _terraform_output(
-            self.infraStructure.service, self.infraStructure.INPUT_STRUCTURE_HOME, 'plant_kubeconfig_context'
-        )
+    def context(self):
+        """Resolve PlantContext from terraform outputs via Order-submitted
+        plant utils (directory model). Generic `job_endpoint` for dispatch;
+        tool-specific BOM keys live on PlantContext.snapshot()."""
+        utils = self._load_plant_utils()
+        structure_home = self.infraStructure.INPUT_STRUCTURE_HOME
+        service = self.infraStructure.service
 
-    def ray_release_name(self):
-        return _terraform_output(
-            self.infraStructure.service, self.infraStructure.INPUT_STRUCTURE_HOME, 'plant_ray_release_name'
-        )
+        def get_output(name):
+            return _terraform_output(service, structure_home, name)
 
-    def ray_dashboard_address(self):
-        """Address of the Ray dashboard InfraFunction submits jobs to via
-        the Ray Job Submission API (see Processor.Integration() in
-        cats/executor/function/__init__.py) - exposed on a static NodePort
-        by module.plant, so this stays valid across reconciles."""
-        return _terraform_output(
-            self.infraStructure.service, self.infraStructure.INPUT_STRUCTURE_HOME, 'plant_ray_dashboard_address'
-        )
+        return utils.PlantContext.from_terraform_outputs(get_output)
 
     def snapshot(self):
         """Plain dict describing what this Plant currently is, for
         recording into the CAT's BOM alongside Function's output (see
         Executor.execute() in cats/factory/__init__.py)."""
-        return {
-            'kind_cluster_name': self.kind_cluster_name(),
-            'kubeconfig_context': self.kubeconfig_context(),
-            'ray_release_name': self.ray_release_name(),
-            'ray_dashboard_address': self.ray_dashboard_address(),
-            'applied_structure_cid': read_applied_structure_cid(self.infraStructure.INPUT_STRUCTURE_HOME),
-            'rebuilt': self.rebuilt,
-        }
+        return self.context().snapshot(
+            rebuilt=self.rebuilt,
+            applied_structure_cid=read_applied_structure_cid(
+                self.infraStructure.INPUT_STRUCTURE_HOME
+            ),
+        )
 
 
 class InfraStructure:
@@ -386,39 +283,36 @@ class InfraStructure:
     def compose(self):
         return Plant(self)
 
-    def minio_endpoint_host(self):
-        """Host-reachable address of module.infrastructure's MinIO S3 API -
-        used by infrafunction_subproc's own (host) process to retrieve a
-        completed job's results (see infrafunction_subproc in
-        data/input/function/infrafunction.py)."""
-        return _terraform_output(self.service, self.INPUT_STRUCTURE_HOME, 'infrastructure_minio_endpoint_host')
+    def _load_obj_store_module(self):
+        """Load Order-submitted modules/infrastructure object-store utils."""
+        path = os.path.join(
+            self.INPUT_STRUCTURE_HOME, 'modules', 'infrastructure', 'obj_store_utils.py'
+        )
+        if not os.path.isfile(path):
+            raise FileNotFoundError(path)
+        import importlib.util
+        import sys
+        spec = importlib.util.spec_from_file_location(
+            'infrastructure_obj_store_utils', path
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        # Required before exec_module so @dataclass can resolve cls.__module__.
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module
 
-    def minio_endpoint_pod(self):
-        """Address of the same MinIO instance as reachable from inside a
-        Ray pod - via the kind Docker network's gateway IP, not any
-        in-cluster Service - used by the Ray job's own write tasks."""
-        return _terraform_output(self.service, self.INPUT_STRUCTURE_HOME, 'infrastructure_minio_endpoint_pod')
+    def obj_store_context(self):
+        """Resolve the deployed object store from terraform outputs via the
+        Order-submitted infrastructure utils module (directory model)."""
+        utils = self._load_obj_store_module()
+        structure_home = self.INPUT_STRUCTURE_HOME
+        service = self.service
 
-    def minio_bucket(self):
-        return _terraform_output(self.service, self.INPUT_STRUCTURE_HOME, 'infrastructure_minio_bucket')
+        def get_output(name):
+            return _terraform_output(service, structure_home, name)
 
-    def minio_access_key(self):
-        return _terraform_output(self.service, self.INPUT_STRUCTURE_HOME, 'infrastructure_minio_access_key')
-
-    def minio_secret_key(self):
-        return _terraform_output(self.service, self.INPUT_STRUCTURE_HOME, 'infrastructure_minio_secret_key')
-
-    def minio_snapshot(self):
-        """Plain dict describing this module.infrastructure's MinIO, for
-        recording into the CAT's BOM (see Executor.execute() in
-        cats/factory/__init__.py) - deliberately excludes the access/
-        secret key, so credentials never end up content-addressed into
-        the BOM/Invoice graph."""
-        return {
-            'minio_endpoint_host': self.minio_endpoint_host(),
-            'minio_endpoint_pod': self.minio_endpoint_pod(),
-            'minio_bucket': self.minio_bucket(),
-        }
+        return utils.ObjectStore.from_terraform_outputs(get_output)
 
     def destroy(self):
         print('Destroy Structure!')
@@ -461,10 +355,17 @@ class InfraStructure:
         print('Apply Structure!')
         configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
         ensure_integration_cache_env(self.service)
-        cleanup_orphan_kind_cluster(self.service, self.INPUT_STRUCTURE_HOME)
-        cleanup_stale_kind_cluster_state(self.service, self.INPUT_STRUCTURE_HOME)
+        self.compose()._load_plant_utils().cleanup_stale_plant_state(
+            self.INPUT_STRUCTURE_HOME,
+            terraform_bin(self.service),
+            configure_tf_data_dir=configure_terraform_data_dir,
+        )
         cleanup_stale_docker_compose_ipfs_transport_state(self.service, self.INPUT_STRUCTURE_HOME)
-        cleanup_stale_docker_compose_minio_state(self.service, self.INPUT_STRUCTURE_HOME)
+        self._load_obj_store_module().cleanup_stale_obj_store_state(
+            self.INPUT_STRUCTURE_HOME,
+            terraform_bin(self.service),
+            configure_tf_data_dir=configure_terraform_data_dir,
+        )
         self.service.executeCMD(
             f'{terraform_bin(self.service)} apply --auto-approve',
             cwd=self.INPUT_STRUCTURE_HOME

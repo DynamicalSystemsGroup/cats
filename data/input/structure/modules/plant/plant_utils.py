@@ -1,0 +1,208 @@
+"""Plant [SaaS] context helpers for deploy-time dispatch / BOM observation.
+
+Ships inside `modules/plant` so it is part of `plant_cid` (directory model).
+Owns PlantContext resolution from terraform outputs, credential-free snapshots,
+and Plant-specific Terraform/kind stale-state cleanup. Ray-specific observation
+JSON keys and TF resource addresses stay here (this Plant's SaaS shape); the
+Quantum Python API exposes a generic `job_endpoint`.
+
+See docs/DASHBOARDS.md and docs/BOM.md.
+"""
+from __future__ import annotations
+
+import importlib.util
+import os
+import subprocess
+import sys
+from dataclasses import dataclass
+from typing import Optional
+
+UTILS_FILENAME = 'plant_utils.py'
+
+# Terraform / kind identifiers for this Plant (module.plant in Structure root).
+_KIND_CLUSTER_NAME = 'cats'
+_KIND_CLUSTER_RESOURCE = 'module.plant.kind_cluster.default'
+# Resources that depend on kind_cluster.default and thus can't be reconciled
+# (or even refreshed) once its cluster is gone from the host.
+_KIND_DEPENDENT_RESOURCES = (
+    'module.plant.helm_release.ray-cluster',
+    'module.plant.helm_release.kuberay-operator',
+    'module.plant.kubernetes_service.ray_dashboard_nodeport',
+)
+
+
+@dataclass(frozen=True)
+class PlantContext:
+    """Generic Plant dispatch/observation handle for Executor → InfraFunction."""
+
+    job_endpoint: Optional[str]
+    kind_cluster_name: Optional[str]
+    kubeconfig_context: Optional[str]
+    # BOM observation fields (tool-specific JSON keys; not Executor vocabulary).
+    ray_release_name: Optional[str]
+    ray_dashboard_address: Optional[str]
+
+    def snapshot(self, *, rebuilt, applied_structure_cid) -> dict:
+        """Credential-free dict for BOM plant_snapshot (JSON keys stable)."""
+        return {
+            'kind_cluster_name': self.kind_cluster_name,
+            'kubeconfig_context': self.kubeconfig_context,
+            'ray_release_name': self.ray_release_name,
+            'ray_dashboard_address': self.ray_dashboard_address,
+            'applied_structure_cid': applied_structure_cid,
+            'rebuilt': rebuilt,
+        }
+
+    @classmethod
+    def from_terraform_outputs(cls, get_output) -> 'PlantContext':
+        """Build from a callable name -> raw terraform output string."""
+        kind_cluster_name = get_output('plant_kind_cluster_name')
+        kubeconfig_context = get_output('plant_kubeconfig_context')
+        ray_release_name = get_output('plant_ray_release_name')
+        ray_dashboard_address = get_output('plant_ray_dashboard_address') or None
+        return cls(
+            job_endpoint=ray_dashboard_address,
+            kind_cluster_name=kind_cluster_name or None,
+            kubeconfig_context=kubeconfig_context or None,
+            ray_release_name=ray_release_name or None,
+            ray_dashboard_address=ray_dashboard_address,
+        )
+
+
+def load_plant_utils(structure_home: str):
+    """importlib-load this module from a materialized Structure tree."""
+    path = os.path.join(structure_home, 'modules', 'plant', UTILS_FILENAME)
+    if not os.path.isfile(path):
+        raise FileNotFoundError(path)
+    spec = importlib.util.spec_from_file_location(
+        'plant_plant_utils', path
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    # Required before exec_module so @dataclass can resolve cls.__module__.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _subproc_run(cmd, cwd=None):
+    return subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True,
+        text=True,
+        cwd=cwd,
+    )
+
+
+def _kind_cluster_names() -> set:
+    proc = _subproc_run('kind get clusters')
+    if proc.returncode != 0:
+        return set()
+    return {line.strip() for line in proc.stdout.splitlines() if line.strip()}
+
+
+def _terraform_state_resources(terraform_bin: str, structure_home: str) -> set:
+    proc = _subproc_run(f'{terraform_bin} state list', cwd=structure_home)
+    if proc.returncode != 0:
+        return set()
+    return {line.strip() for line in proc.stdout.splitlines() if line.strip()}
+
+
+def cleanup_orphan_kind_cluster(
+    structure_home: str,
+    terraform_bin: str,
+    *,
+    configure_tf_data_dir=None,
+):
+    """Remove a leftover kind cluster when it exists on the host but not in state."""
+    if configure_tf_data_dir is not None:
+        configure_tf_data_dir(structure_home)
+
+    clusters = _kind_cluster_names()
+    if _KIND_CLUSTER_NAME not in clusters:
+        return
+
+    state = _terraform_state_resources(terraform_bin, structure_home)
+    if _KIND_CLUSTER_RESOURCE in state:
+        return
+
+    print(
+        f'Removing orphan kind cluster "{_KIND_CLUSTER_NAME}" '
+        f'({_KIND_CLUSTER_RESOURCE} is not in Terraform state)'
+    )
+    proc = _subproc_run(f'kind delete cluster --name {_KIND_CLUSTER_NAME}')
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f'Failed to delete orphan kind cluster "{_KIND_CLUSTER_NAME}": '
+            f'{proc.stderr.strip()}'
+        )
+    if proc.stdout.strip():
+        print(proc.stdout.strip())
+
+
+def cleanup_stale_kind_cluster_state(
+    structure_home: str,
+    terraform_bin: str,
+    *,
+    configure_tf_data_dir=None,
+):
+    """Remove state for the kind cluster and Plant dependents when the host
+    has no kind cluster (e.g. Docker Desktop wiped containers under Terraform).
+
+    Left alone, the next apply fails during refresh before it can recreate
+    the Plant."""
+    if configure_tf_data_dir is not None:
+        configure_tf_data_dir(structure_home)
+
+    state = _terraform_state_resources(terraform_bin, structure_home)
+    clusters = _kind_cluster_names()
+    if _KIND_CLUSTER_NAME in clusters:
+        return
+
+    stale_resources = [
+        resource
+        for resource in (*_KIND_DEPENDENT_RESOURCES, _KIND_CLUSTER_RESOURCE)
+        if resource in state
+    ]
+    if not stale_resources:
+        return
+
+    print(
+        f'No kind cluster named "{_KIND_CLUSTER_NAME}" on the host; removing '
+        f'stale Terraform Plant state for: {", ".join(stale_resources)}'
+    )
+    proc = _subproc_run(
+        f'{terraform_bin} state rm {" ".join(stale_resources)}',
+        cwd=structure_home,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f'Failed to remove stale Terraform state for "{_KIND_CLUSTER_NAME}": '
+            f'{proc.stderr.strip()}'
+        )
+    if proc.stdout.strip():
+        print(proc.stdout.strip())
+
+
+def cleanup_stale_plant_state(
+    structure_home: str,
+    terraform_bin: str,
+    *,
+    configure_tf_data_dir=None,
+):
+    """Heal Plant/kind Terraform drift before Structure apply (directory model).
+
+    Parallel to InfraStructure object-store stale cleanup in obj_store_utils.
+    """
+    cleanup_orphan_kind_cluster(
+        structure_home,
+        terraform_bin,
+        configure_tf_data_dir=configure_tf_data_dir,
+    )
+    cleanup_stale_kind_cluster_state(
+        structure_home,
+        terraform_bin,
+        configure_tf_data_dir=configure_tf_data_dir,
+    )
