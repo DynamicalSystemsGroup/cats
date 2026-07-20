@@ -29,7 +29,7 @@ the Structure's lifetime.
   `data/input/structure/modules/infrastructure/minio_compose.yaml`.
 - Runtime config is `ObjectStore` from `InfraStructure.obj_store_context()` (Order-submitted
   `modules/infrastructure/obj_store_utils.py`) — **not** Service fields. BOM `log` may record
-  `minio_result_uri` for Structure-lifetime correlation; credential-free endpoints land in
+  `object_store_result_uri` for Structure-lifetime correlation; credential-free endpoints land in
   `bom.infrastructure_snapshot_cid` via `ObjectStore.snapshot()` (see [`BOM.md`](./BOM.md)).
 - There is **no CAT Node HTTP API** for scratch — use this Console, the S3 API, or:
 

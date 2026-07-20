@@ -21,18 +21,18 @@ CATs' architecture is built around the "Plant" family of engineering analogies r
 "Power plant" effectively surfaces twice on the disambiguation page, and they mean different things:
 
 - **[Power station](https://en.wikipedia.org/wiki/Power_station)** - the top-level bullet's target: a facility
-that *generates* power and feeds it into a transmission/distribution grid. This is the
-"generation + transmission/distribution" model.
+that *generates* power and feeds it into a Transmission & Distribution (T&D) grid. This is the
+"generation + Transmission & Distribution (T&D)" model.
 - **[Physical plant § Power plants](https://en.wikipedia.org/wiki/Physical_plant#Power_plants)** - a subsection
 nested *inside* the separate "Physical plant" bullet's target article. It isn't the generation+grid model; it's
 a taxonomy of a power facility's *internal equipment* (primary systems like the reactor core/cooling loops vs.
 generic balance-of-plant systems like turbines/generators/feedwater) - an equipment classification, not a
-generation/distribution architecture.
+generation / Transmission & Distribution (T&D) architecture.
 
 For CATs, the meaningful match is the **Power Station** sense: `Plant [SaaS]` generates compute
-(Ray/KubeRay), `InfraStructure [IaaS]` is the transmission/distribution substrate (IPFS/MinIO/Docker Compose)
+(Ray/KubeRay), `InfraStructure [IaaS]` is the Transmission & Distribution (T&D) substrate (IPFS/MinIO/Docker Compose)
 the generated results move through. The Physical-Plant-internal "Power plants" taxonomy doesn't map onto that
-generation/distribution split; at most, its primary-systems/balance-of-plant-systems distinction loosely echoes
+generation / Transmission & Distribution (T&D) split; at most, its primary-systems/balance-of-plant-systems distinction loosely echoes
 `Plant [SaaS]` (generation-specific core) vs. `InfraStructure [IaaS]` (generic supporting substrate reusable
 across generation mechanisms) - worth noting, but not the primary analogy used below.
 
@@ -76,13 +76,13 @@ Read-Eval-Print Loop as Code that composes and submits transport callables plus 
   - `Process [REPL(aC)]` alone -> the **process** half of Plant (control theory)
   - `InfraFunction [FaaS]` alone -> the **actuator** half of Plant (control theory)
 - **Structure [PaaS]** (`Plant [SaaS]` + `InfraStructure [IaaS]`) -> **Power plant**, specifically the Power
-Station generation+transmission/distribution model (per the caveat above).
+Station generation + Transmission & Distribution (T&D) model (per the caveat above).
   - `Plant [SaaS]` alone (Ray/KubeRay) -> the **generation** side of that Power Station model - not a
   separately-named type on the list, since "generation" isn't its own bullet, but it's the half of Power
   plant that produces the resource.
   - `InfraStructure [IaaS]` alone (IPFS/MinIO/Docker Compose) -> doubles as **Physical plant** in its own right
   ("a facility's infrastructure" - its literal Wikipedia definition matches directly) *and* plays the
-  transmission/distribution role within Structure's Power-Station reading. It's the one component that
+  Transmission & Distribution (T&D) role within Structure's Power-Station reading. It's the one component that
   legitimately sits in two of the six categories simultaneously.
 
 ### 3. the (ephemeral) Executor
@@ -105,7 +105,7 @@ the Manufacturing-plant output (a composed Function+Structure pair) and those co
 | InfraFunction [FaaS]  | ✓ ("actuator" half)    | -                   | -              | -                   | -              | -               |
 | Structure [PaaS]      | -                      | -                   | -              | **✓**               | -              | -               |
 | Plant [SaaS]          | -                      | -                   | -              | ✓ (generation half) | -              | -               |
-| InfraStructure [IaaS] | -                      | -                   | **✓**          | ✓ (T&D half)        | -              | -               |
+| InfraStructure [IaaS] | -                      | -                   | **✓**          | ✓ (Transmission & Distribution (T&D) half) | -              | -               |
 | Executor              | -                      | -                   | -              | -                   | -              | -               |
 
 

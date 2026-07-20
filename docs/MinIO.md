@@ -4,6 +4,13 @@ CATs uses MinIO as InfraStructure [IaaS] **shared object store / scratch** for P
 writes (bucket `cats-scratch`). Durable post-run retrieval of integration outputs is via IPFS
 (`invoice.integration_data_cid`), not MinIO. See [`STORAGE.md`](./STORAGE.md).
 
+MinIO access is **InfraStructure-as-Code** (directory model): the module under
+`data/input/structure/modules/infrastructure/` is what `create_order_request()` CIDs as
+`infrastructure_cid`. Object-store config is resolved at runtime as `ObjectStore` via
+`InfraStructure.obj_store_context()` (importlib seam into `obj_store_utils.py`) — it is **not** a
+Service field. There is **no CAT Node HTTP API** for job scratch — use the Console, S3 API, or the
+module’s local CLI (`obj_store_utils.py`).
+
 #### Automatic lifecycle — usually nothing to do
 
 Structure’s Terraform (`Structure.deploy()` / `redeploy()` / `reconcile()`) starts MinIO via
@@ -56,35 +63,28 @@ cats-scratch/jobs/<uuid>/result/*.csv
 After a CAT run, the BOM `log` records a non-secret correlator:
 
 ```text
-minio_result_uri: s3://cats-scratch/jobs/<uuid>/result
+object_store_result_uri: s3://cats-scratch/jobs/<uuid>/result
 ```
 
 Use that URI (or the Console) to find Structure-lifetime scratch objects. Host download + `cidDir` still
 produce `invoice.integration_data_cid` for durable IPFS access. Objects are **not** deleted after each
 `cidDir`; they remain until Structure destroy (`down -v`).
 
-#### Opt-in CAT Node jobs API (default: off)
+#### Accessing job scratch (no Node API)
 
-By default the CAT Node does **not** expose MinIO job data (`GET /cat/node/minio/jobs…` returns `403`).
+Preferred UI: [MinIO Console](http://127.0.0.1:9001) — browse `cats-scratch/jobs/…`.
 
-Enable Structure-lifetime read access:
+Optional CLI shipped in the InfraStructure module (rides in `infrastructure_cid`):
 
 ```bash
-export CAT_MINIO_JOBS_API=1
-# then start / restart cats/node.py
+# from repo root, with Structure MinIO up
+uv run python data/input/structure/modules/infrastructure/obj_store_utils.py list-jobs
+uv run python data/input/structure/modules/infrastructure/obj_store_utils.py list-files <job_uuid>
+uv run python data/input/structure/modules/infrastructure/obj_store_utils.py get-file <job_uuid> <name.csv>
 ```
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| `GET` | `/cat/node/minio/jobs` | List job UUIDs under `cats-scratch/jobs/` |
-| `GET` | `/cat/node/minio/jobs/<job_uuid>` | List files under `…/result/` |
-| `GET` | `/cat/node/minio/jobs/<job_uuid>/files/<name>` | Stream a CSV |
-
-When enabled but MinIO/Structure config is unavailable, those routes return `503`. Credentials are never
-returned in API responses. Correlate jobs via `log.minio_result_uri`.
-
-Unset `CAT_MINIO_JOBS_API` (or set it to anything other than `1` / `true` / `yes`) to keep the default:
-no access.
+Override connection via `MINIO_ENDPOINT`, `MINIO_BUCKET`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` if needed.
+Correlate jobs with `log.object_store_result_uri` from the BOM.
 
 #### Related docs
 
