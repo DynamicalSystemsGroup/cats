@@ -58,24 +58,6 @@ class Service:
         self.EGRESS_HOME = None
         self.EGRESS_EXIT_CODE = None
         self.EGRESS_JOB_STATUS = None
-        # Set by Executor.execute() from Structure.reconcile()'s Plant
-        # snapshot, before Function.execute() runs - lets InfraFunction
-        # dispatch Processing onto the Plant actually deployed for this CAT
-        # (see Processor.Integration() in cats/executor/function/__init__.py).
-        self.RAY_DASHBOARD_ADDRESS = None
-        # Set by Executor.execute() from InfraStructure's MinIO accessors,
-        # alongside RAY_DASHBOARD_ADDRESS - lets InfraFunction write Ray
-        # Data results to (and retrieve them from) a filesystem every Ray
-        # node actually shares, instead of gathering to one node's disk.
-        self.MINIO_ENDPOINT_HOST = None
-        self.MINIO_ENDPOINT_POD = None
-        self.MINIO_BUCKET = None
-        self.MINIO_ACCESS_KEY = None
-        self.MINIO_SECRET_KEY = None
-        # Set by Processor.Integration() after infrafunction_subproc returns
-        # its job_prefix — non-secret s3:// URI for Structure-lifetime
-        # correlation (see docs/STORAGE.md / docs/MinIO.md).
-        self.MINIO_RESULT_URI = None
 
         self.init_bom_json_cid = None
         self.bom_json_cid = None

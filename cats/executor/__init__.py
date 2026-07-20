@@ -75,8 +75,11 @@ class Function:
         self.egress_data_cid = None
         self.invoice_data_cid = None
 
-    def execute(self):
+    def execute(self, object_store, plant):
         self.ingress_data_cid, self.integration_data_cid, self.egress_data_cid = \
-            self.processor.process()
+            self.processor.process(
+                object_store=object_store,
+                plant=plant,
+            )
         self.invoice_data_cid = self.processor.invoice_data_cid
         return self.ingress_data_cid, self.integration_data_cid, self.egress_data_cid
