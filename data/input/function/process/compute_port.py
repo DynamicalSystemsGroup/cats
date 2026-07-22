@@ -1,0 +1,21 @@
+"""Function-owned compute port contract for Process [REPL(aC)] tHOFs.
+
+Process ``integrated_subproc`` callables depend on ``ComputePort`` only —
+``run_transfer(batch_fn, input_path, ...)``. They must not import Ray or
+Plant Job Submission APIs.
+
+The Ray job entrypoint wires Order-submitted ``RayComputePort`` into the
+tHOF so distributed Ray Data stays behind the Structure adapter.
+"""
+from __future__ import annotations
+
+from typing import Protocol, runtime_checkable
+
+
+@runtime_checkable
+class ComputePort(Protocol):
+    """Thin Process-facing compute surface (Function-owned contract)."""
+
+    def run_transfer(self, batch_fn, input_path: str, *, zip_with_range: bool = False):
+        """Run distributed transfer; adapter defines return type (Ray: Dataset)."""
+        ...

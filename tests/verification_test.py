@@ -1,14 +1,21 @@
 ### Execute Initial CAT0:
 ##### Instantiate CAT Mesh Client:
-import glob, os
+import glob, os, time
 from pprint import pprint
+import numpy as np
 import pandas as pd
 
 from cats import DATA_HOME, MESH_CLIENT as meshClient
 from cats import INPUT_STRUCTURE_HOME, INPUT_DATA_HOME
 
 ##### Compose Initial CAT Order request for CAT Node
-from data.input.function.process import *
+from data.input.function.process import (
+    egress,
+    ingress,
+    integration_cache,
+    process_0,
+    process_1,
+)
 from data.input.function.infrafunction import infrafunction_subproc
 
 def files_to_pandasDF(output, format):
