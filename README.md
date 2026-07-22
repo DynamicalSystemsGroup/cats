@@ -50,9 +50,30 @@ Content-Addressing Data Provenance records with [IPFS](https://ipfs.io/) **[CIDs
     uv sync             # creates .venv and installs locked dependencies from uv.lock
   ```
   - See `[ENV.md](./docs/ENV.md)` for the full environment workflow, including the `ops` and `mac` extras.
-3. **Demo: [Establish a CAT Mesh](./docs/DEMO.md)**
-4. **Test: [CAT Mesh Verification](./docs/TEST.md)**
-5. **[Experiments](./experiments/EXP.md)**
+3. **Start a CAT Node** (convenience: ensure host ContentStore, then bind Flask):
+  ```bash
+  make node-up
+  # chains: make content-store-ensure && make node-start
+  ```
+  See [`STORAGE.md`](./docs/STORAGE.md#node-up-vs-content-store-ensure-and-node-start)
+  for why ensure and start are separate Make targets.
+4. **Check Node status** (Flask listen + ContentStore ready):
+  ```bash
+  make node-status
+  # or: uv run python cats/node.py status
+  ```
+5. **Demo: [Establish a CAT Mesh](./docs/DEMO.md)**
+6. **Test: [CAT Mesh Verification](./docs/TEST.md)**
+7. **Stop the CAT Node** (Flask only — host Kubo stays up):
+  ```bash
+  make node-stop
+  # or: uv run python cats/node.py stop
+
+  # host IPFS (Kubo) daemon is left running on purpose
+  # stop IPFS (Kubo) daemon via the following command:
+  # ipfs shutdown
+  ```
+8. **[Experiments](./experiments/EXP.md)**
 
 ### [Dashboards:](docs/DASHBOARDS.md)
 
