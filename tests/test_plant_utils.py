@@ -88,3 +88,22 @@ def test_plant_kind_resource_addresses_live_in_utils():
         'module.plant.kubernetes_service.ray_dashboard_nodeport'
         in plant_utils._KIND_DEPENDENT_RESOURCES
     )
+
+
+def test_write_job_landing_helpers_copy_from_plant(tmp_path):
+    job_dir = tmp_path / 'job'
+    job_dir.mkdir()
+    plant_utils.write_job_result_entrypoint(str(job_dir))
+    plant_utils.write_job_compute_utils(str(job_dir))
+
+    entry = job_dir / 'entrypoint.py'
+    compute = job_dir / 'ray_compute_utils.py'
+    assert entry.is_file()
+    assert compute.is_file()
+    plant_dir = PLANT_UTILS.parent
+    assert entry.read_text(encoding='utf-8') == (
+        plant_dir / 'ray_job_result_entrypoint.py'
+    ).read_text(encoding='utf-8')
+    assert compute.read_text(encoding='utf-8') == (
+        plant_dir / 'ray_compute_utils.py'
+    ).read_text(encoding='utf-8')

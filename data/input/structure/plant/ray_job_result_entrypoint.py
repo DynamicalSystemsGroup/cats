@@ -1,11 +1,15 @@
 """Ray job entrypoint: run tHOF via ComputePort and write CSV shards to scratch.
 
-Ships in `infrastructure/` (`infrastructure_cid`). Copied into the Ray
-job working_dir as `entrypoint.py` by ObjectStore.write_job_scratch.
-Credentials stay in object_store_config.json (pod-reachable MinIO endpoint).
+Ships in `plant/` (`plant_cid`). Copied into the Ray job working_dir as
+``entrypoint.py`` by ``RayPlantPort.submit_job``. Credentials stay in
+object_store_config.json (written by ObjectStore; pod-reachable MinIO).
 
-Wires Structure ``RayComputePort`` into Process ``integrated_subproc`` so
-Function stays Plant-agnostic (no ``import ray`` in process.py).
+This Plant's landing assumes Ray Dataset + ``write_csv``; another Plant
+ships its own entrypoint under its ``plant_cid``. IaaS stays MinIO config /
+``JobHandle`` only.
+
+Wires Plant ``RayComputePort`` into Process ``integrated_subproc`` so
+Function stays Plant-agnostic (no ``import ray`` in Process).
 """
 import json
 
