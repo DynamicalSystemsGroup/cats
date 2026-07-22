@@ -2,12 +2,17 @@
 
 Talks to the host daemon at http://{host}:{port}/api/v0/* with plain
 `requests` POSTs — no ipfshttpclient / http+ip4 multiaddr stack.
+MeshClient reads and writes both go through this client (no `ipfs` CLI).
 """
 from __future__ import annotations
 
+import io
 import json
 import os
 import pickle
+import shutil
+import tarfile
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -51,11 +56,86 @@ class KuboRpcClient:
             stream=stream,
         )
         if response.status_code >= 400:
-            raise KuboRpcError(endpoint, response.status_code, response.text[:500])
+            # Prefer reading text for errors; streamed bodies may need content.
+            try:
+                err_body = response.text[:500]
+            except Exception:
+                err_body = ''
+            raise KuboRpcError(endpoint, response.status_code, err_body)
         return response
 
     def id(self) -> dict:
         return self._post('id').json()
+
+    def cat_bytes(self, cid: str) -> bytes:
+        response = self._post('cat', params={'arg': cid})
+        return response.content
+
+    def cat(self, cid: str) -> str:
+        return self.cat_bytes(cid).decode('utf-8')
+
+    def ls(self, cid: str) -> list[dict]:
+        """List UnixFS links under ``cid`` (``Objects[0].Links``)."""
+        response = self._post('ls', params={'arg': cid})
+        payload = response.json()
+        objects = payload.get('Objects') or []
+        if not objects:
+            return []
+        return list(objects[0].get('Links') or [])
+
+    def dag_export(self, cid: str, filepath: str) -> None:
+        """Stream ``/api/v0/dag/export`` CAR bytes to ``filepath``."""
+        response = self._post('dag/export', params={'arg': cid}, stream=True)
+        path = Path(filepath)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open('wb') as fh:
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    fh.write(chunk)
+
+    def get(self, cid: str, dest_path: str) -> str:
+        """Fetch CID to ``dest_path``, matching CLI ``ipfs get CID --output dest``.
+
+        HTTP ``/api/v0/get`` returns a tar archive; extract and place the single
+        top-level member at ``dest_path`` (file or directory root).
+        """
+        response = self._post(
+            'get',
+            params={'arg': cid, 'archive': 'true'},
+            stream=True,
+        )
+        dest = Path(dest_path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+
+        # Materialize archive then extract — tarfile needs seekable or full stream.
+        archive_bytes = response.content
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_root = Path(tmp)
+            with tarfile.open(fileobj=io.BytesIO(archive_bytes), mode='r:*') as tar:
+                # filter= avoids Python 3.14 DeprecationWarning on extractall.
+                try:
+                    tar.extractall(tmp_root, filter='data')
+                except TypeError:
+                    tar.extractall(tmp_root)
+            entries = [p for p in tmp_root.iterdir()]
+            if not entries:
+                raise RuntimeError(f'Kubo get returned empty archive for {cid!r}')
+            if len(entries) == 1:
+                extracted = entries[0]
+            else:
+                # Unexpected multi-root tar: stage into a folder then move.
+                extracted = tmp_root / '_cats_get_root'
+                extracted.mkdir()
+                for entry in entries:
+                    shutil.move(str(entry), str(extracted / entry.name))
+
+            if dest.exists():
+                if dest.is_dir():
+                    shutil.rmtree(dest)
+                else:
+                    dest.unlink()
+            shutil.move(str(extracted), str(dest))
+        return str(dest)
 
     def add_bytes(self, data: bytes, *, filename: str = 'blob', **_kwargs) -> str:
         response = self._post(
@@ -127,7 +207,16 @@ class KuboRpcClient:
         return entries
 
 
-def connect(host: str = '127.0.0.1', port: int = 5001, validate: bool = False):
+def connect(
+    host: str | None = None,
+    port: int | None = None,
+    validate: bool = False,
+):
+    """Build CatsIPFSClient; host/port kwargs override IPFS_API_HOST / IPFS_API_PORT."""
+    if host is None:
+        host = os.environ.get('IPFS_API_HOST', '127.0.0.1')
+    if port is None:
+        port = int(os.environ.get('IPFS_API_PORT', '5001'))
     client = KuboRpcClient(host=host, port=port)
     if validate:
         client.id()
@@ -142,6 +231,21 @@ class CatsIPFSClient:
 
     def id(self) -> dict:
         return self._client.id()
+
+    def cat_bytes(self, cid: str) -> bytes:
+        return self._client.cat_bytes(cid)
+
+    def cat(self, cid: str) -> str:
+        return self._client.cat(cid)
+
+    def ls(self, cid: str) -> list[dict]:
+        return self._client.ls(cid)
+
+    def dag_export(self, cid: str, filepath: str) -> None:
+        return self._client.dag_export(cid, filepath)
+
+    def get(self, cid: str, dest_path: str) -> str:
+        return self._client.get(cid, dest_path)
 
     def add(self, filepath: str, recursive: bool = False, **kwargs):
         return self._client.add(filepath, recursive=recursive, **kwargs)

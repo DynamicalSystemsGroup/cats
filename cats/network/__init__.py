@@ -1,11 +1,97 @@
-import json, subprocess
+import contextlib
+import importlib.util
+import itertools
+import json
 import os
+import pickle
+import sys
+import threading
+import time
 from copy import deepcopy
 from pprint import pprint
-import pickle
 
-from cats.network.clients import CoD, ipfs
+import requests
+
+from cats.network.clients import CoD
 from cats.utils import Text2Python
+
+
+def _node_base_url():
+    """Flask Node base URL — same defaults as cats/node.py CAT_NODE_*."""
+    host = os.environ.get('CAT_NODE_HOST', '127.0.0.1')
+    port = int(os.environ.get('CAT_NODE_PORT', '5000'))
+    return f'http://{host}:{port}'
+
+
+def _node_init_endpoint():
+    return f'{_node_base_url()}/cat/node/init'
+
+
+@contextlib.contextmanager
+def _activity_spinner(label='Waiting'):
+    """Indeterminate activity line on stderr while a long call runs (TTY only).
+
+    Order submit wait is mostly server-side work, not byte transfer — a spinner /
+    elapsed counter beats a fake percent bar. Non-TTY (tests/CI): no animation.
+    """
+    stop = threading.Event()
+    started = time.perf_counter()
+    use_tty = sys.stderr.isatty()
+
+    def _run():
+        frames = itertools.cycle('|/-\\')
+        while not stop.wait(0.1):
+            elapsed = time.perf_counter() - started
+            sys.stderr.write(f'\r{label} {next(frames)} {elapsed:.0f}s')
+            sys.stderr.flush()
+
+    thread = None
+    if use_tty:
+        thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        if thread is not None:
+            thread.join(timeout=1.0)
+            sys.stderr.write('\r' + ' ' * 60 + '\r')
+            sys.stderr.flush()
+
+
+def _bootstrap_content_store_utils_path(cats_home):
+    """Repo-default content_store_utils.py (not Order-submitted Structure)."""
+    if not cats_home:
+        return None
+    return os.path.join(
+        cats_home,
+        'data',
+        'input',
+        'structure',
+        'infrastructure',
+        'content_store_utils.py',
+    )
+
+
+def _load_bootstrap_content_store_module(cats_home):
+    """Load default-tree ContentStore for pre-Structure CID work only.
+
+    Not Order-bound — Order-submitted ensure is TF shell_script.host_ipfs_daemon
+    create; InfraStructure.apply only asserts is_ready after terraform apply.
+    """
+    path = _bootstrap_content_store_utils_path(cats_home)
+    if path is None:
+        raise RuntimeError('CATS_HOME is required to locate content_store_utils')
+    if not os.path.isfile(path):
+        raise FileNotFoundError(path)
+    spec = importlib.util.spec_from_file_location(
+        'infrastructure_content_store_utils_bootstrap', path
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 class MeshClient(CoD):
@@ -21,14 +107,10 @@ class MeshClient(CoD):
         self.INPUT_DATA_HOME = None
         if CATS_HOME is not None:
             self.catStore(CATS_HOME)
-        # ipfs(cwd=self.CATS_HOME).shutdown()
-        # Probe/start uses the Kubo HTTP API (not bare `ipfs id`, which can
-        # succeed offline). Failure here must not block package import for
-        # unit tests; node operators still see the error and can start Kubo.
-        try:
-            ipfs(cwd=self.CATS_HOME).daemon()
-        except RuntimeError as exc:
-            print(f'WARNING: host IPFS daemon not ready: {exc}', flush=True)
+        # Bootstrap ContentStore readiness is lazy (ensure_bootstrap_content_store),
+        # not at import — assert/soft-warn only, never Order-bound ensure.
+        # Order-submitted ensure is TF host_ipfs_daemon create; apply asserts.
+        self._bootstrap_content_store_ensured = False
 
         self.INGRESS_HOME = None
         self.INTEGRATION_HOME = None
@@ -44,6 +126,42 @@ class MeshClient(CoD):
         self.awsClient = awsClient
         self.context = ...
         CoD.__init__(self, INTEGRATION_INPUT_CACHE=self.INTEGRATION_INPUT_CACHE, cidDir=self.cidDir)
+
+    def ensure_bootstrap_content_store(self):
+        """Lazy default-tree ContentStore readiness check (no ensure/heal).
+
+        Soft-warns once if the HTTP API is down. Does not call
+        ``ContentStore.ensure`` — operator heal is ``node ensure`` /
+        ``content-store-ensure``; automatic Order mutate is TF
+        ``host_ipfs_daemon`` create. Not Order-bound (repo default tree only).
+        """
+        if self._bootstrap_content_store_ensured:
+            return
+        path = _bootstrap_content_store_utils_path(self.CATS_HOME)
+        if path is None or not os.path.isfile(path):
+            print(
+                'WARNING: bootstrap content_store_utils.py missing; '
+                'skipping MeshClient ContentStore readiness check '
+                f'(path={path!r})',
+                flush=True,
+            )
+            self._bootstrap_content_store_ensured = True
+            return
+        try:
+            module = _load_bootstrap_content_store_module(self.CATS_HOME)
+            if not module.ContentStore.is_ready():
+                print(
+                    'WARNING: host IPFS ContentStore API not ready; '
+                    'run make content-store-ensure or cats/node.py ensure '
+                    '(MeshClient does not auto-ensure).',
+                    flush=True,
+                )
+        except (RuntimeError, FileNotFoundError, OSError) as exc:
+            print(
+                f'WARNING: host IPFS bootstrap content store probe failed: {exc}',
+                flush=True,
+            )
+        self._bootstrap_content_store_ensured = True
 
     def retrieve_cids(self, cid_dict):
         def switch_case(case):
@@ -83,11 +201,8 @@ class MeshClient(CoD):
 
     def fetch_ipfs_object(self, cid):
         try:
-            # Fetch the binary content from IPFS
-            binary_content = self.cat(cid)
-            # Deserialize the object using pickle
-            obj = pickle.loads(binary_content)
-            return obj
+            binary_content = self.catObj(cid)
+            return pickle.loads(binary_content)
         except Exception as e:
             print(f"An error occurred while fetching the object from IPFS: {e}")
             return None
@@ -104,18 +219,28 @@ class MeshClient(CoD):
         pprint(order)
         print()
 
-        ppost = lambda args, endpoint: \
-            f'curl -X POST -H "Content-Type: application/json" -d \\\n\'{json.dumps(**args)}\' {endpoint}'
-        post = lambda args, endpoint: \
-            'curl -X POST -H "Content-Type: application/json" -d \'' + json.dumps(**args) + f'\' {endpoint}'
-
-        post_cmd = post({'obj': order_request}, order["endpoint"])
-        print(ppost({'obj': order_request}, order["endpoint"]))
+        endpoint = order["endpoint"]
+        # Demo-friendly curl equivalent (execution uses requests, same as Kubo RPC).
+        curl_cmd = (
+            "curl -X POST -H \"Content-Type: application/json\" -d '"
+            + json.dumps(order_request)
+            + f"' {endpoint}"
+        )
+        print(curl_cmd)
         print()
-        response_str = subprocess.check_output(post_cmd, shell=True)
-        output_bom = json.loads(response_str)
-
-        output_bom['POST'] = post_cmd
+        print(f'POST {endpoint} …', flush=True)
+        t0 = time.perf_counter()
+        with _activity_spinner(label='Waiting on Node'):
+            response = requests.post(endpoint, json=order_request, timeout=600)
+        elapsed = time.perf_counter() - t0
+        response.raise_for_status()
+        print(
+            f'done in {elapsed:.1f}s → {response.status_code} '
+            f'({len(response.content)} bytes)',
+            flush=True,
+        )
+        output_bom = response.json()
+        output_bom['POST'] = curl_cmd
         return output_bom
 
     def linkProcess(
@@ -170,12 +295,13 @@ class MeshClient(CoD):
         order['function_cid'] = new_function_cid
         order['invoice_cid'] = prev_invoice_cid
         del order['flat']
-        order['endpoint'] = 'http://127.0.0.1:5000/cat/node/init'
+        order['endpoint'] = _node_init_endpoint()
 
         order_request = {'order_cid': self.ipfsClient.add_str(json.dumps(order))}
         return order_request
 
     def cidDir(self, filepath: str):
+        self.ensure_bootstrap_content_store()
         # print(filepath)
         name = filepath.split('/')[-1]
         dir = self.ipfsClient.add(filepath, recursive=True)
@@ -191,6 +317,7 @@ class MeshClient(CoD):
             return dir_cid
 
     def cidFile(self, filepath):
+        self.ensure_bootstrap_content_store()
         file_json = self.ipfsClient.add(filepath)
         file_cid = file_json['Hash']
         file_name = file_json['Name']
@@ -205,16 +332,19 @@ class MeshClient(CoD):
             infrafunction_subproc,
             data_dirpath,
             structure_filepath,
-            endpoint='http://127.0.0.1:5000/cat/node/execute'
+            endpoint=None,
     ):
+        if endpoint is None:
+            endpoint = _node_init_endpoint()
+        self.ensure_bootstrap_content_store()
         structure_name = os.path.basename(structure_filepath.rstrip('/'))
-        # Plant (SaaS): modules/plant - the kind cluster + Helm releases
+        # Plant (SaaS): plant/ - the kind cluster + Helm releases
         # that constitute the dynamically scaled execution environment.
-        plant_cid, _ = self.cidDir(os.path.join(structure_filepath, 'modules', 'plant'))
-        # InfraStructure (IaaS): modules/infrastructure - the IPFS/Docker
+        plant_cid, _ = self.cidDir(os.path.join(structure_filepath, 'plant'))
+        # InfraStructure (IaaS): infrastructure/ - the IPFS/Docker
         # transport layer used to move content-addressed data in and out
         # of the Plant.
-        infrastructure_cid, _ = self.cidDir(os.path.join(structure_filepath, 'modules', 'infrastructure'))
+        infrastructure_cid, _ = self.cidDir(os.path.join(structure_filepath, 'infrastructure'))
         structure_cid = self.ipfsClient.add_str(json.dumps({
             'plant_cid': plant_cid,
             'infrastructure_cid': infrastructure_cid,
@@ -327,53 +457,57 @@ class MeshClient(CoD):
         car_bom_cid, init_bom_json_cid = self.convertBOMtoCAR(init_bom_json_cid, init_bom_filename)
         return car_bom_cid, init_bom_json_cid
 
-    def linkData(self, cid, subdir=' - outputs/'):
-        cmd = f"ipfs ls {cid}"
-        response = subprocess.check_output(cmd.split(' ')).decode()
-        dirs = response.split('\n')
-        res = [i for i in dirs if subdir in i]
-        return res[0].split(' - ')[0]
+    def linkData(self, cid, subdir='outputs'):
+        """Return Hash of the UnixFS link matching ``subdir`` (name fragment).
+
+        Legacy CLI filter strings like ``' - outputs/'`` are normalized to
+        ``outputs``.
+        """
+        self.ensure_bootstrap_content_store()
+        needle = subdir.strip(' -/')
+        if not needle:
+            needle = 'outputs'
+        links = self.ipfsClient.ls(cid)
+        for link in links:
+            name = link.get('Name') or ''
+            if needle in name:
+                return link['Hash']
+        raise RuntimeError(
+            f'No ls link matching {needle!r} under {cid!r}; '
+            f'names={[link.get("Name") for link in links]}'
+        )
 
     def get(self, cid: str, filepath: str, output: str = None):
+        self.ensure_bootstrap_content_store()
         if output is None:
             output = self.CATS_HOME
-        subprocess.check_output(
-            f"ipfs get {cid} --output {output}/{filepath}",
-            stderr=subprocess.STDOUT,
-            shell=True,
-            cwd=output
-        )
+        dest = os.path.join(output, filepath)
+        self.ipfsClient.get(cid, dest)
         return filepath
 
     def testGet(self, cid: str, output: str):
-        subprocess.check_output(
-            f"ipfs get {cid} --output {output} --progress=true && echo 'IPFS download of {output} completed successfully.' || echo 'IPFS download of {cid} failed.'",
-            stderr=subprocess.STDOUT,
-            shell=True,
-            cwd=output
-        )
+        self.ensure_bootstrap_content_store()
+        self.ipfsClient.get(cid, output)
+        print(f'IPFS download of {output} completed successfully.')
 
     def cat(self, cid: str):
-        return subprocess.check_output(['ipfs', 'cat', cid]).decode()
+        self.ensure_bootstrap_content_store()
+        return self.ipfsClient.cat(cid)
 
     def catObj(self, cid: str):
-        return subprocess.check_output(['ipfs', 'cat', cid])
+        self.ensure_bootstrap_content_store()
+        return self.ipfsClient.cat_bytes(cid)
 
     def getCar(self, cid: str, filepath: str):
-        subprocess.check_output(
-            f"ipfs dag export {cid} > {filepath}",
-            stderr=subprocess.STDOUT,
-            shell=True
-        )
+        self.ensure_bootstrap_content_store()
+        self.ipfsClient.dag_export(cid, filepath)
 
     def getBom(self, cid: str, filepath: str):
         self.get(cid, filepath)
-        bom = dict(json.loads(filepath))
-        subprocess.check_output(
-            f"rm {filepath}",
-            stderr=subprocess.STDOUT,
-            shell=True
-        )
+        path = os.path.join(self.CATS_HOME, filepath)
+        with open(path, encoding='utf-8') as fh:
+            bom = dict(json.load(fh))
+        os.remove(path)
         return bom
 
     def BOMcarToIPFS(self, bom_cid: str, filepath: str):
@@ -412,17 +546,17 @@ class MeshClient(CoD):
 
         # structure_cid nests plant_cid (module.plant) and infrastructure_cid
         # (module.infrastructure) - see create_order_request() - so each is
-        # fetched into its corresponding modules/ subdirectory rather than
-        # structure_cid itself being a single directory CID.
+        # fetched into its corresponding plant/ or infrastructure/ subdirectory
+        # rather than structure_cid itself being a single directory CID.
         structure = json.loads(self.cat(enhanced_bom['order']['structure_cid']))
         structure_filepath = enhanced_bom['order']['structure_filepath']
         self.get(
             cid=structure['plant_cid'], output=INPUT_HOME,
-            filepath=os.path.join(structure_filepath, 'modules', 'plant')
+            filepath=os.path.join(structure_filepath, 'plant')
         )
         self.get(
             cid=structure['infrastructure_cid'], output=INPUT_HOME,
-            filepath=os.path.join(structure_filepath, 'modules', 'infrastructure')
+            filepath=os.path.join(structure_filepath, 'infrastructure')
         )
         return deepcopy(enhanced_bom), bom
 
