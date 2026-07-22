@@ -85,12 +85,22 @@ def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
     fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
     fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmPy'
 
-    plant = tmp_path / 'structure' / 'plant'
-    infra = tmp_path / 'structure' / 'infrastructure'
+    structure = tmp_path / 'structure'
+    plant = structure / 'plant'
+    infra = structure / 'infrastructure'
     plant.mkdir(parents=True)
     infra.mkdir(parents=True)
+    (structure / 'main.tf').write_text('module "plant" { source = "./plant" }\n')
+    (structure / 'outputs.tf').write_text('output "x" { value = 1 }\n')
+    (structure / '.terraform.lock.hcl').write_text('# lock\n')
     (plant / 'x.tf').write_text('x')
     (infra / 'y.tf').write_text('y')
+    process_pkg = tmp_path / 'function' / 'process'
+    infra_pkg = tmp_path / 'function' / 'infrafunction'
+    process_pkg.mkdir(parents=True)
+    infra_pkg.mkdir(parents=True)
+    (process_pkg / '__init__.py').write_text('# process\n')
+    (infra_pkg / '__init__.py').write_text('# infrafunction\n')
     data = tmp_path / 'data'
     data.mkdir()
     (data / 'f.csv').write_text('a\n')
@@ -114,7 +124,7 @@ def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
         integration_cache_subproc=lambda: None,
         infrafunction_subproc=lambda: None,
         data_dirpath=str(data),
-        structure_filepath=str(tmp_path / 'structure'),
+        structure_filepath=str(structure),
     )
     order = json.loads(
         # last add_str for order body — recover from fake call args that look like order JSON
@@ -126,6 +136,31 @@ def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
     )
     assert order['endpoint'] == 'http://127.0.0.1:5000/cat/node/init'
     assert order_req['order_cid']
+
+    structure_payload = json.loads(
+        next(
+            args[0]
+            for args, _ in fake.add_str.call_args_list
+            if '"root_cid"' in args[0]
+            and '"plant_cid"' in args[0]
+            and '"infrastructure_cid"' in args[0]
+        )
+    )
+    assert structure_payload['root_cid'] == 'Qmstructure-root'
+    assert structure_payload['plant_cid'] == 'Qmplant'
+    assert structure_payload['infrastructure_cid'] == 'Qminfrastructure'
+
+    function_payload = json.loads(
+        next(
+            args[0]
+            for args, _ in fake.add_str.call_args_list
+            if '"process_source_cid"' in args[0]
+            and '"infrafunction_source_cid"' in args[0]
+            and '"process_cid"' in args[0]
+        )
+    )
+    assert function_payload['process_source_cid'] == 'Qmprocess'
+    assert function_payload['infrafunction_source_cid'] == 'Qminfrafunction'
 
 
 def test_cat_submit_uses_requests(monkeypatch, capsys):
