@@ -8,12 +8,18 @@ terraform {
 }
 
 locals {
-  ipfs_transport_compose   = "${path.module}/ipfs_transport_compose.yaml"
+  ipfs_transport_compose = "${path.module}/ipfs_transport_compose.yaml"
+  # Legacy pidfile from older create scripts that started Kubo via nohup;
+  # delete only removes the file — never kills host Kubo (content-store facet).
   host_ipfs_daemon_pidfile = "${path.module}/.host-ipfs-daemon.pid"
-  host_ipfs_daemon_logfile = "${path.module}/.host-ipfs-daemon.log"
-  # Pinned so container names (and ipfs_connect_peers.sh's defaults) stay
-  # "structure-ipfs_migration-1"/"structure-ipfs_integration-1" regardless of
-  # which module directory the compose file lives in.
+  content_store_utils = "${path.module}/content_store_utils.py"
+  transport_utils     = "${path.module}/transport_utils.py"
+  # infrastructure/ → … → repo root (four levels up).
+  cats_repo_root = "${path.module}/../../../.."
+  # Pinned so Docker Compose names stay
+  # "structure-ipfs_migration-1"/"structure-ipfs_integration-1" (matches
+  # TransportContext defaults in transport_utils.py) regardless of which
+  # module directory the compose file lives in.
   compose_project_name = "structure"
 
   minio_compose       = "${path.module}/minio_compose.yaml"
@@ -27,45 +33,37 @@ locals {
 }
 
 resource "shell_script" "host_ipfs_daemon" {
-  # Idempotent: probes the Kubo HTTP API (POST :5001/api/v0/id), not bare
-  # `ipfs id` — modern Kubo answers `ipfs id` from the local repo with the
-  # daemon down (Addresses null), which would skip starting the API.
-  # Only starts `ipfs daemon` - and only ever kills it again on destroy -
-  # when this resource is the one that started it, so a daemon already
-  # running from outside Terraform is never disturbed and never hit with
-  # a second `ipfs daemon` (which would fail with "someone else has the
-  # lock").
+  # InfraStructure content-store facet: sole Order-submitted ContentStore.ensure
+  # during Structure TF (à la carte; bare terraform apply can start host Kubo).
+  # Executor InfraStructure.apply only asserts is_ready after apply — it does
+  # not call ensure. Does not kill host Kubo on destroy — content store
+  # outlives Structure T&D (Docker peers / MinIO) and Plant.
   lifecycle_commands {
     create = <<-EOF
       #!/bin/bash
       set -e
-      ipfs_api_ready() {
-        curl -sf -X POST http://127.0.0.1:5001/api/v0/id >/dev/null 2>&1
-      }
-      if ipfs_api_ready; then
-        echo "Host IPFS daemon already running; not starting another one."
-        exit 0
+      REPO_ROOT="$(cd "${local.cats_repo_root}" && pwd)"
+      SCRIPT="${local.content_store_utils}"
+      if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
+        "$REPO_ROOT/.venv/bin/python" "$SCRIPT" ensure
+      elif command -v uv >/dev/null 2>&1; then
+        (cd "$REPO_ROOT" && uv run python "$SCRIPT" ensure)
+      else
+        python3 "$SCRIPT" ensure
       fi
-      nohup ipfs daemon >"${local.host_ipfs_daemon_logfile}" 2>&1 &
-      echo $! > "${local.host_ipfs_daemon_pidfile}"
-      for i in $(seq 1 30); do
-        ipfs_api_ready && exit 0
-        sleep 1
-      done
-      echo "Timed out waiting for host IPFS daemon to become ready" >&2
-      exit 1
     EOF
     delete = <<-EOF
       #!/bin/bash
-      if [ -f "${local.host_ipfs_daemon_pidfile}" ]; then
-        kill "$(cat "${local.host_ipfs_daemon_pidfile}")" 2>/dev/null || true
-        rm -f "${local.host_ipfs_daemon_pidfile}"
-      fi
+      # Content-store facet: leave host Kubo running for Order/BOM CIDs and
+      # the next demo/Node session. Only clear a legacy pidfile if present.
+      rm -f "${local.host_ipfs_daemon_pidfile}"
     EOF
   }
 }
 
 resource "shell_script" "docker_compose_ipfs_transport" {
+  # T&D transport peer containers (create-once). Peering mutate is
+  # shell_script.ipfs_transport_peering (every apply) — not Process heal.
   lifecycle_commands {
     create = <<-EOF
       #!/bin/bash
@@ -73,7 +71,6 @@ resource "shell_script" "docker_compose_ipfs_transport" {
       mkdir -p "$INTEGRATION_INPUT_DATA_CACHE"
       export INTEGRATION_INPUT_DATA_CACHE="$(cd "$INTEGRATION_INPUT_DATA_CACHE" && pwd)"
       docker-compose -p ${local.compose_project_name} -f ${local.ipfs_transport_compose} up --scale ipfs_migration=1 --scale ipfs_integration=1 -d --wait
-      bash ${path.module}/ipfs_connect_peers.sh
     EOF
     delete = <<-EOF
       #!/bin/bash
@@ -85,14 +82,48 @@ resource "shell_script" "docker_compose_ipfs_transport" {
   ]
 }
 
+resource "shell_script" "ipfs_transport_peering" {
+  # Sole Order-submitted peering mutate (TransportContext.ensure_peered).
+  # triggers.always = timestamp() ForceNews this resource every terraform apply
+  # so swarm is healed every reconcile without recreating Compose.
+  # Executor InfraStructure.apply only asserts assert_ready after apply.
+  # terraform plan will always show this resource replacing — expected.
+  triggers = {
+    always = timestamp()
+  }
+  lifecycle_commands {
+    create = <<-EOF
+      #!/bin/bash
+      set -e
+      REPO_ROOT="$(cd "${local.cats_repo_root}" && pwd)"
+      SCRIPT="${local.transport_utils}"
+      if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
+        "$REPO_ROOT/.venv/bin/python" "$SCRIPT" ensure-peered
+      elif command -v uv >/dev/null 2>&1; then
+        (cd "$REPO_ROOT" && uv run python "$SCRIPT" ensure-peered)
+      else
+        python3 "$SCRIPT" ensure-peered
+      fi
+    EOF
+    delete = <<-EOF
+      #!/bin/bash
+      # Swarm links are ephemeral; do not tear down Compose peers.
+      true
+    EOF
+  }
+  depends_on = [
+    shell_script.docker_compose_ipfs_transport
+  ]
+}
+
 # Shared S3-compatible object store Ray Data's write tasks and
 # infrafunction_subproc's result retrieval use instead of a local
 # filesystem (see cats/executor/function's Processor.Integration() and
-# data/input/function/infrafunction.py's infrafunction_subproc).
+# data/input/function/infrafunction/actuator.py's infrafunction_subproc).
 # Published straight to the host, like the IPFS transport containers'
 # pattern above - reachable from the host at 127.0.0.1, and from Ray pods
 # via the kind Docker network's gateway IP (see the root-level
-# data.docker_network.kind lookup in ../../main.tf).
+# data.docker_network.kind lookup in ../main.tf).
 resource "shell_script" "docker_compose_minio" {
   lifecycle_commands {
     create = <<-EOF

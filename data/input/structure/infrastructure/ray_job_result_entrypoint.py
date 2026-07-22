@@ -1,13 +1,18 @@
-"""Ray job entrypoint: run tHOF and write CSV shards to object-store scratch.
+"""Ray job entrypoint: run tHOF via ComputePort and write CSV shards to scratch.
 
-Ships in `modules/infrastructure` (`infrastructure_cid`). Copied into the Ray
-job working_dir as `entrypoint.py` by ObjectStore.write_ray_job_scratch.
+Ships in `infrastructure/` (`infrastructure_cid`). Copied into the Ray
+job working_dir as `entrypoint.py` by ObjectStore.write_job_scratch.
 Credentials stay in object_store_config.json (pod-reachable MinIO endpoint).
+
+Wires Structure ``RayComputePort`` into Process ``integrated_subproc`` so
+Function stays Plant-agnostic (no ``import ray`` in process.py).
 """
 import json
 
 import ray.cloudpickle as cloudpickle
 from pyarrow.fs import S3FileSystem
+
+from ray_compute_utils import RayComputePort
 
 with open('subproc.pkl', 'rb') as subproc_file:
     subproc = cloudpickle.load(subproc_file)
@@ -27,6 +32,7 @@ object_store_output_key = '{}/{}/result'.format(
 
 # Every node writes its own blocks directly to the shared object store, so
 # this stays genuinely distributed regardless of how many nodes
-# participate in producing the Dataset that `subproc` (Process) returns.
-ds_out = subproc('input')
+# participate in producing the Dataset that ComputePort returns.
+compute = RayComputePort()
+ds_out = subproc('input', compute)
 ds_out.write_csv(object_store_output_key, filesystem=object_store_fs)

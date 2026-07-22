@@ -1,10 +1,11 @@
 """Plant [SaaS] context helpers for deploy-time dispatch / BOM observation.
 
-Ships inside `modules/plant` so it is part of `plant_cid` (directory model).
+Ships inside `plant/` so it is part of `plant_cid` (directory model).
 Owns PlantContext resolution from terraform outputs, credential-free snapshots,
-and Plant-specific Terraform/kind stale-state cleanup. Ray-specific observation
-JSON keys and TF resource addresses stay here (this Plant's SaaS shape); the
-Quantum Python API exposes a generic `job_endpoint`.
+Plant-specific Terraform/kind stale-state cleanup, and the Ray PlantPort adapter
+(``RayPlantPort`` / ``plant_port_from_context``). Ray-specific observation JSON
+keys and TF resource addresses stay here (this Plant's SaaS shape); InfraFunction
+speaks Function-owned ``PlantPort`` only.
 
 See docs/DASHBOARDS.md and docs/BOM.md.
 """
@@ -14,6 +15,7 @@ import importlib.util
 import os
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -33,7 +35,7 @@ _KIND_DEPENDENT_RESOURCES = (
 
 @dataclass(frozen=True)
 class PlantContext:
-    """Generic Plant dispatch/observation handle for Executor → InfraFunction."""
+    """Plant observation handle; Ray dashboard URL feeds RayPlantPort."""
 
     job_endpoint: Optional[str]
     kind_cluster_name: Optional[str]
@@ -69,9 +71,75 @@ class PlantContext:
         )
 
 
+class RayPlantPort:
+    """PlantPort adapter: Ray Job Submission against KubeRay dashboard URL."""
+
+    def __init__(self, job_endpoint: str, *, connect_timeout: int = 60, poll_interval: float = 1):
+        if not job_endpoint:
+            raise RuntimeError('RayPlantPort requires a non-empty job_endpoint')
+        self.job_endpoint = job_endpoint
+        self.connect_timeout = connect_timeout
+        self.poll_interval = poll_interval
+        self._client = None
+
+    def _connect(self):
+        from ray.job_submission import JobSubmissionClient
+
+        deadline = time.time() + self.connect_timeout
+        while True:
+            try:
+                return JobSubmissionClient(self.job_endpoint)
+            except Exception:
+                if time.time() >= deadline:
+                    raise
+                time.sleep(self.poll_interval)
+
+    @property
+    def client(self):
+        if self._client is None:
+            self._client = self._connect()
+        return self._client
+
+    def submit_job(self, *, entrypoint: str, working_dir: str) -> str:
+        return self.client.submit_job(
+            entrypoint=entrypoint,
+            runtime_env={'working_dir': working_dir},
+        )
+
+    def wait(self, job_id: str) -> None:
+        from ray.job_submission import JobStatus
+
+        status = self.client.get_job_status(job_id)
+        while status not in (JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.STOPPED):
+            time.sleep(self.poll_interval)
+            status = self.client.get_job_status(job_id)
+
+        if status != JobStatus.SUCCEEDED:
+            logs = self.client.get_job_logs(job_id)
+            raise RuntimeError(
+                f'Ray job {job_id} on Plant job_endpoint {self.job_endpoint} '
+                f'ended in {status}:\n{logs}'
+            )
+
+
+def plant_port_from_context(plant) -> RayPlantPort:
+    """Build RayPlantPort from PlantContext (or any object with job_endpoint).
+
+    Objects that already implement ``submit_job`` / ``wait`` are returned as-is.
+    """
+    if hasattr(plant, 'submit_job') and hasattr(plant, 'wait'):
+        return plant
+    job_endpoint = getattr(plant, 'job_endpoint', None)
+    if not job_endpoint:
+        raise RuntimeError(
+            'PlantContext.job_endpoint is required to build RayPlantPort'
+        )
+    return RayPlantPort(job_endpoint)
+
+
 def load_plant_utils(structure_home: str):
     """importlib-load this module from a materialized Structure tree."""
-    path = os.path.join(structure_home, 'modules', 'plant', UTILS_FILENAME)
+    path = os.path.join(structure_home, 'plant', UTILS_FILENAME)
     if not os.path.isfile(path):
         raise FileNotFoundError(path)
     spec = importlib.util.spec_from_file_location(

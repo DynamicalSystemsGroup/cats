@@ -1,15 +1,31 @@
+import importlib.util
+import json
 import os
 import re
 import stat
+import sys
 
 from cats.utils import subproc_run
-from cats.network.docker_ipfs_transport_peering import (
-    MIGRATION_CONTAINER,
-    INTEGRATION_CONTAINER,
-)
 
 DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE = "module.infrastructure.shell_script.docker_compose_ipfs_transport"
 APPLIED_STRUCTURE_MARKER = '.applied-structure.cid'
+
+
+def _load_transport_utils_module(structure_home):
+    """Load Order-submitted infrastructure/transport_utils.py."""
+    path = os.path.join(
+        structure_home, 'infrastructure', 'transport_utils.py'
+    )
+    if not os.path.isfile(path):
+        raise FileNotFoundError(path)
+    spec = importlib.util.spec_from_file_location(
+        'infrastructure_transport_utils', path
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def _applied_structure_marker_path(structure_home):
@@ -145,6 +161,36 @@ def providers_cached(structure_home):
     return True
 
 
+def modules_installed(structure_home):
+    """True when TF module cache dirs exist for every entry in modules.json.
+
+    After local module ``source`` path changes (e.g. ``modules/plant`` →
+    ``plant``), providers may still be cached while the module cache is
+    stale; ``terraform destroy``/``apply`` then fail with "Module not
+    installed". ``initialize`` must re-run ``init`` in that case.
+    """
+    modules_json = os.path.join(
+        structure_home, '.terraform-data', 'modules', 'modules.json'
+    )
+    if not os.path.isfile(modules_json):
+        return False
+    try:
+        with open(modules_json, encoding='utf-8') as fh:
+            payload = json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return False
+    modules = payload.get('Modules') or []
+    if not modules:
+        return False
+    for entry in modules:
+        rel = entry.get('Dir') or '.'
+        if rel in ('', '.'):
+            continue
+        if not os.path.isdir(os.path.join(structure_home, rel)):
+            return False
+    return True
+
+
 def _terraform_state_resources(service, structure_home):
     configure_terraform_data_dir(structure_home)
     proc = subproc_run(
@@ -168,23 +214,27 @@ def cleanup_stale_docker_compose_ipfs_transport_state(service, structure_home):
     when Terraform state believes it's already up but its containers are
     gone from the host - e.g. after a Docker Desktop restart or reset.
 
-    Unlike `shell_script.host_ipfs_daemon`, this resource's `create` script
-    isn't idempotent/self-probing, and the `scottwinkler/shell` provider
-    has no `read` command to detect this drift on its own - so once this
-    resource is in state, plain `apply` never notices the containers are
-    missing and never re-runs `create`. Left alone, `ingress`/`egress`
-    then fail against a nonexistent container (e.g. "No such container:
-    structure-ipfs_migration-1") the next time a CAT executes."""
+    Unlike `shell_script.host_ipfs_daemon` (ContentStore.ensure — idempotent
+    API probe), this resource's `create` script isn't self-probing, and the
+    `scottwinkler/shell` provider has no `read` command to detect this drift
+    on its own - so once this resource is in state, plain `apply` never
+    notices the containers are missing and never re-runs `create`. Left
+    alone, `ingress`/`egress` then fail against a nonexistent container
+    (e.g. "No such container: structure-ipfs_migration-1") the next time a
+    CAT executes."""
     state = _terraform_state_resources(service, structure_home)
     if DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE not in state:
         return
 
-    if _docker_container_running(MIGRATION_CONTAINER) and _docker_container_running(INTEGRATION_CONTAINER):
+    transport_utils = _load_transport_utils_module(structure_home)
+    migration = transport_utils.MIGRATION_CONTAINER
+    integration = transport_utils.INTEGRATION_CONTAINER
+    if _docker_container_running(migration) and _docker_container_running(integration):
         return
 
     print(
         f'Terraform state has "{DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE}" but its '
-        f'containers ("{MIGRATION_CONTAINER}", "{INTEGRATION_CONTAINER}") are not '
+        f'containers ("{migration}", "{integration}") are not '
         f'running on the host; removing stale state so apply recreates them'
     )
     proc = subproc_run(
@@ -225,10 +275,9 @@ class Plant:
         self.rebuilt = None
 
     def _load_plant_utils(self):
-        """Load Order-submitted modules/plant context utils."""
+        """Load Order-submitted plant context utils."""
         path = os.path.join(
             self.infraStructure.INPUT_STRUCTURE_HOME,
-            'modules',
             'plant',
             'plant_utils.py',
         )
@@ -248,8 +297,8 @@ class Plant:
 
     def context(self):
         """Resolve PlantContext from terraform outputs via Order-submitted
-        plant utils (directory model). Generic `job_endpoint` for dispatch;
-        tool-specific BOM keys live on PlantContext.snapshot()."""
+        plant utils (directory model). Observation + Ray dashboard URL;
+        dispatch uses ``plant_port()`` → PlantPort."""
         utils = self._load_plant_utils()
         structure_home = self.infraStructure.INPUT_STRUCTURE_HOME
         service = self.infraStructure.service
@@ -258,6 +307,11 @@ class Plant:
             return _terraform_output(service, structure_home, name)
 
         return utils.PlantContext.from_terraform_outputs(get_output)
+
+    def plant_port(self):
+        """Resolve Function-owned PlantPort (RayPlantPort for this Plant)."""
+        utils = self._load_plant_utils()
+        return utils.plant_port_from_context(self.context())
 
     def snapshot(self):
         """Plain dict describing what this Plant currently is, for
@@ -287,20 +341,40 @@ class InfraStructure:
         return Plant(self)
 
     def _load_obj_store_module(self):
-        """Load Order-submitted modules/infrastructure object-store utils."""
+        """Load Order-submitted infrastructure object-store utils."""
         path = os.path.join(
-            self.INPUT_STRUCTURE_HOME, 'modules', 'infrastructure', 'obj_store_utils.py'
+            self.INPUT_STRUCTURE_HOME, 'infrastructure', 'obj_store_utils.py'
         )
         if not os.path.isfile(path):
             raise FileNotFoundError(path)
-        import importlib.util
-        import sys
         spec = importlib.util.spec_from_file_location(
             'infrastructure_obj_store_utils', path
         )
         module = importlib.util.module_from_spec(spec)
         assert spec.loader is not None
         # Required before exec_module so @dataclass can resolve cls.__module__.
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module
+
+    def _load_transport_module(self):
+        """Load Order-submitted infrastructure transport utils."""
+        return _load_transport_utils_module(self.INPUT_STRUCTURE_HOME)
+
+    def _load_content_store_module(self):
+        """Load Order-submitted infrastructure content-store utils."""
+        path = os.path.join(
+            self.INPUT_STRUCTURE_HOME,
+            'infrastructure',
+            'content_store_utils.py',
+        )
+        if not os.path.isfile(path):
+            raise FileNotFoundError(path)
+        spec = importlib.util.spec_from_file_location(
+            'infrastructure_content_store_utils_order', path
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
         sys.modules[spec.name] = module
         spec.loader.exec_module(module)
         return module
@@ -316,6 +390,61 @@ class InfraStructure:
             return _terraform_output(service, structure_home, name)
 
         return utils.ObjectStore.from_terraform_outputs(get_output)
+
+    def transport_context(self):
+        """Resolve TransportContext from Order-submitted transport_utils.
+
+        T&D facet for Process port (migrate / stage_for_plant). Peering mutate
+        is TF shell_script.ipfs_transport_peering (every apply); apply only
+        asserts — not Process heal.
+        """
+        utils = self._load_transport_module()
+        return utils.TransportContext.default(
+            structure_home=self.INPUT_STRUCTURE_HOME
+        )
+
+    def transport_assert(self):
+        """Fail loud if Order-submitted transport peer containers are not up.
+
+        Executor composes à la carte TF (ipfs_transport_peering ensures swarm
+        every apply); this only probes container readiness.
+        """
+        try:
+            self.transport_context().assert_ready()
+        except RuntimeError as exc:
+            raise RuntimeError(
+                'InfraStructure transport peers not ready after Structure '
+                'terraform apply. TF shell_script.ipfs_transport_peering '
+                'should have peered them; heal via '
+                'transport_utils.py ensure-peered or re-apply Structure. '
+                f'({exc})'
+            ) from exc
+
+    def content_store_ensure(self, cwd=None):
+        """À la carte Order-submitted ContentStore.ensure (same tree as TF CLI).
+
+        Distinct from MeshClient bootstrap ensure (repo default tree). Structure
+        apply does **not** call this — TF ``shell_script.host_ipfs_daemon``
+        create is the sole Order-submitted mutate path; apply only asserts.
+        """
+        utils = self._load_content_store_module()
+        utils.ContentStore.ensure(cwd=cwd)
+
+    def content_store_assert(self):
+        """Fail loud if Order-submitted ContentStore is not ready after TF.
+
+        Executor composes à la carte TF (which ensures on host_ipfs_daemon
+        create); this only probes readiness.
+        """
+        utils = self._load_content_store_module()
+        if utils.ContentStore.is_ready():
+            return
+        raise RuntimeError(
+            'Host Kubo ContentStore not ready after Structure terraform apply. '
+            'TF shell_script.host_ipfs_daemon create should have ensured it; '
+            'heal via make content-store-ensure / node ensure, or replace '
+            'host_ipfs_daemon so create re-runs.'
+        )
 
     def destroy(self):
         print('Destroy Structure!')
@@ -340,8 +469,11 @@ class InfraStructure:
     def initialize(self):
         print('Initialize Structure!')
         tf_data_dir = configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
-        if providers_cached(self.INPUT_STRUCTURE_HOME):
-            print('Terraform providers already cached; skipping init.')
+        if (
+            providers_cached(self.INPUT_STRUCTURE_HOME)
+            and modules_installed(self.INPUT_STRUCTURE_HOME)
+        ):
+            print('Terraform providers and modules already cached; skipping init.')
             print()
             return
         self.service.executeCMD(
@@ -358,6 +490,8 @@ class InfraStructure:
         print('Apply Structure!')
         configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
         ensure_integration_cache_env(self.service)
+        # ContentStore.ensure is à la carte TF (host_ipfs_daemon create), not
+        # Python apply — Executor only asserts readiness after terraform apply.
         self.compose()._load_plant_utils().cleanup_stale_plant_state(
             self.INPUT_STRUCTURE_HOME,
             terraform_bin(self.service),
@@ -373,15 +507,11 @@ class InfraStructure:
             f'{terraform_bin(self.service)} apply --auto-approve',
             cwd=self.INPUT_STRUCTURE_HOME
         )
-        peer_script = os.path.join(
-            self.INPUT_STRUCTURE_HOME, 'modules', 'infrastructure', 'ipfs_connect_peers.sh'
-        )
-        if os.path.isfile(peer_script):
-            print('Connect IPFS transport peers...')
-            proc = subproc_run(f'bash {peer_script}', cwd=self.INPUT_STRUCTURE_HOME)
-            if proc.stdout.strip():
-                print(proc.stdout.strip())
-            if proc.returncode != 0 and proc.stderr.strip():
-                print(proc.stderr.strip())
+        print('Assert InfraStructure content store ready (Order-submitted)...')
+        self.content_store_assert()
+        # Peering mutate is à la carte TF (ipfs_transport_peering every apply);
+        # Executor only asserts containers are up.
+        print('Assert InfraStructure transport peers ready (Order-submitted)...')
+        self.transport_assert()
         print()
         print()

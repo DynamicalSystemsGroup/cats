@@ -1,9 +1,9 @@
-"""InfraStructure [IaaS] object-store helpers (MinIO) for Ray job scratch.
+"""InfraStructure [IaaS] object-store helpers (MinIO) for Plant job scratch.
 
-Ships inside `modules/infrastructure` so it is part of `infrastructure_cid`
+Ships inside `infrastructure/` so it is part of `infrastructure_cid`
 (directory model). Owns ObjectStore resolution, credential-free snapshots,
-Ray-job scratch write/download (entrypoint + host retrieval), stale
-Terraform/compose cleanup, and a local CLI. There is no CAT Node HTTP API —
+job scratch write/download (entrypoint + ComputePort adapter + host retrieval),
+stale Terraform/compose cleanup, and a local CLI. There is no CAT Node HTTP API —
 operators use the MinIO Console / S3 API, or this module's CLI. Durable
 retrieval remains IPFS `integration_data_cid`.
 
@@ -19,6 +19,7 @@ import re
 import shutil
 import subprocess
 import sys
+import uuid
 from dataclasses import dataclass
 
 import pyarrow.fs
@@ -42,7 +43,18 @@ _SAFE_NAME_RE = re.compile(r'^[A-Za-z0-9._-]+$')
 
 UTILS_FILENAME = 'obj_store_utils.py'
 ENTRYPOINT_FILENAME = 'ray_job_result_entrypoint.py'
+COMPUTE_UTILS_FILENAME = 'ray_compute_utils.py'
 JOB_ENTRYPOINT_NAME = 'entrypoint.py'
+
+
+@dataclass(frozen=True)
+class JobHandle:
+    """Correlator for one Plant job's object-store scratch prefix."""
+
+    prefix: str  # jobs/{uuid}
+
+    def result_key(self) -> str:
+        return f'{self.prefix}/result'
 
 
 @dataclass(frozen=True)
@@ -53,8 +65,15 @@ class ObjectStore:
     access_key: str
     secret_key: str
 
-    def result_uri(self, job_prefix: str) -> str:
-        return f's3://{self.bucket}/{job_prefix}/result'
+    def begin_job(self) -> JobHandle:
+        """Allocate a unique scratch prefix for one InfraFunction dispatch."""
+        return JobHandle(prefix=f'jobs/{uuid.uuid4()}')
+
+    def result_uri(self, handle: JobHandle) -> str:
+        if not isinstance(handle, JobHandle):
+            # Legacy string prefix still used by some tests/helpers.
+            return f's3://{self.bucket}/{handle}/result'
+        return f's3://{self.bucket}/{handle.result_key()}'
 
     def snapshot(self) -> dict:
         """Credential-free dict for BOM infrastructure_snapshot (JSON keys stable)."""
@@ -72,8 +91,8 @@ class ObjectStore:
             'secret_key': self.secret_key,
         }
 
-    def write_ray_job_scratch(self, job_dir: str, job_prefix: str) -> None:
-        """Write pod-reachable object-store config + Ray job result entrypoint.
+    def write_job_scratch(self, job_dir: str, handle: JobHandle) -> None:
+        """Write pod-reachable object-store config + Ray entrypoint + ComputePort adapter.
 
         InfraFunction supplies subproc.pkl / input/; this owns MinIO scratch
         mechanics so Function does not embed S3FileSystem / key layout.
@@ -84,13 +103,15 @@ class ObjectStore:
             access_key=self.access_key,
             secret_key=self.secret_key,
             bucket=self.bucket,
-            prefix=job_prefix,
+            prefix=handle.prefix,
         )
         write_job_result_entrypoint(job_dir)
+        write_job_compute_utils(job_dir)
 
-    def download_job_result(self, job_prefix: str, output: str) -> None:
+    def download_job_result(self, handle: JobHandle, output: str) -> None:
         """Host-side download of a completed job's result prefix."""
-        download_job_result_prefix(self.as_cli_config(), job_prefix, output)
+        prefix = handle.prefix if isinstance(handle, JobHandle) else handle
+        download_job_result_prefix(self.as_cli_config(), prefix, output)
 
     @classmethod
     def from_terraform_outputs(cls, get_output) -> 'ObjectStore':
@@ -126,7 +147,7 @@ class ObjectStore:
 def load_obj_store_utils(structure_home: str):
     """importlib-load this module from a materialized Structure tree."""
     path = os.path.join(
-        structure_home, 'modules', 'infrastructure', UTILS_FILENAME
+        structure_home, 'infrastructure', UTILS_FILENAME
     )
     if not os.path.isfile(path):
         raise FileNotFoundError(path)
@@ -170,12 +191,22 @@ def write_job_result_entrypoint(job_dir):
     """Copy Order-submitted ray_job_result_entrypoint.py into the job working_dir.
 
     Ray submits `python entrypoint.py`; the source file ships beside this module
-    in `modules/infrastructure` so it is part of `infrastructure_cid`.
+    in `infrastructure/` so it is part of `infrastructure_cid`.
     """
     source = os.path.join(os.path.dirname(os.path.abspath(__file__)), ENTRYPOINT_FILENAME)
     if not os.path.isfile(source):
         raise FileNotFoundError(source)
     shutil.copyfile(source, os.path.join(job_dir, JOB_ENTRYPOINT_NAME))
+
+
+def write_job_compute_utils(job_dir):
+    """Copy RayComputePort adapter into the job working_dir for entrypoint import."""
+    source = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), COMPUTE_UTILS_FILENAME
+    )
+    if not os.path.isfile(source):
+        raise FileNotFoundError(source)
+    shutil.copyfile(source, os.path.join(job_dir, COMPUTE_UTILS_FILENAME))
 
 
 def download_job_result_prefix(config, job_prefix, output):
