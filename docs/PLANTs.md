@@ -72,14 +72,14 @@ Function's dependency on Structure, not a standalone facility:
 
 - **Function [FaaS]** (`Process [REPL(aC)]` + `InfraFunction [FaaS]`) -> **Plant (control theory)** as a whole -
 "the combination of process and actuator" is verbatim Function's own composition (Process [REPL(aC)] = the
-Read-Eval-Print Loop as Code that composes and submits transport callables plus a tHOF = the "process"; InfraFunction = the actuator dispatching that tHOF onto compute).
+Read-Eval-Print Loop as Code that composes and submits transport/`ComputePort` callables plus a Plant-agnostic tHOF = the "process"; InfraFunction = the actuator dispatching that tHOF onto compute via `PlantPort`).
   - `Process [REPL(aC)]` alone -> the **process** half of Plant (control theory)
   - `InfraFunction [FaaS]` alone -> the **actuator** half of Plant (control theory)
 - **Structure [PaaS]** (`Plant [SaaS]` + `InfraStructure [IaaS]`) -> **Power plant**, specifically the Power
 Station generation + Transmission & Distribution (T&D) model (per the caveat above).
-  - `Plant [SaaS]` alone (Ray/KubeRay) -> the **generation** side of that Power Station model - not a
+  - `Plant [SaaS]` alone (this demo: Ray/KubeRay via `RayPlantPort`) -> the **generation** side of that Power Station model - not a
   separately-named type on the list, since "generation" isn't its own bullet, but it's the half of Power
-  plant that produces the resource.
+  plant that produces the resource. Function stays Plant-agnostic; Ray adapters live under Structure.
   - `InfraStructure [IaaS]` alone (IPFS/MinIO/Docker Compose) -> doubles as **Physical plant** in its own right
   ("a facility's infrastructure" - its literal Wikipedia definition matches directly) *and* plays the
   Transmission & Distribution (T&D) role within Structure's Power-Station reading. It's the one component that
@@ -110,5 +110,6 @@ the Manufacturing-plant output (a composed Function+Structure pair) and those co
 
 
 See also: `[COMPONENTS.md](COMPONENTS.md)` for the Node's top-level Architectural Components,
-`[NodeProductFlow.md](NodeProductFlow.md)` for how they're exercised per execution, and
-`[DESIGN.md](DESIGN.md)` for how the Architectural Quantum is realized as content-addressed CIDs.
+`[NodeProductFlow.md](NodeProductFlow.md)` for how they're exercised per execution,
+`[DESIGN.md](DESIGN.md)` for how the Architectural Quantum is realized as content-addressed CIDs, and
+`[INTEROP.md](INTEROP.md)` for proving Plant/T&D interoperability across AQ components.

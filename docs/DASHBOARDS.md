@@ -13,28 +13,28 @@ the Structure's lifetime.
 - Live address is `Plant.snapshot()['ray_dashboard_address']`, threaded into
   `Function.execute(…, dashboard_address=…)`. It is **not** a Service field.
 - Static NodePort `30265` → host `8265` via kind `extraPortMappings`
-  (`data/input/structure/modules/plant/main.tf`).
+  (`data/input/structure/plant/main.tf`).
 
 ### [MinIO Console](http://127.0.0.1:9001)
 
 - **URL:** http://127.0.0.1:9001 (S3 API: http://127.0.0.1:9000)
 - **Credentials:** `cats-minio` / `cats-minio-secret`
   (`local.minio_root_user` / `local.minio_root_password` in
-  `data/input/structure/modules/infrastructure/main.tf`) — change these before deploying a
+  `data/input/structure/infrastructure/main.tf`) — change these before deploying a
   Structure whose console would be reachable by anyone else.
 - Console for InfraStructure [IaaS] shared object store / scratch (`cats-scratch`) used for
   Plant parallel Ray writes (`jobs/<uuid>/result`). Named volume `structure_minio_data` retains
   objects for the Structure's lifetime; durable integration outputs are IPFS
   (`invoice.integration_data_cid`), not MinIO. Compose:
-  `data/input/structure/modules/infrastructure/minio_compose.yaml`.
+  `data/input/structure/infrastructure/minio_compose.yaml`.
 - Runtime config is `ObjectStore` from `InfraStructure.obj_store_context()` (Order-submitted
-  `modules/infrastructure/obj_store_utils.py`) — **not** Service fields. BOM `log` may record
+  `infrastructure/obj_store_utils.py`) — **not** Service fields. BOM `log` may record
   `object_store_result_uri` for Structure-lifetime correlation; credential-free endpoints land in
   `bom.infrastructure_snapshot_cid` via `ObjectStore.snapshot()` (see [`BOM.md`](./BOM.md)).
 - There is **no CAT Node HTTP API** for scratch — use this Console, the S3 API, or:
 
   ```bash
-  uv run python data/input/structure/modules/infrastructure/obj_store_utils.py list-jobs
+  uv run python data/input/structure/infrastructure/obj_store_utils.py list-jobs
   ```
 
   Details: [`MinIO.md`](./MinIO.md), roles: [`STORAGE.md`](./STORAGE.md).
