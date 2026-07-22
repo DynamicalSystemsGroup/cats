@@ -43,9 +43,21 @@ def test_object_store_result_uri():
         prefix='jobs/11111111-2222-3333-4444-555555555555'
     )
     uri = store.result_uri(handle)
-    assert uri == 's3://cats-scratch/jobs/11111111-2222-3333-4444-555555555555/result'
-    # Legacy string prefix still accepted for helpers/tests.
-    assert store.result_uri(handle.prefix) == uri
+    assert uri == f's3://{store.bucket}/{handle.result_key()}'
+    with pytest.raises(TypeError, match='JobHandle'):
+        store.result_uri(handle.prefix)
+
+
+def test_download_job_result_requires_job_handle(tmp_path):
+    store = obj_store_utils.ObjectStore(
+        endpoint_host='http://127.0.0.1:9000',
+        endpoint_pod='http://172.19.0.1:9000',
+        bucket='cats-scratch',
+        access_key='cats-minio',
+        secret_key='cats-minio-secret',
+    )
+    with pytest.raises(TypeError, match='JobHandle'):
+        store.download_job_result('jobs/not-a-handle', str(tmp_path / 'out'))
 
 
 def test_object_store_snapshot_excludes_credentials():
@@ -109,7 +121,7 @@ def test_cli_list_jobs_help():
     assert exc.value.code == 0
 
 
-def test_write_job_scratch_writes_config_entrypoint_and_compute(tmp_path):
+def test_write_job_scratch_writes_config_only(tmp_path):
     store = obj_store_utils.ObjectStore(
         endpoint_host='http://127.0.0.1:9000',
         endpoint_pod='http://172.19.0.1:9000',
@@ -125,11 +137,9 @@ def test_write_job_scratch_writes_config_entrypoint_and_compute(tmp_path):
     store.write_job_scratch(str(job_dir), handle)
 
     config_path = job_dir / 'object_store_config.json'
-    entry_path = job_dir / 'entrypoint.py'
-    compute_path = job_dir / 'ray_compute_utils.py'
     assert config_path.is_file()
-    assert entry_path.is_file()
-    assert compute_path.is_file()
+    assert not (job_dir / 'entrypoint.py').exists()
+    assert not (job_dir / 'ray_compute_utils.py').exists()
 
     import json
     config = json.loads(config_path.read_text(encoding='utf-8'))
@@ -137,21 +147,7 @@ def test_write_job_scratch_writes_config_entrypoint_and_compute(tmp_path):
     assert config['bucket'] == 'cats-scratch'
     assert config['prefix'] == handle.prefix
     assert 'access_key' in config
-    assert store.result_uri(handle) == (
-        's3://cats-scratch/jobs/11111111-2222-3333-4444-555555555555/result'
-    )
-    assert 'object_store_config.json' in entry_path.read_text(encoding='utf-8')
-    assert 'write_csv' in entry_path.read_text(encoding='utf-8')
-    source = (
-        REPO_ROOT
-        / 'data'
-        / 'input'
-        / 'structure'
-        / 'infrastructure'
-        / 'ray_job_result_entrypoint.py'
-
-    )
-    assert entry_path.read_text(encoding='utf-8') == source.read_text(encoding='utf-8')
+    assert store.result_uri(handle) == f's3://{store.bucket}/{handle.result_key()}'
 
 
 def test_load_obj_store_utils_from_structure_home():

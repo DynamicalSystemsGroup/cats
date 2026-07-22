@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -20,6 +21,9 @@ from dataclasses import dataclass
 from typing import Optional
 
 UTILS_FILENAME = 'plant_utils.py'
+ENTRYPOINT_FILENAME = 'ray_job_result_entrypoint.py'
+COMPUTE_UTILS_FILENAME = 'ray_compute_utils.py'
+JOB_ENTRYPOINT_NAME = 'entrypoint.py'
 
 # Terraform / kind identifiers for this Plant (module.plant in Structure root).
 _KIND_CLUSTER_NAME = 'cats'
@@ -101,6 +105,9 @@ class RayPlantPort:
         return self._client
 
     def submit_job(self, *, entrypoint: str, working_dir: str) -> str:
+        # Plant-owned Ray landing (plant_cid): stage before Job Submission.
+        write_job_result_entrypoint(working_dir)
+        write_job_compute_utils(working_dir)
         return self.client.submit_job(
             entrypoint=entrypoint,
             runtime_env={'working_dir': working_dir},
@@ -120,6 +127,28 @@ class RayPlantPort:
                 f'Ray job {job_id} on Plant job_endpoint {self.job_endpoint} '
                 f'ended in {status}:\n{logs}'
             )
+
+
+def write_job_result_entrypoint(job_dir):
+    """Copy Order-submitted ray_job_result_entrypoint.py into the job working_dir.
+
+    Ray submits ``python entrypoint.py``; the source ships beside this module
+    in ``plant/`` so it is part of ``plant_cid``.
+    """
+    source = os.path.join(os.path.dirname(os.path.abspath(__file__)), ENTRYPOINT_FILENAME)
+    if not os.path.isfile(source):
+        raise FileNotFoundError(source)
+    shutil.copyfile(source, os.path.join(job_dir, JOB_ENTRYPOINT_NAME))
+
+
+def write_job_compute_utils(job_dir):
+    """Copy RayComputePort adapter into the job working_dir for entrypoint import."""
+    source = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), COMPUTE_UTILS_FILENAME
+    )
+    if not os.path.isfile(source):
+        raise FileNotFoundError(source)
+    shutil.copyfile(source, os.path.join(job_dir, COMPUTE_UTILS_FILENAME))
 
 
 def plant_port_from_context(plant) -> RayPlantPort:

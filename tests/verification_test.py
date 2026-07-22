@@ -102,12 +102,25 @@ class catDataVerification:
         log = flat_cat_invoiced_response['flat_bom']['log']
         object_store_result_uri = log.get('object_store_result_uri')
         assert object_store_result_uri, "log.object_store_result_uri should be set"
-        assert object_store_result_uri.startswith('s3://cats-scratch/jobs/'), (
-            f"log.object_store_result_uri should be under cats-scratch/jobs/: "
+        # JobHandle correlator shape (s3://<bucket>/<prefix>/result) — do not
+        # hardcode demo bucket/key layout as a product invariant.
+        assert object_store_result_uri.startswith('s3://'), (
+            f"log.object_store_result_uri should be an s3 URI: "
             f"{object_store_result_uri}"
         )
         assert object_store_result_uri.endswith('/result'), (
-            f"log.object_store_result_uri should end with /result: "
+            f"log.object_store_result_uri should end with JobHandle result_key "
+            f"suffix /result: {object_store_result_uri}"
+        )
+        # bucket + non-empty prefix between s3:// and /result
+        remainder = object_store_result_uri[len('s3://'):]
+        assert '/' in remainder and not remainder.startswith('/'), (
+            f"log.object_store_result_uri missing bucket/prefix: "
+            f"{object_store_result_uri}"
+        )
+        bucket, _, key = remainder.partition('/')
+        assert bucket and key and key.endswith('/result'), (
+            f"log.object_store_result_uri not JobHandle-shaped: "
             f"{object_store_result_uri}"
         )
 

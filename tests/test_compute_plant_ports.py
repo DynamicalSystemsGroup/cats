@@ -15,18 +15,16 @@ ENTRYPOINT_PY = (
     / 'data'
     / 'input'
     / 'structure'
-    / 'infrastructure'
+    / 'plant'
     / 'ray_job_result_entrypoint.py'
-
 )
 RAY_COMPUTE_PY = (
     REPO_ROOT
     / 'data'
     / 'input'
     / 'structure'
-    / 'infrastructure'
+    / 'plant'
     / 'ray_compute_utils.py'
-
 )
 OBJ_STORE_UTILS = (
     REPO_ROOT
@@ -107,7 +105,7 @@ def test_entrypoint_wires_compute_port():
     assert RAY_COMPUTE_PY.is_file()
 
 
-def test_job_handle_begin_and_scratch_copies_compute_utils(tmp_path):
+def test_job_handle_begin_and_scratch_writes_config_only(tmp_path):
     ou = _load(OBJ_STORE_UTILS, 'infrastructure_obj_store_utils_ports')
     store = ou.ObjectStore(
         endpoint_host='http://127.0.0.1:9000',
@@ -118,14 +116,14 @@ def test_job_handle_begin_and_scratch_copies_compute_utils(tmp_path):
     )
     handle = store.begin_job()
     assert handle.prefix.startswith('jobs/')
-    assert store.result_uri(handle) == f's3://cats-scratch/{handle.prefix}/result'
+    assert store.result_uri(handle) == f's3://{store.bucket}/{handle.result_key()}'
 
     job_dir = tmp_path / 'job'
     job_dir.mkdir()
     store.write_job_scratch(str(job_dir), handle)
-    assert (job_dir / 'entrypoint.py').is_file()
-    assert (job_dir / 'ray_compute_utils.py').is_file()
     assert (job_dir / 'object_store_config.json').is_file()
+    assert not (job_dir / 'entrypoint.py').exists()
+    assert not (job_dir / 'ray_compute_utils.py').exists()
 
 
 def test_plant_port_from_context_and_passthrough():
@@ -145,6 +143,37 @@ def test_plant_port_from_context_and_passthrough():
     assert pu.plant_port_from_context(fake) is fake
 
 
+def test_ray_plant_port_submit_job_stages_landing(tmp_path, monkeypatch):
+    pu = _load(PLANT_UTILS, 'plant_plant_utils_submit')
+    job_dir = tmp_path / 'job'
+    job_dir.mkdir()
+    submitted = []
+
+    class _FakeClient:
+        def submit_job(self, *, entrypoint, runtime_env):
+            submitted.append((entrypoint, runtime_env))
+            return 'job-staged'
+
+    port = pu.RayPlantPort(job_endpoint='http://127.0.0.1:8265')
+    monkeypatch.setattr(port, '_client', _FakeClient())
+    job_id = port.submit_job(
+        entrypoint='python entrypoint.py',
+        working_dir=str(job_dir),
+    )
+    assert job_id == 'job-staged'
+    assert (job_dir / 'entrypoint.py').is_file()
+    assert (job_dir / 'ray_compute_utils.py').is_file()
+    assert (job_dir / 'entrypoint.py').read_text(
+        encoding='utf-8'
+    ) == ENTRYPOINT_PY.read_text(encoding='utf-8')
+    assert (job_dir / 'ray_compute_utils.py').read_text(
+        encoding='utf-8'
+    ) == RAY_COMPUTE_PY.read_text(encoding='utf-8')
+    assert submitted == [
+        ('python entrypoint.py', {'working_dir': str(job_dir)}),
+    ]
+
+
 def test_infrafunction_subproc_uses_plant_port_and_job_handle(tmp_path, monkeypatch):
     from data.input.function.infrafunction import actuator
     from data.input.function.infrafunction import infrafunction_subproc
@@ -161,7 +190,7 @@ def test_infrafunction_subproc_uses_plant_port_and_job_handle(tmp_path, monkeypa
             return h
 
         def write_job_scratch(self, job_dir, handle):
-            Path(job_dir).joinpath('entrypoint.py').write_text('# stub\n')
+            Path(job_dir).joinpath('object_store_config.json').write_text('{}')
 
         def download_job_result(self, handle, output):
             self.downloads.append((handle.prefix, output))

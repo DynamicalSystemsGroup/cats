@@ -8,7 +8,7 @@
 #   - process_0 / process_1 (Order slot: integrated_subproc) — the Transfer
 #     Higher-Order Function (tHOF): input→output data transform via
 #     ComputePort.run_transfer (Plant-agnostic). Ray Data orchestration lives
-#     in Structure RayComputePort, wired by the job entrypoint.
+#     in Plant RayComputePort, wired by the Plant-owned job entrypoint.
 # InfraFunction [FaaS] dispatches only the tHOF onto Plant [SaaS]; transport runs
 # locally around that dispatch. Executor wires `transport` like object_store/plant.
 #

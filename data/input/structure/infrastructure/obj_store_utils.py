@@ -2,10 +2,11 @@
 
 Ships inside `infrastructure/` so it is part of `infrastructure_cid`
 (directory model). Owns ObjectStore resolution, credential-free snapshots,
-job scratch write/download (entrypoint + ComputePort adapter + host retrieval),
-stale Terraform/compose cleanup, and a local CLI. There is no CAT Node HTTP API —
-operators use the MinIO Console / S3 API, or this module's CLI. Durable
-retrieval remains IPFS `integration_data_cid`.
+job scratch config write / host download, stale Terraform/compose cleanup,
+and a local CLI. Ray job landing (entrypoint / ``RayComputePort``) is
+Plant-owned under ``plant_cid``. There is no CAT Node HTTP API — operators
+use the MinIO Console / S3 API, or this module's CLI. Durable retrieval
+remains IPFS `integration_data_cid`.
 
 See docs/MinIO.md and docs/STORAGE.md.
 """
@@ -16,7 +17,6 @@ import importlib.util
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import uuid
@@ -42,9 +42,6 @@ _JOB_UUID_RE = re.compile(
 _SAFE_NAME_RE = re.compile(r'^[A-Za-z0-9._-]+$')
 
 UTILS_FILENAME = 'obj_store_utils.py'
-ENTRYPOINT_FILENAME = 'ray_job_result_entrypoint.py'
-COMPUTE_UTILS_FILENAME = 'ray_compute_utils.py'
-JOB_ENTRYPOINT_NAME = 'entrypoint.py'
 
 
 @dataclass(frozen=True)
@@ -71,8 +68,9 @@ class ObjectStore:
 
     def result_uri(self, handle: JobHandle) -> str:
         if not isinstance(handle, JobHandle):
-            # Legacy string prefix still used by some tests/helpers.
-            return f's3://{self.bucket}/{handle}/result'
+            raise TypeError(
+                f'result_uri requires JobHandle, got {type(handle).__name__}'
+            )
         return f's3://{self.bucket}/{handle.result_key()}'
 
     def snapshot(self) -> dict:
@@ -92,10 +90,11 @@ class ObjectStore:
         }
 
     def write_job_scratch(self, job_dir: str, handle: JobHandle) -> None:
-        """Write pod-reachable object-store config + Ray entrypoint + ComputePort adapter.
+        """Write pod-reachable object-store config for the Plant job working_dir.
 
-        InfraFunction supplies subproc.pkl / input/; this owns MinIO scratch
-        mechanics so Function does not embed S3FileSystem / key layout.
+        InfraFunction supplies subproc.pkl / input/; Plant stages Ray landing
+        on ``submit_job``. This owns MinIO scratch config so Function does not
+        embed S3FileSystem / key layout.
         """
         write_job_object_store_config(
             job_dir,
@@ -105,13 +104,15 @@ class ObjectStore:
             bucket=self.bucket,
             prefix=handle.prefix,
         )
-        write_job_result_entrypoint(job_dir)
-        write_job_compute_utils(job_dir)
 
     def download_job_result(self, handle: JobHandle, output: str) -> None:
         """Host-side download of a completed job's result prefix."""
-        prefix = handle.prefix if isinstance(handle, JobHandle) else handle
-        download_job_result_prefix(self.as_cli_config(), prefix, output)
+        if not isinstance(handle, JobHandle):
+            raise TypeError(
+                f'download_job_result requires JobHandle, got '
+                f'{type(handle).__name__}'
+            )
+        download_job_result_prefix(self.as_cli_config(), handle.prefix, output)
 
     @classmethod
     def from_terraform_outputs(cls, get_output) -> 'ObjectStore':
@@ -185,28 +186,6 @@ def write_job_object_store_config(
             'bucket': bucket,
             'prefix': prefix,
         }, config_file)
-
-
-def write_job_result_entrypoint(job_dir):
-    """Copy Order-submitted ray_job_result_entrypoint.py into the job working_dir.
-
-    Ray submits `python entrypoint.py`; the source file ships beside this module
-    in `infrastructure/` so it is part of `infrastructure_cid`.
-    """
-    source = os.path.join(os.path.dirname(os.path.abspath(__file__)), ENTRYPOINT_FILENAME)
-    if not os.path.isfile(source):
-        raise FileNotFoundError(source)
-    shutil.copyfile(source, os.path.join(job_dir, JOB_ENTRYPOINT_NAME))
-
-
-def write_job_compute_utils(job_dir):
-    """Copy RayComputePort adapter into the job working_dir for entrypoint import."""
-    source = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), COMPUTE_UTILS_FILENAME
-    )
-    if not os.path.isfile(source):
-        raise FileNotFoundError(source)
-    shutil.copyfile(source, os.path.join(job_dir, COMPUTE_UTILS_FILENAME))
 
 
 def download_job_result_prefix(config, job_prefix, output):
