@@ -57,8 +57,9 @@ class Executor:
                 transport=transport,
             )
 
-        # function_cid -> {process_cid, infrafunction_cid}; structure_cid ->
-        # {plant_cid, infrastructure_cid} - surfaced here alongside the
+        # function_cid -> {process_cid, infrafunction_cid, process_source_cid,
+        # infrafunction_source_cid}; structure_cid ->
+        # {root_cid, plant_cid, infrastructure_cid} - surfaced here alongside the
         # Plant snapshot so the BOM records both what Structure/Function
         # were specified (as Code) and what Plant was actually observed.
         self.enhanced_bom['function'] = json.loads(self.service.meshClient.cat(self.enhanced_bom['order']['function_cid']))

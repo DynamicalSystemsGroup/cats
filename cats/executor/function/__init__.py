@@ -1,4 +1,4 @@
-import json, pickle
+import json
 from cats.utils import wait_for_directory
 from data.input.function.process.transport_port import as_transport_port
 
@@ -150,14 +150,31 @@ class InfraFunction:
         self.infrafunction = json.loads(self.service.meshClient.cat(self.infrafunction_cid))
         self.infrafunction_subproc_cid = self.infrafunction['infrafunction_subproc_cid']
 
-        self.ingress_subproc = pickle.loads(self.service.meshClient.catObj(self.ingress_subproc_cid))
-        self.integrated_subproc = pickle.loads(self.service.meshClient.catObj(self.integrated_subproc_cid))
-        self.egress_subproc = pickle.loads(self.service.meshClient.catObj(self.egress_subproc_cid))
-        self.integration_cache_subproc = pickle.loads(
-            self.service.meshClient.catObj(self.integration_cache_subproc_cid)
+        process_source_cid = self.function.get('process_source_cid')
+        infrafunction_source_cid = self.function.get('infrafunction_source_cid')
+        if not process_source_cid or not infrafunction_source_cid:
+            raise RuntimeError(
+                'function_cid is missing process_source_cid / '
+                'infrafunction_source_cid; recreate the Order with '
+                'create_order_request after hybrid Function source CIDs.'
+            )
+        mesh = self.service.meshClient
+        self.ingress_subproc = mesh.resolve_subproc(
+            self.ingress_subproc_cid, expected_source_cid=process_source_cid
         )
-        self.infrafunction_subproc = pickle.loads(
-            self.service.meshClient.catObj(self.infrafunction_subproc_cid)
+        self.integrated_subproc = mesh.resolve_subproc(
+            self.integrated_subproc_cid, expected_source_cid=process_source_cid
+        )
+        self.egress_subproc = mesh.resolve_subproc(
+            self.egress_subproc_cid, expected_source_cid=process_source_cid
+        )
+        self.integration_cache_subproc = mesh.resolve_subproc(
+            self.integration_cache_subproc_cid,
+            expected_source_cid=process_source_cid,
+        )
+        self.infrafunction_subproc = mesh.resolve_subproc(
+            self.infrafunction_subproc_cid,
+            expected_source_cid=infrafunction_source_cid,
         )
 
     def compose(self):
