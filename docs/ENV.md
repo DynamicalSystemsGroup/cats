@@ -22,7 +22,7 @@ and not part of the `cats` package's published dependencies.
 ```bash
 make node-up                    # content-store-ensure then node-start (or split targets; see STORAGE.md)
 make node-stop                  # Flask only — never host Kubo
-uv run pytest tests/verification_test.py
+uv run pytest tests/test_provenance.py
 ```
 **Optional — activate `.venv` directly** (traditional venv activate/deactivate, if you prefer it to `uv run`):
 ```bash

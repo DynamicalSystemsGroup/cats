@@ -25,7 +25,7 @@ In general, we follow the ["fork-and-pull"](https://github.com/susam/gitpr) Git 
 4. Set up your environment with [uv](https://docs.astral.sh/uv/) and commit changes to the new branch:
    ```bash
    uv sync --extra ops --group dev   # for the MAC experiment, also: uv pip install -r experiments/mac/requirements-mac.txt
-   uv run pytest -s tests/verification_test.py
+   uv run pytest -s tests/test_provenance.py
    ```
    If you add, remove, or bump a dependency in `pyproject.toml`, run `uv lock` and commit the updated
    `uv.lock` alongside your change so the lockfile stays reproducible for other contributors and CI.
