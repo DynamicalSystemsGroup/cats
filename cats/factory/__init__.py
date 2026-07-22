@@ -48,11 +48,13 @@ class Executor:
         self.orderCID = self.enhanced_bom['invoice']['order_cid']
         plant_snapshot = self.structure.reconcile()
         object_store = self.structure.infraStructure.obj_store_context()
-        plant = self.structure.plant.context()
+        plant = self.structure.plant.plant_port()
+        transport = self.structure.infraStructure.transport_context()
         self.ingress_data_cid, self.integration_data_cid, self.egress_data_cid = \
             self.function.execute(
                 object_store=object_store,
                 plant=plant,
+                transport=transport,
             )
 
         # function_cid -> {process_cid, infrafunction_cid}; structure_cid ->
