@@ -80,7 +80,7 @@ Process public surface is locked by `process.__all__` and
 | **Plant [SaaS]** | Implements `PlantPort`; BOM snapshot may stay tool-specific | Demo-proved (KubeRay only) | **2f**: second Plant module (non-Ray) with `plant_port_from_context` equivalent |
 | **InfraStructure [IaaS] — content-store** | Host Kubo facet; MeshClient client; TF ensure / apply assert | Demo-proved; soft dual-job documented | Interop = mesh CIDs remain valid across Structure swaps; destroy must not kill host Kubo (already). Optional hard dual-daemon isolation is **not** required for Function interop |
 | **InfraStructure [IaaS] — T&D transport** | `TransportContext` / `TransportPort` | Demo-proved (Compose peers) | Optional second transport adapter only if a Plant cannot use Docker Kubo peers; Function stays on `TransportPort` |
-| **InfraStructure [IaaS] — object store** | `ObjectStore` / `JobHandle` | Demo-proved (MinIO) | **2f** may keep MinIO; alternate scratch backend needs `begin_job` / `download_job_result` / entrypoint landing. **2g**: drop legacy string `result_uri` shim |
+| **InfraStructure [IaaS] — object store** | `ObjectStore` / `JobHandle` | Demo-proved (MinIO); **2g** JobHandle-only `result_uri` / `download_job_result` | **2f** may keep MinIO; alternate scratch backend needs `begin_job` / `download_job_result` / Plant-owned entrypoint landing |
 
 ## 2f. Second Plant (interop incomplete as product)
 
@@ -103,10 +103,11 @@ adapter modules).
 4. Demo or test: two Orders, identical Function callables, different Structure CIDs; both green.
    Recreate Orders so pickles match the post-port Process/InfraFunction surface.
 5. Docs: which Plants are supported; BOM snapshot fields may differ per Plant.
-6. **Structure lineage tooling:** `linkProcess()` can mutate Function across runs; there is no
-   `linkStructure` (see [`LineageOfProvenance.md`](./LineageOfProvenance.md)). Add an Order helper
-   that keeps Invoice / `data_cid` lineage while changing `structure_cid` — ops for proving 2f,
-   not a new port.
+6. **Structure lineage tooling:** `linkProcess()` mutates Function; **`linkStructure()`** mutates
+   apply-complete `structure_cid`; **`linkOrder()`** mutates Function and/or Structure in one
+   lineage step (single Invoice `data_cid` chain). A-la-carte helpers remain
+   (see [`LineageOfProvenance.md`](./LineageOfProvenance.md)). Available as Order ops for proving
+   2f; second Plant adapters still required for a full interop prove.
 7. **Executor / Factory adapter-blind CI:** Function modules are grep-guarded against Ray /
    Job Submission; extend CI so `cats/factory`, `cats/executor`, and `cats/service` never import
    `JobSubmissionClient` / `import ray` / hard-coded `structure-ipfs_*`. Executor may only pass
@@ -127,20 +128,34 @@ Acceptable while only KubeRay is demo-proved; clean up as interop hardens:
 | Edge | Why it’s soft | Fix |
 |------|---------------|-----|
 | `PlantContext.job_endpoint` = Ray dashboard URL | Adapter input for `RayPlantPort`, not InfraFunction vocabulary | Leave for Ray Plant; second Plant uses its own context fields |
-| Entrypoint assumes Dataset + `write_csv` | Ray compute landing | Alternate entrypoint (or landing helper) per Plant under Structure |
-| `ObjectStore.result_uri` accepts legacy string prefix | Compat shim | Drop once all call sites pass `JobHandle` only; tighten tests |
-| BOM / verification assert MinIO key layout (`s3://cats-scratch/jobs/…`) | Correlator is a string URI even with `JobHandle` | Assert via `JobHandle` helpers; don’t hardcode bucket/key layout in tests |
-| `batch_fn` ABI (`function_0` / `function_1` take `Dict[str, np.ndarray]`) | Orchestration left Process; callable contract is still Ray Data–shaped | Document as this demo’s batch ABI; second Plant’s `ComputePort` adapts engine batches → that dict (or thin the ABI later). No engine imports in Process |
-| `RayComputePort` + `ray_job_result_entrypoint.py` under `infrastructure/` | Ray landing ships in `infrastructure_cid`; swapping Plant without republishing IaaS leaves Ray CSV landing in the InfraStructure CID | Fine for Ray-only demo; with **2f** or here: move Ray compute/entrypoint under Plant (or split compute-adapter CID from MinIO scratch). Scratch / `JobHandle` can stay IaaS |
+| Entrypoint assumes Dataset + `write_csv` | Ray compute landing | **Documented:** alternate entrypoint (or landing helper) per Plant under that Plant’s `plant_cid`; IaaS stays scratch config / `JobHandle` |
+| `ObjectStore.result_uri` / `download_job_result` | Was legacy string-prefix shim | **Done:** JobHandle-only (`TypeError` otherwise) |
+| BOM / verification assert MinIO key layout | Correlator is a string URI even with `JobHandle` | **Done:** asserts JobHandle URI shape (`s3://<bucket>/<prefix>/result`), not a hardcoded `cats-scratch` path |
+| `batch_fn` ABI (`function_0` / `function_1` take `Dict[str, np.ndarray]`) | Orchestration left Process; callable contract is still Ray Data–shaped | **Documented** (below + `ComputePort` / `RayComputePort` docstrings); second Plant’s adapter maps engine batches → that dict (or thin the ABI later). No engine imports in Process |
+| `RayComputePort` + `ray_job_result_entrypoint.py` under `plant/` | Ray landing ships in `plant_cid` | **Done:** Plant stages landing; scratch / `JobHandle` stay IaaS |
 
-Treat **2g** as cleanup alongside or after the first non-Ray Plant path — not as reopening soft leak “Ray in Process” (already closed via ComputePort).
+### Demo batch ABI (adapter concern)
+
+This demo’s Process `batch_fn` contract is:
+
+```text
+Dict[str, np.ndarray] -> Dict[str, np.ndarray]
+```
+
+Process owns the math (`function_0` / `function_1`); the Plant **ComputePort** adapter owns mapping engine batches onto that shape (KubeRay: Ray Data `map_batches`). A second Plant may adapt differently — do **not** require Process rewrites unless the engine cannot feed this ABI. Thinning the ABI is deferred.
+
+### Entrypoint per Plant
+
+Job landing (entrypoint + compute adapter) is **Plant-owned** under `plant_cid`, staged by that Plant’s `PlantPort.submit_job`. This demo: `ray_job_result_entrypoint.py` + `RayComputePort` (Dataset + `write_csv`). Another Plant ships its own landing files; InfraStructure keeps MinIO / `ObjectStore` / `JobHandle` only.
+
+Treat remaining soft edges (`job_endpoint` shape) as cleanup with the first non-Ray Plant path — not as reopening “Ray in Process” (already closed via ComputePort).
 
 ## Phased prove plan
 
 | Phase | Scope | Exit criteria |
 |-------|--------|---------------|
 | **P0** (done) | Ports + JobHandle + public-surface discipline + Ray demo | Verification/demo on KubeRay; Process/InfraFunction free of Ray Job Submission / Ray Data imports |
-| **P1** | **2g** polish (string `result_uri` shim; entrypoint-per-Plant docs; batch ABI note; JobHandle-based BOM asserts; optional Ray landing under Plant) | No legacy prefix API; docs list Ray landing + batch ABI as adapter concerns; tests don’t hardcode MinIO key layout |
+| **P1** | **2g** polish (JobHandle-only correlator API; entrypoint-per-Plant + batch ABI docs; JobHandle-shaped BOM asserts; Ray landing under Plant) — **done** | No legacy prefix API; docs list Ray landing + batch ABI as adapter concerns; tests don’t hardcode MinIO key layout |
 | **P2** | **2f** second Plant adapters + shared Function Order pair + `linkStructure` (or equivalent) + Executor/Factory import CI | Interop-proved for Plant + Compute + scratch seams; Structure lineage operable; Node packages stay adapter-blind |
 | **P3** | Optional second T&D transport / object-store backend | Only if a target Plant cannot use Compose Kubo / MinIO |
 | **P4** | Optional content-store hard isolation (Phase C) | Only if isolation demand is concrete — not required for Function interop |
@@ -152,15 +167,15 @@ Treat **2g** as cleanup alongside or after the first non-Ray Plant path — not 
 - [ ] Executor wiring unchanged (ports/handles only); CI guards Factory / Executor / Service against adapter imports
 - [ ] BOM still records tool-specific snapshots without feeding them back as dispatch inputs
 - [ ] Demo or CI path documents how to select the Structure CID (incl. Structure-mutation / `linkStructure` path when swapping Plant)
-- [ ] Republish lag understood: new adapters ship in new `infrastructure_cid` / `plant_cid` (Ray landing location documented if still under IaaS)
-- [ ] Batch ABI / correlator: adapter maps to demo `batch_fn` shape; BOM correlator asserts use `JobHandle`, not hardcoded MinIO paths
+- [ ] Republish lag understood: new adapters ship in new `infrastructure_cid` / `plant_cid` (Ray landing under `plant_cid`)
+- [x] Batch ABI / correlator: adapter maps to demo `batch_fn` shape; BOM correlator asserts use `JobHandle`, not hardcoded MinIO paths
 
 ## Related docs
 
 - [`PLANTs.md`](./PLANTs.md) — Plant analogies and generation vs T&D
 - [`STORAGE.md`](./STORAGE.md) — content-store vs T&D facets; TransportPort / ComputePort / PlantPort / JobHandle
 - [`BOM.md`](./BOM.md) — Order Function/Structure CIDs; named Process imports
-- [`LineageOfProvenance.md`](./LineageOfProvenance.md) — `linkProcess` today; `linkStructure` for **2f**
+- [`LineageOfProvenance.md`](./LineageOfProvenance.md) — `linkProcess` / `linkStructure` / `linkOrder` Order lineage; **2f** still needs second Plant adapters
 - [`IPFS.md`](./IPFS.md) — host Kubo content-store; transport peering
 - [`MinIO.md`](./MinIO.md) — object-store scratch / JobHandle landing
 - [`DESIGN.md`](./DESIGN.md) — AQ as content-addressed CIDs
