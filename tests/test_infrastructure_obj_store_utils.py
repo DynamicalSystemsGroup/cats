@@ -11,9 +11,9 @@ OBJ_STORE_UTILS = (
     / 'data'
     / 'input'
     / 'structure'
-    / 'modules'
     / 'infrastructure'
     / 'obj_store_utils.py'
+
 )
 
 
@@ -39,8 +39,13 @@ def test_object_store_result_uri():
         access_key='cats-minio',
         secret_key='cats-minio-secret',
     )
-    uri = store.result_uri('jobs/11111111-2222-3333-4444-555555555555')
+    handle = obj_store_utils.JobHandle(
+        prefix='jobs/11111111-2222-3333-4444-555555555555'
+    )
+    uri = store.result_uri(handle)
     assert uri == 's3://cats-scratch/jobs/11111111-2222-3333-4444-555555555555/result'
+    # Legacy string prefix still accepted for helpers/tests.
+    assert store.result_uri(handle.prefix) == uri
 
 
 def test_object_store_snapshot_excludes_credentials():
@@ -104,7 +109,7 @@ def test_cli_list_jobs_help():
     assert exc.value.code == 0
 
 
-def test_write_ray_job_scratch_writes_config_and_entrypoint(tmp_path):
+def test_write_job_scratch_writes_config_entrypoint_and_compute(tmp_path):
     store = obj_store_utils.ObjectStore(
         endpoint_host='http://127.0.0.1:9000',
         endpoint_pod='http://172.19.0.1:9000',
@@ -114,20 +119,27 @@ def test_write_ray_job_scratch_writes_config_and_entrypoint(tmp_path):
     )
     job_dir = tmp_path / 'job'
     job_dir.mkdir()
-    prefix = 'jobs/11111111-2222-3333-4444-555555555555'
-    store.write_ray_job_scratch(str(job_dir), prefix)
+    handle = obj_store_utils.JobHandle(
+        prefix='jobs/11111111-2222-3333-4444-555555555555'
+    )
+    store.write_job_scratch(str(job_dir), handle)
 
     config_path = job_dir / 'object_store_config.json'
     entry_path = job_dir / 'entrypoint.py'
+    compute_path = job_dir / 'ray_compute_utils.py'
     assert config_path.is_file()
     assert entry_path.is_file()
+    assert compute_path.is_file()
 
     import json
     config = json.loads(config_path.read_text(encoding='utf-8'))
     assert config['endpoint'] == 'http://172.19.0.1:9000'
     assert config['bucket'] == 'cats-scratch'
-    assert config['prefix'] == prefix
+    assert config['prefix'] == handle.prefix
     assert 'access_key' in config
+    assert store.result_uri(handle) == (
+        's3://cats-scratch/jobs/11111111-2222-3333-4444-555555555555/result'
+    )
     assert 'object_store_config.json' in entry_path.read_text(encoding='utf-8')
     assert 'write_csv' in entry_path.read_text(encoding='utf-8')
     source = (
@@ -135,9 +147,9 @@ def test_write_ray_job_scratch_writes_config_and_entrypoint(tmp_path):
         / 'data'
         / 'input'
         / 'structure'
-        / 'modules'
         / 'infrastructure'
         / 'ray_job_result_entrypoint.py'
+
     )
     assert entry_path.read_text(encoding='utf-8') == source.read_text(encoding='utf-8')
 

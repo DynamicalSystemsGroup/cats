@@ -1,7 +1,7 @@
-data/input/function/process.py
-data/input/function/infrafunction.py
+data/input/function/process/
+data/input/function/infrafunction/
 data/input/data/iris.csv
 data/input/structure/main.tf
-data/input/structure/ipfs_transport_compose.yaml
-data/input/structure/ipfs_connect_peers.sh
+data/input/structure/infrastructure/ipfs_transport_compose.yaml
+data/input/structure/infrastructure/transport_utils.py
 data/testing

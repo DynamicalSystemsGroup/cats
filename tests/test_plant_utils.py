@@ -9,7 +9,6 @@ PLANT_UTILS = (
     / 'data'
     / 'input'
     / 'structure'
-    / 'modules'
     / 'plant'
     / 'plant_utils.py'
 )
