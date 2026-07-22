@@ -78,7 +78,10 @@ endef
 
 .PHONY: help deps deps-all \
 	deps-docker deps-uv deps-kind deps-kubectl deps-terraform deps-go deps-ipfs deps-helm \
-	check-pkg-manager print-versions
+	check-pkg-manager print-versions \
+	node-start node-stop node-status node-up content-store-ensure
+
+CONTENT_STORE_UTILS := data/input/structure/infrastructure/content_store_utils.py
 
 help:
 	@echo "CATs dependency installer for macOS & Linux (see docs/DEPS.md for details)"
@@ -98,6 +101,13 @@ help:
 	@echo "  make deps-helm       Install the optional helm CLI (>= $(HELM_MIN_VERSION));"
 	@echo "                       manual debugging only, not required by 'terraform apply'"
 	@echo "  make print-versions  Print installed versions of all dependencies"
+	@echo ""
+	@echo "Node lifecycle (AQ-safe: start asserts ContentStore; ensure heals; stop = Flask only):"
+	@echo "  make node-up               Convenience: content-store-ensure then node-start"
+	@echo "  make content-store-ensure  InfraStructure ContentStore.ensure CLI (heal/start Kubo)"
+	@echo "  make node-start            Assert bootstrap ContentStore ready, then bind Flask"
+	@echo "  make node-stop             Stop Flask Node only (never host Kubo)"
+	@echo "  make node-status           Flask listen + ContentStore ready"
 
 deps: deps-docker deps-uv deps-kind deps-kubectl deps-terraform deps-go deps-ipfs
 	@echo ""
@@ -291,3 +301,17 @@ print-versions:
 	@command -v go        >/dev/null && printf "%-10s %s\n" go        "$$(go version)"                  || printf "%-10s not installed\n" go
 	@command -v ipfs      >/dev/null && printf "%-10s %s\n" ipfs      "$$(ipfs version)"                || printf "%-10s not installed\n" ipfs
 	@command -v helm      >/dev/null && printf "%-10s %s\n" helm      "$$(helm version --short)"        || printf "%-10s not installed (optional)\n" helm
+
+node-up: content-store-ensure node-start
+
+node-start:
+	uv run python cats/node.py start
+
+node-stop:
+	uv run python cats/node.py stop
+
+node-status:
+	uv run python cats/node.py status
+
+content-store-ensure:
+	uv run python $(CONTENT_STORE_UTILS) ensure

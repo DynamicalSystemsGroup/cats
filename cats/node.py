@@ -11,9 +11,8 @@ os.environ.setdefault('RAY_ENABLE_UV_RUN_RUNTIME_ENV', '0')
 
 # Running this file by path (`python cats/node.py`) only puts its own
 # directory - not the repo root - on sys.path. `data/` (holding Process
-# [REPL(aC)] transport callables and the tHOF / integrated_subproc in
-# data/input/function/process.py, and InfraFunction [FaaS]'s actuator in
-# data/input/function/infrafunction.py) lives at the repo root, sibling
+# [REPL(aC)] under data/input/function/process/ and InfraFunction [FaaS]
+# under data/input/function/infrafunction/) lives at the repo root, sibling
 # to `cats/`, and isn't part of the installed `cats` package - so it's
 # only importable once the repo root is on sys.path. That's needed here
 # because InfraFunction unpickles those functions by their
@@ -24,24 +23,40 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-import atexit
-import logging, json, signal, socket, subprocess, time, traceback
+import argparse
+import logging
+import json
+import signal
+import socket
+import subprocess
+import time
+import traceback
 
 from flask import Flask, request, jsonify
-from cats import SERVICE
-from cats.network.clients import shutdown_owned_daemon
+from cats import CATS_HOME, SERVICE
+from cats.network import _load_bootstrap_content_store_module
 
 catNode = Flask(__name__)
 
 # Overridable so multiple CAT Node peers can eventually run side-by-side
-# (e.g. simulating a local mesh) - callers/peers still need to know a
-# node's address out-of-band, since `cats/network/__init__.py`'s
-# MeshClient hardcodes `http://127.0.0.1:5000/cat/node/*` for now.
+# (e.g. simulating a local mesh). MeshClient Order endpoints use the same
+# CAT_NODE_HOST / CAT_NODE_PORT defaults via `_node_base_url()`.
 HOST = os.environ.get('CAT_NODE_HOST', '127.0.0.1')
 PORT = int(os.environ.get('CAT_NODE_PORT', 5000))
 
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
-def _free_stale_port(host: str, port: int) -> None:
+
+def _flask_listening(host: str, port: int) -> bool:
+    """True when something accepts TCP on host:port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.2)
+        return probe.connect_ex((host, port)) == 0
+
+
+def _stop_node_process(host: str, port: int) -> None:
     """Kill any leftover node.py still bound to our port.
 
     Agent/chat sessions launch this server in the background and don't
@@ -49,11 +64,11 @@ def _free_stale_port(host: str, port: int) -> None:
     left holding the port for a future run to collide with. Only processes
     whose command line matches this script are killed - other programs on
     the port (e.g. macOS's AirPlay Receiver on 5000) are left alone.
+
+    Never touches InfraStructure ContentStore (host Kubo).
     """
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-        probe.settimeout(0.2)
-        if probe.connect_ex((host, port)) != 0:
-            return  # nothing listening, nothing to do
+    if not _flask_listening(host, port):
+        return
 
     try:
         pids = subprocess.run(
@@ -91,7 +106,7 @@ def _free_stale_port(host: str, port: int) -> None:
             if 'node.py' not in parent_cmd:
                 continue
             logger.warning(
-                "Killing stale node.py process (pid %s) still bound to %s:%d",
+                "Killing node.py process (pid %s) still bound to %s:%d",
                 target, host, port,
             )
             try:
@@ -103,14 +118,42 @@ def _free_stale_port(host: str, port: int) -> None:
     if killed_any:
         for _ in range(20):
             time.sleep(0.1)
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-                probe.settimeout(0.2)
-                if probe.connect_ex((host, port)) != 0:
-                    return  # port is free now
+            if not _flask_listening(host, port):
+                return
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)  # Set level to DEBUG for more detailed logging
-logger = logging.getLogger(__name__)
+
+def _free_stale_port(host: str, port: int) -> None:
+    """Alias used by start — clear a prior node.py listener before bind."""
+    _stop_node_process(host, port)
+
+
+def _bootstrap_content_store_ensure():
+    """Operator heal: bootstrap-tree ContentStore.ensure (default tree).
+
+    Used by ``node ensure`` only — not by ``node start``. MeshClient does not
+    call this. Fail loud if utils missing or ensure raises.
+    """
+    module = _load_bootstrap_content_store_module(CATS_HOME)
+    module.ContentStore.ensure(cwd=CATS_HOME)
+    SERVICE.meshClient._bootstrap_content_store_ensured = True
+
+
+def _bootstrap_content_store_assert_ready():
+    """Strict bootstrap ContentStore.is_ready (default tree; not Order-bound).
+
+    Used by ``node start``. Does not heal — run ``node ensure`` /
+    ``make content-store-ensure`` first if Kubo is down.
+    """
+    module = _load_bootstrap_content_store_module(CATS_HOME)
+    if module.ContentStore.is_ready():
+        SERVICE.meshClient._bootstrap_content_store_ensured = True
+        return
+    raise RuntimeError(
+        'Host Kubo ContentStore API not ready. Run '
+        '`make content-store-ensure` or `uv run python cats/node.py ensure` '
+        'before node start (start asserts only; TF host_ipfs_daemon create '
+        'is the sole automatic Order-submitted ensure).'
+    )
 
 
 @catNode.route('/cat/node/init', methods=['POST'])
@@ -140,12 +183,23 @@ def execute_init_cat():
 
 
 def _handle_stop_signal(signum, frame):
-    """Shut down an owned host Kubo daemon, then exit cleanly."""
-    shutdown_owned_daemon()
+    """Exit cleanly; leave InfraStructure content-store (host Kubo) running."""
     raise SystemExit(0)
 
 
-if __name__ == '__main__':
+def _cmd_start():
+    """Assert bootstrap ContentStore ready (strict), then bind Flask.
+
+    Host Kubo is InfraStructure's long-lived content-store facet — Node is
+    only a client. Start does not heal; use ``node ensure`` / content-store
+    CLI. SIGINT/SIGTERM must not stop Kubo.
+    """
+    try:
+        _bootstrap_content_store_assert_ready()
+    except (RuntimeError, FileNotFoundError, OSError) as exc:
+        logger.error('ContentStore bootstrap assert failed: %s', exc)
+        return 1
+
     # Debug mode's reloader re-executes this script for its worker process,
     # inheriting the listening socket the monitor already created (via
     # WERKZEUG_SERVER_FD) rather than opening its own. That worker run sets
@@ -154,10 +208,77 @@ if __name__ == '__main__':
     # kill its own monitor process out from under itself.
     if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         _free_stale_port(HOST, PORT)
-    # MeshClient already ensured Kubo at import time; only stop it on exit
-    # when this process owns the host daemon (_host_daemon_owned).
-    atexit.register(shutdown_owned_daemon)
     signal.signal(signal.SIGINT, _handle_stop_signal)
     signal.signal(signal.SIGTERM, _handle_stop_signal)
-    # Run the Flask application, by default on http://127.0.0.1:5000/
     catNode.run(host=HOST, port=PORT, debug=True, use_reloader=False)
+    return 0
+
+
+def _cmd_stop():
+    """Stop Flask Node only — never ContentStore / host Kubo."""
+    _stop_node_process(HOST, PORT)
+    if _flask_listening(HOST, PORT):
+        logger.error('Node still listening on %s:%d after stop', HOST, PORT)
+        return 1
+    print(f'node stopped ({HOST}:{PORT})')
+    return 0
+
+
+def _cmd_status():
+    """Report Flask listen + ContentStore readiness; exit 0 only if both OK."""
+    flask_up = _flask_listening(HOST, PORT)
+    try:
+        module = _load_bootstrap_content_store_module(CATS_HOME)
+        store_ready = module.ContentStore.is_ready()
+    except (RuntimeError, FileNotFoundError, OSError) as exc:
+        logger.error('ContentStore status probe failed: %s', exc)
+        store_ready = False
+
+    print(f'flask={"up" if flask_up else "down"}')
+    print(f'content_store={"ready" if store_ready else "not_ready"}')
+    return 0 if flask_up and store_ready else 1
+
+
+def _cmd_ensure():
+    """Operator heal facade: bootstrap ContentStore.ensure only (no Flask)."""
+    try:
+        _bootstrap_content_store_ensure()
+    except (RuntimeError, FileNotFoundError, OSError) as exc:
+        logger.error('ContentStore bootstrap ensure failed: %s', exc)
+        return 1
+    print('content_store ready')
+    return 0
+
+
+def main(argv=None):
+    """AQ-safe Node CLI: start|stop|status|ensure (default: start)."""
+    parser = argparse.ArgumentParser(
+        description=(
+            'CAT Node process lifecycle. start asserts InfraStructure '
+            'bootstrap ContentStore ready then binds Flask; ensure heals '
+            'host Kubo via ContentStore.ensure; stop kills Flask only '
+            '(never host Kubo).'
+        )
+    )
+    parser.add_argument(
+        'command',
+        nargs='?',
+        default='start',
+        choices=('start', 'stop', 'status', 'ensure'),
+        help='start (default), stop, status, or ensure',
+    )
+    args = parser.parse_args(argv)
+
+    if args.command == 'start':
+        return _cmd_start()
+    if args.command == 'stop':
+        return _cmd_stop()
+    if args.command == 'status':
+        return _cmd_status()
+    if args.command == 'ensure':
+        return _cmd_ensure()
+    return 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
