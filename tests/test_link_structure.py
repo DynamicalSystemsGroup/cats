@@ -74,6 +74,7 @@ def _write_structure_tree(tmp_path: Path):
 
 
 def test_cid_structure_pairing(monkeypatch, tmp_path):
+    """cid_structure_pairing CIDs root, plant, and infrastructure directories."""
     fake = MagicMock()
     client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
@@ -93,6 +94,7 @@ def test_cid_structure_pairing(monkeypatch, tmp_path):
 
 
 def test_link_structure_from_filepath(monkeypatch, tmp_path):
+    """linkStructure from filepath rebuilds structure_cid and chains data_cid."""
     fake = MagicMock()
     fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
 
@@ -155,6 +157,7 @@ def test_link_structure_from_filepath(monkeypatch, tmp_path):
 
 
 def test_link_structure_plant_override_only(monkeypatch, tmp_path):
+    """linkStructure can override plant_cid while keeping root/infra CIDs."""
     fake = MagicMock()
     fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
 
@@ -194,6 +197,7 @@ def test_link_structure_plant_override_only(monkeypatch, tmp_path):
 
 
 def test_link_structure_fails_without_root_cid(monkeypatch, tmp_path):
+    """linkStructure fails when prior structure_cid lacks root_cid."""
     fake = MagicMock()
     cat_response, _cat, _, _, _ = _cat_response_fixture(
         structure={'plant_cid': 'QmPlant', 'infrastructure_cid': 'QmInfra'}
@@ -207,6 +211,7 @@ def test_link_structure_fails_without_root_cid(monkeypatch, tmp_path):
 
 
 def test_link_structure_fails_without_args(monkeypatch, tmp_path):
+    """linkStructure requires structure_filepath or a pairing override."""
     fake = MagicMock()
     cat_response, _cat, _, _, _ = _cat_response_fixture()
     client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
@@ -218,6 +223,7 @@ def test_link_structure_fails_without_args(monkeypatch, tmp_path):
 
 
 def test_link_structure_fails_when_pairing_unchanged(monkeypatch, tmp_path):
+    """linkStructure rejects overrides that leave structure pairing unchanged."""
     fake = MagicMock()
     fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
     cat_response, _cat, prev_structure, _, _ = _cat_response_fixture()

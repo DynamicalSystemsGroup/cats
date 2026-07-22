@@ -34,6 +34,7 @@ def _iter_scanned_files():
 
 
 def test_no_star_import_from_process_or_infrafunction():
+    """Repo sources must not star-import Process or InfraFunction packages."""
     banned = (
         re.compile(
             r'from\s+data\.input\.function\.process\s+import\s+\*'
@@ -57,6 +58,7 @@ def test_no_star_import_from_process_or_infrafunction():
 
 
 def test_process_all_matches_public_surface():
+    """process.__all__ matches the locked public surface allowlist."""
     from data.input.function import process as proc
 
     assert tuple(proc.__all__) == PROCESS_PUBLIC_SURFACE
@@ -82,6 +84,7 @@ def test_process_no_runtime_data_package_imports():
 
 
 def test_infrafunction_no_ray_job_submission_imports():
+    """InfraFunction sources must not import Ray Job Submission / ray.data."""
     text = INFRAFUNCTION_PY.read_text(encoding='utf-8')
     for banned in ('JobSubmissionClient', 'ray.data', 'import ray', 'from ray'):
         assert banned not in text, banned

@@ -30,6 +30,7 @@ def _write_function_fixture(input_home: Path, *, with_pycache=True):
 
 
 def test_resolve_function_package_dirs(tmp_path):
+    """resolve_function_package_dirs finds process and infrafunction packages."""
     structure = tmp_path / 'structure'
     structure.mkdir()
     _write_function_fixture(tmp_path)
@@ -39,6 +40,7 @@ def test_resolve_function_package_dirs(tmp_path):
 
 
 def test_resolve_function_package_dirs_fails_if_missing(tmp_path):
+    """resolve_function_package_dirs raises when Function packages are missing."""
     structure = tmp_path / 'structure'
     structure.mkdir()
     with pytest.raises(FileNotFoundError, match='missing'):
@@ -46,6 +48,7 @@ def test_resolve_function_package_dirs_fails_if_missing(tmp_path):
 
 
 def test_stage_function_package_excludes_pycache(tmp_path):
+    """stage_function_package copies sources and excludes __pycache__ / .pyc."""
     process, _ = _write_function_fixture(tmp_path)
     staging_parent = tmp_path / 'stage'
     staging_parent.mkdir()
@@ -60,6 +63,7 @@ def test_stage_function_package_excludes_pycache(tmp_path):
 
 
 def test_create_order_request_emits_source_cids(monkeypatch, tmp_path):
+    """create_order_request emits process_source_cid and infrafunction_source_cid."""
     fake = MagicMock()
     fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
     fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmPy'
@@ -109,6 +113,7 @@ def test_create_order_request_emits_source_cids(monkeypatch, tmp_path):
 
 
 def test_get_enhanced_bom_requires_function_source_cids(monkeypatch, tmp_path):
+    """getEnhancedBom fails when function_cid lacks source CIDs."""
     fake = MagicMock()
     client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
@@ -173,6 +178,7 @@ def test_get_enhanced_bom_requires_function_source_cids(monkeypatch, tmp_path):
 
 
 def test_get_enhanced_bom_materializes_function_sources(monkeypatch, tmp_path):
+    """getEnhancedBom fetches process/infrafunction source trees by source CID."""
     fake = MagicMock()
     client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
@@ -253,6 +259,7 @@ def test_get_enhanced_bom_materializes_function_sources(monkeypatch, tmp_path):
 
 
 def test_link_process_carries_source_cids(monkeypatch, tmp_path):
+    """linkProcess preserves prior process_source_cid / infrafunction_source_cid."""
     fake = MagicMock()
     fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
     fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmNewPy'
@@ -345,6 +352,7 @@ def test_link_process_carries_source_cids(monkeypatch, tmp_path):
 
 
 def test_link_process_fails_without_source_cids(monkeypatch, tmp_path):
+    """linkProcess fails when prior function_cid lacks source CIDs."""
     fake = MagicMock()
     prev_function = {
         'process_cid': 'QmProcBind',

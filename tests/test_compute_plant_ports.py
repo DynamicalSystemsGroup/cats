@@ -77,6 +77,7 @@ class _FakePlantPort:
 
 
 def test_process_uses_compute_port_no_ray():
+    """Process tHOFs use ComputePort and must not import Ray adapters."""
     from data.input.function import process as proc
     from data.input.function.process.compute_port import ComputePort
 
@@ -93,12 +94,14 @@ def test_process_uses_compute_port_no_ray():
 
 
 def test_infrafunction_has_no_job_submission_client():
+    """InfraFunction actuator must not import Ray Job Submission / ray.data."""
     text = INFRAFUNCTION_PY.read_text(encoding='utf-8')
     for banned in ('JobSubmissionClient', 'ray.data', 'import ray', 'from ray'):
         assert banned not in text, banned
 
 
 def test_entrypoint_wires_compute_port():
+    """Plant job entrypoint constructs RayComputePort and calls the subproc."""
     text = ENTRYPOINT_PY.read_text(encoding='utf-8')
     assert 'RayComputePort' in text
     assert "subproc('input', compute)" in text
@@ -106,6 +109,7 @@ def test_entrypoint_wires_compute_port():
 
 
 def test_job_handle_begin_and_scratch_writes_config_only(tmp_path):
+    """begin_job + write_job_scratch write ObjectStore config, not Ray landing."""
     ou = _load(OBJ_STORE_UTILS, 'infrastructure_obj_store_utils_ports')
     store = ou.ObjectStore(
         endpoint_host='http://127.0.0.1:9000',
@@ -127,6 +131,7 @@ def test_job_handle_begin_and_scratch_writes_config_only(tmp_path):
 
 
 def test_plant_port_from_context_and_passthrough():
+    """plant_port_from_context wraps PlantContext and passes through PlantPorts."""
     pu = _load(PLANT_UTILS, 'plant_plant_utils_ports')
     ctx = pu.PlantContext(
         job_endpoint='http://127.0.0.1:8265',
@@ -144,6 +149,7 @@ def test_plant_port_from_context_and_passthrough():
 
 
 def test_ray_plant_port_submit_job_stages_landing(tmp_path, monkeypatch):
+    """RayPlantPort.submit_job stages Plant landing files into working_dir."""
     pu = _load(PLANT_UTILS, 'plant_plant_utils_submit')
     job_dir = tmp_path / 'job'
     job_dir.mkdir()
@@ -175,6 +181,7 @@ def test_ray_plant_port_submit_job_stages_landing(tmp_path, monkeypatch):
 
 
 def test_infrafunction_subproc_uses_plant_port_and_job_handle(tmp_path, monkeypatch):
+    """infrafunction_subproc submits via PlantPort and uses JobHandle scratch."""
     from data.input.function.infrafunction import actuator
     from data.input.function.infrafunction import infrafunction_subproc
 

@@ -30,6 +30,7 @@ def _write_structure_fixture(structure: Path, *, with_noise=True):
 
 
 def test_stage_structure_root_copies_allowlist_only(tmp_path):
+    """stage_structure_root copies only STRUCTURE_ROOT_FILES allowlisted files."""
     structure = tmp_path / 'structure'
     _write_structure_fixture(structure)
     staging_parent = tmp_path / 'stage'
@@ -43,6 +44,7 @@ def test_stage_structure_root_copies_allowlist_only(tmp_path):
 
 
 def test_stage_structure_root_fails_if_allowlist_incomplete(tmp_path):
+    """stage_structure_root raises when required root files are missing."""
     structure = tmp_path / 'structure'
     structure.mkdir()
     (structure / 'main.tf').write_text('x\n')
@@ -51,6 +53,7 @@ def test_stage_structure_root_fails_if_allowlist_incomplete(tmp_path):
 
 
 def test_materialize_structure_root_files_preserves_siblings(tmp_path):
+    """materialize_structure_root_files writes root files without clobbering siblings."""
     fetched = tmp_path / 'fetched'
     fetched.mkdir()
     (fetched / 'main.tf').write_text('root-main\n')
@@ -69,6 +72,7 @@ def test_materialize_structure_root_files_preserves_siblings(tmp_path):
 
 
 def test_get_enhanced_bom_requires_root_cid(monkeypatch, tmp_path):
+    """getEnhancedBom fails when structure_cid lacks root_cid."""
     fake = MagicMock()
     client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
@@ -127,6 +131,7 @@ def test_get_enhanced_bom_requires_root_cid(monkeypatch, tmp_path):
 
 
 def test_get_enhanced_bom_materializes_root_then_modules(monkeypatch, tmp_path):
+    """getEnhancedBom materializes root_cid files then plant/infrastructure modules."""
     fake = MagicMock()
     client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)

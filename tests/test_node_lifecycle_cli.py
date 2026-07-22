@@ -11,12 +11,14 @@ NODE_PY = Path(__file__).resolve().parents[1] / 'cats' / 'node.py'
 
 
 def test_node_py_has_no_ipfs_daemon_or_shutdown_strings():
+    """Node CLI source must not start or shut down the host Kubo daemon."""
     text = NODE_PY.read_text(encoding='utf-8')
     assert 'ipfs shutdown' not in text
     assert 'ipfs daemon' not in text
 
 
 def test_start_asserts_ready_before_run(monkeypatch):
+    """start asserts ContentStore readiness before catNode.run."""
     calls = []
 
     def fake_assert():
@@ -38,6 +40,7 @@ def test_start_asserts_ready_before_run(monkeypatch):
 
 
 def test_bare_main_defaults_to_start(monkeypatch):
+    """Bare `python -m cats.node` with no args defaults to start."""
     calls = []
     monkeypatch.setattr(
         node, '_cmd_start', lambda: calls.append('start') or 0
@@ -47,6 +50,7 @@ def test_bare_main_defaults_to_start(monkeypatch):
 
 
 def test_start_assert_failure_skips_run(monkeypatch):
+    """start exits non-zero and skips Flask run when ContentStore is not ready."""
     run_called = []
 
     def boom():
@@ -62,6 +66,7 @@ def test_start_assert_failure_skips_run(monkeypatch):
 
 
 def test_stop_uses_port_helper_only(monkeypatch):
+    """stop only frees the Flask port; it must not touch host Kubo."""
     stopped = []
 
     monkeypatch.setattr(
@@ -76,6 +81,7 @@ def test_stop_uses_port_helper_only(monkeypatch):
 
 
 def test_status_exit_codes(monkeypatch):
+    """status is 0 only when both Flask and ContentStore are ready."""
     class FakeCS:
         ready = True
 
@@ -102,6 +108,7 @@ def test_status_exit_codes(monkeypatch):
 
 
 def test_ensure_still_heals_via_bootstrap_ensure(monkeypatch):
+    """ensure still mutates via bootstrap ContentStore.ensure (operator path)."""
     calls = []
 
     monkeypatch.setattr(
@@ -120,6 +127,7 @@ def test_ensure_still_heals_via_bootstrap_ensure(monkeypatch):
 
 
 def test_assert_ready_raises_when_not_ready(monkeypatch):
+    """_bootstrap_content_store_assert_ready raises when is_ready is False."""
     class FakeCS:
         @classmethod
         def is_ready(cls):
