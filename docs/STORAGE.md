@@ -57,11 +57,16 @@ Process transport callables depend on Function-owned **`TransportPort`**
 Peering **mutate** is TF `ipfs_transport_peering` every reconcile; Executor `apply`
 only **asserts** containers ready — not Process heal.
 
-Process tHOFs depend on Function-owned **`ComputePort`** (`run_transfer`); the Ray job
-entrypoint wires Structure **`RayComputePort`** (no `import ray` in Process). InfraFunction
-dispatches via Function-owned **`PlantPort`** (`submit_job` / `wait`); Executor passes
-`Plant.plant_port()` → Structure **`RayPlantPort`**. Scratch correlator is
-**`ObjectStore.begin_job()` → `JobHandle`** (BOM `object_store_result_uri`).
+Process tHOFs depend on Function-owned **`ComputePort`** (`run_transfer`); the Plant-owned
+Ray job entrypoint (staged by **`RayPlantPort.submit_job`**) wires **`RayComputePort`**
+(no `import ray` in Process). Demo **batch ABI** is
+`Dict[str, np.ndarray] -> Dict[str, np.ndarray]` — the ComputePort adapter maps engine
+batches onto that shape (see [`INTEROP.md`](./INTEROP.md) §2g). InfraFunction dispatches
+via Function-owned **`PlantPort`** (`submit_job` / `wait`); Executor passes
+`Plant.plant_port()` → Structure **`RayPlantPort`**. `ObjectStore.write_job_scratch`
+stages MinIO config only. Scratch correlator is
+**`ObjectStore.begin_job()` → `JobHandle`** (BOM `object_store_result_uri`;
+`result_uri` / `download_job_result` are JobHandle-only).
 
 There is no separate Quantum label such as “ScratchStore” vs “ProvenanceStore.” Content-store vs T&D is an
 operational lifetime split inside InfraStructure; the host daemon’s two traffic classes (above) sit on that
@@ -92,8 +97,8 @@ use after the run (`integration_data_cid` and related Invoice/BOM CIDs).
 
 1. InfraFunction dispatches Process’s tHOF (`integrated_subproc`) onto Plant via **PlantPort**
    (this demo: Ray Job on KubeRay).
-2. In-job entrypoint wires **ComputePort** (`RayComputePort`); workers write CSV shards to MinIO
-   (`cats-scratch/jobs/<uuid>/result/`) — genuinely distributed.
+2. Plant stages entrypoint + **ComputePort** (`RayComputePort`) into the job working_dir;
+   workers write CSV shards to MinIO (`cats-scratch/jobs/<uuid>/result/`) — genuinely distributed.
 3. The host downloads that **JobHandle** prefix into `…/integration/outputs/`.
 4. `cidDir` adds that directory to IPFS → `invoice.integration_data_cid` (and the BOM `log` mirror).
 
