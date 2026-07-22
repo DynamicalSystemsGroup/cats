@@ -103,6 +103,7 @@ def _invoice_payloads(fake):
 
 
 def test_link_order_function_only(monkeypatch, tmp_path):
+    """linkOrder Function-only mutates function_cid and chains prior data_cid."""
     fake = MagicMock()
     fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
     fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmNewPy'
@@ -129,6 +130,7 @@ def test_link_order_function_only(monkeypatch, tmp_path):
 
 
 def test_link_order_structure_only(monkeypatch, tmp_path):
+    """linkOrder Structure-only mutates pairing and keeps function_cid."""
     fake = MagicMock()
     fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
 
@@ -166,6 +168,7 @@ def test_link_order_structure_only(monkeypatch, tmp_path):
 
 
 def test_link_order_both_sides_single_invoice(monkeypatch, tmp_path):
+    """linkOrder can change Function and Structure with one Invoice data_cid."""
     fake = MagicMock()
     fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
     fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmNewPy'
@@ -201,6 +204,7 @@ def test_link_order_both_sides_single_invoice(monkeypatch, tmp_path):
 
 
 def test_link_order_fails_when_neither_side(monkeypatch, tmp_path):
+    """linkOrder requires at least one Function or Structure mutation."""
     fake = MagicMock()
     cat_response, _cat, _, _, _, _ = _cat_response_fixture()
     client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
@@ -212,6 +216,7 @@ def test_link_order_fails_when_neither_side(monkeypatch, tmp_path):
 
 
 def test_link_order_fails_when_structure_pairing_unchanged(monkeypatch, tmp_path):
+    """linkOrder rejects Structure overrides that leave pairing unchanged."""
     fake = MagicMock()
     fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
     cat_response, _cat, prev_structure, _, _, _ = _cat_response_fixture()

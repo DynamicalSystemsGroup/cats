@@ -23,6 +23,7 @@ from data.input.function.process import (
 
 
 def test_is_stock_function_callable_allowlist():
+    """Stock Process/InfraFunction callables are allowlisted; locals are not."""
     assert is_stock_function_callable(process_0)
     assert is_stock_function_callable(process_1)
     assert is_stock_function_callable(ingress)
@@ -38,6 +39,7 @@ def test_is_stock_function_callable_allowlist():
 
 
 def test_parse_named_bind_leaf():
+    """parse_named_bind_leaf accepts named-bind JSON and rejects pickle/partials."""
     payload = named_bind_payload('QmSrc', 'data.input.function.process.callables', 'process_0')
     raw = json.dumps(payload).encode('utf-8')
     assert parse_named_bind_leaf(raw) == payload
@@ -47,6 +49,7 @@ def test_parse_named_bind_leaf():
 
 
 def test_bind_subproc_stock_vs_lambda(monkeypatch, tmp_path):
+    """bind_subproc uses named-bind JSON for stock callables and pickle for lambdas."""
     fake = MagicMock()
     fake.add_str.side_effect = lambda s: f'named-{hash(s) & 0xFFFF:x}'
     fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmPickle'
@@ -70,6 +73,7 @@ def test_bind_subproc_stock_vs_lambda(monkeypatch, tmp_path):
 
 
 def test_resolve_subproc_named_and_pickle(tmp_path, monkeypatch):
+    """resolve_subproc loads named-bind leaves and pickle leaves correctly."""
     fake = MagicMock()
     client = MeshClient(ipfsClient=fake, CATS_HOME=str(Path(__file__).resolve().parents[1]))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
@@ -96,6 +100,7 @@ def test_resolve_subproc_named_and_pickle(tmp_path, monkeypatch):
 
 
 def test_resolve_subproc_source_mismatch(tmp_path, monkeypatch):
+    """resolve_subproc rejects named binds whose source_cid does not match."""
     fake = MagicMock()
     client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
@@ -131,6 +136,7 @@ def _write_order_fixture(tmp_path: Path):
 
 
 def test_create_order_request_stock_emits_named_bind_leaves(monkeypatch, tmp_path):
+    """create_order_request binds stock callables as named-bind JSON leaves."""
     fake = MagicMock()
     fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
     fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmPickleUnexpected'
@@ -173,6 +179,7 @@ def test_create_order_request_stock_emits_named_bind_leaves(monkeypatch, tmp_pat
 
 
 def test_link_process_rewrites_stock_named_bind(monkeypatch, tmp_path):
+    """linkProcess rewrites stock slot changes as named-bind leaves."""
     fake = MagicMock()
     fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
     fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmPickleUnexpected'

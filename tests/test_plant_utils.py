@@ -29,6 +29,7 @@ plant_utils = _load_plant_utils()
 
 
 def test_plant_context_from_terraform_outputs():
+    """PlantContext.from_terraform_outputs maps plant_* TF output keys."""
     outputs = {
         'plant_kind_cluster_name': 'cats',
         'plant_kubeconfig_context': 'kind-cats',
@@ -42,6 +43,7 @@ def test_plant_context_from_terraform_outputs():
 
 
 def test_plant_context_job_endpoint_none_when_empty():
+    """Empty dashboard address yields job_endpoint None."""
     outputs = {
         'plant_kind_cluster_name': 'cats',
         'plant_kubeconfig_context': 'kind-cats',
@@ -54,6 +56,7 @@ def test_plant_context_job_endpoint_none_when_empty():
 
 
 def test_plant_context_snapshot_shape():
+    """PlantContext.snapshot records cluster fields without credentials."""
     ctx = plant_utils.PlantContext(
         job_endpoint='http://127.0.0.1:8265',
         kind_cluster_name='cats',
@@ -73,6 +76,7 @@ def test_plant_context_snapshot_shape():
 
 
 def test_load_plant_utils_from_structure_home():
+    """load_plant_utils resolves PlantContext helpers from Structure home."""
     structure_home = str(REPO_ROOT / 'data' / 'input' / 'structure')
     mod = plant_utils.load_plant_utils(structure_home)
     assert hasattr(mod, 'PlantContext')
@@ -91,6 +95,7 @@ def test_plant_kind_resource_addresses_live_in_utils():
 
 
 def test_write_job_landing_helpers_copy_from_plant(tmp_path):
+    """write_job_* helpers copy Ray landing modules from the Plant tree."""
     job_dir = tmp_path / 'job'
     job_dir.mkdir()
     plant_utils.write_job_result_entrypoint(str(job_dir))

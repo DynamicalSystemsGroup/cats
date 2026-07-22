@@ -69,6 +69,7 @@ def _infra_with_structure_home(structure_home: Path, cats_home: Path):
 
 
 def test_bootstrap_path_never_under_input_structure_home():
+    """Bootstrap ContentStore utils live under checkout input/, never jobs/."""
     path = _bootstrap_content_store_utils_path(CATS_HOME)
     assert path is not None
     assert 'INPUT_STRUCTURE_HOME' not in path
@@ -82,6 +83,7 @@ def test_bootstrap_path_never_under_input_structure_home():
 
 
 def test_order_loader_path_is_under_input_structure_home(tmp_path):
+    """InfraStructure loads ContentStore utils from the Order structure tree."""
     structure_home = tmp_path / 'order_structure'
     utils_path = (
         structure_home
@@ -99,6 +101,7 @@ def test_order_loader_path_is_under_input_structure_home(tmp_path):
 
 
 def test_repo_content_store_utils_required_public_api():
+    """Repo content_store_utils exposes ContentStore ensure/is_ready and CLI."""
     spec = importlib.util.spec_from_file_location(
         'content_store_utils_api_check', REPO_CONTENT_STORE_UTILS
     )
@@ -158,6 +161,7 @@ def test_infrastructure_content_store_ensure_loads_order_tree(tmp_path):
 
 
 def test_content_store_assert_passes_when_ready(tmp_path):
+    """content_store_assert succeeds when Order-tree ContentStore reports ready."""
     structure_home = tmp_path / 'order_structure'
     utils_path = (
         structure_home
@@ -171,6 +175,7 @@ def test_content_store_assert_passes_when_ready(tmp_path):
 
 
 def test_content_store_assert_raises_when_not_ready(tmp_path):
+    """content_store_assert raises when Order-tree ContentStore is not ready."""
     structure_home = tmp_path / 'order_structure'
     utils_path = (
         structure_home
@@ -185,6 +190,7 @@ def test_content_store_assert_raises_when_not_ready(tmp_path):
 
 
 def test_apply_does_not_call_content_store_ensure(tmp_path, monkeypatch):
+    """apply asserts readiness only; it must not call content_store_ensure."""
     structure_home = tmp_path / 'order_structure'
     utils_path = (
         structure_home
@@ -262,6 +268,7 @@ def test_apply_does_not_call_content_store_ensure(tmp_path, monkeypatch):
 
 
 def test_meshclient_init_does_not_call_bootstrap_ensure(tmp_path, monkeypatch):
+    """MeshClient construction does not probe or ensure ContentStore."""
     calls = []
 
     def _spy(self):
@@ -275,6 +282,7 @@ def test_meshclient_init_does_not_call_bootstrap_ensure(tmp_path, monkeypatch):
 
 
 def test_meshclient_ciddir_triggers_bootstrap_readiness_once(tmp_path, monkeypatch):
+    """cidDir triggers bootstrap readiness checks (soft probe path)."""
     calls = []
 
     def _spy(self):
@@ -300,6 +308,7 @@ def test_meshclient_ciddir_triggers_bootstrap_readiness_once(tmp_path, monkeypat
 
 
 def test_meshclient_bootstrap_probes_is_ready_not_ensure(tmp_path):
+    """Bootstrap path probes is_ready and never calls ContentStore.ensure."""
     cats_home = tmp_path / 'cats_home'
     utils_path = (
         cats_home
@@ -327,6 +336,7 @@ def test_meshclient_bootstrap_probes_is_ready_not_ensure(tmp_path):
 
 
 def test_meshclient_bootstrap_skips_when_utils_missing(tmp_path):
+    """Missing bootstrap utils soft-skips and marks bootstrap as checked."""
     cats_home = tmp_path / 'empty_home'
     cats_home.mkdir()
     client = MeshClient(ipfsClient=MagicMock(), CATS_HOME=str(cats_home))

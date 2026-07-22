@@ -48,6 +48,7 @@ class _FakeTransport:
 
 
 def test_assert_ready_fails_when_containers_missing(monkeypatch):
+    """assert_ready raises when transport containers are not running."""
     monkeypatch.setattr(tu, '_container_running', lambda *_: False)
     ctx = tu.TransportContext.default()
     try:
@@ -58,11 +59,13 @@ def test_assert_ready_fails_when_containers_missing(monkeypatch):
 
 
 def test_assert_ready_ok_when_both_running(monkeypatch):
+    """assert_ready succeeds when both transport containers report running."""
     monkeypatch.setattr(tu, '_container_running', lambda *_: True)
     tu.TransportContext.default().assert_ready()
 
 
 def test_ensure_peered_noops_when_migration_missing(monkeypatch):
+    """ensure_peered does not swarm-connect when migration container is down."""
     calls = []
     monkeypatch.setattr(tu, '_container_running', lambda name: False)
     monkeypatch.setattr(
@@ -73,6 +76,7 @@ def test_ensure_peered_noops_when_migration_missing(monkeypatch):
 
 
 def test_ensure_peered_connects_peers(monkeypatch):
+    """ensure_peered swarm-connects host and integration peers when ready."""
     connects = []
 
     def _running(name):
@@ -95,6 +99,7 @@ def test_ensure_peered_connects_peers(monkeypatch):
 
 
 def test_migrate_parses_cid(monkeypatch, tmp_path):
+    """migrate parses the added CID and data name from ipfs add stdout."""
     monkeypatch.setattr(tu, '_container_running', lambda *_: True)
     monkeypatch.setattr(tu.time, 'time', lambda: 1700000000)
     monkeypatch.setattr(
@@ -112,6 +117,7 @@ def test_migrate_parses_cid(monkeypatch, tmp_path):
 
 
 def test_stage_for_plant_returns_host_path(monkeypatch, tmp_path):
+    """stage_for_plant returns the host-side staged data cache path."""
     monkeypatch.setattr(tu, '_container_running', lambda *_: True)
     monkeypatch.setattr(tu.time, 'time', lambda: 42)
     data_cache = tmp_path / 'outputs'
@@ -129,6 +135,7 @@ def test_stage_for_plant_returns_host_path(monkeypatch, tmp_path):
 
 
 def test_cli_status_ready(monkeypatch):
+    """CLI status exits 0 when TransportContext.assert_ready succeeds."""
     monkeypatch.setattr(
         tu.TransportContext, 'assert_ready', lambda self: None
     )
@@ -136,6 +143,7 @@ def test_cli_status_ready(monkeypatch):
 
 
 def test_cli_status_not_ready(monkeypatch):
+    """CLI status exits 1 when TransportContext.assert_ready raises."""
     def _raise(self):
         raise RuntimeError('missing')
 
@@ -144,6 +152,7 @@ def test_cli_status_not_ready(monkeypatch):
 
 
 def test_cli_ensure_peered(monkeypatch):
+    """CLI ensure-peered delegates to TransportContext.ensure_peered."""
     calls = []
     monkeypatch.setattr(
         tu.TransportContext,
@@ -155,6 +164,7 @@ def test_cli_ensure_peered(monkeypatch):
 
 
 def test_no_cats_network_peering_module():
+    """Legacy cats.network docker peering helper module must stay removed."""
     peering = (
         REPO_ROOT / 'cats' / 'network' / 'docker_ipfs_transport_peering.py'
     )
@@ -162,6 +172,7 @@ def test_no_cats_network_peering_module():
 
 
 def test_process_port_uses_fake_transport():
+    """Process ingress/egress/integration_cache accept a TransportPort duck type."""
     from data.input.function import process as proc
 
     fake = _FakeTransport()
@@ -171,6 +182,7 @@ def test_process_port_uses_fake_transport():
 
 
 def test_grep_guard_no_ensure_docker_ipfs_peers_in_process():
+    """Process sources must not import or call transport peering internals."""
     text = PROCESS_PY.read_text(encoding='utf-8')
     banned = (
         'ensure_docker_ipfs_peers',
@@ -224,6 +236,7 @@ def test_tf_peering_resource_every_apply_not_on_compose_create():
 
 
 def test_transport_assert_wraps_assert_ready(tmp_path, monkeypatch):
+    """InfraStructure.transport_assert wraps assert_ready with peering context."""
     from types import SimpleNamespace
 
     from cats.executor.structure import InfraStructure

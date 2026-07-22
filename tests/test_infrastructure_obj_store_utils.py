@@ -32,6 +32,7 @@ obj_store_utils = _load_obj_store_utils()
 
 
 def test_object_store_result_uri():
+    """result_uri builds an s3 JobHandle URI and rejects non-JobHandle args."""
     store = obj_store_utils.ObjectStore(
         endpoint_host='http://127.0.0.1:9000',
         endpoint_pod='http://172.19.0.1:9000',
@@ -49,6 +50,7 @@ def test_object_store_result_uri():
 
 
 def test_download_job_result_requires_job_handle(tmp_path):
+    """download_job_result requires a JobHandle, not a raw prefix string."""
     store = obj_store_utils.ObjectStore(
         endpoint_host='http://127.0.0.1:9000',
         endpoint_pod='http://172.19.0.1:9000',
@@ -61,6 +63,7 @@ def test_download_job_result_requires_job_handle(tmp_path):
 
 
 def test_object_store_snapshot_excludes_credentials():
+    """BOM snapshot includes endpoints/bucket but never access credentials."""
     store = obj_store_utils.ObjectStore(
         endpoint_host='http://127.0.0.1:9000',
         endpoint_pod='http://172.19.0.1:9000',
@@ -79,6 +82,7 @@ def test_object_store_snapshot_excludes_credentials():
 
 
 def test_object_store_from_terraform_outputs():
+    """ObjectStore.from_terraform_outputs maps infrastructure_* TF keys."""
     outputs = {
         'infrastructure_minio_endpoint_host': 'http://127.0.0.1:9000',
         'infrastructure_minio_endpoint_pod': 'http://172.19.0.1:9000',
@@ -92,6 +96,7 @@ def test_object_store_from_terraform_outputs():
 
 
 def test_minio_result_uri_helper():
+    """minio_result_uri builds the JobHandle-shaped s3 result path."""
     config = {'bucket': 'cats-scratch'}
     uri = obj_store_utils.minio_result_uri(
         config, '11111111-2222-3333-4444-555555555555'
@@ -100,6 +105,7 @@ def test_minio_result_uri_helper():
 
 
 def test_list_job_files_rejects_bad_uuid():
+    """list_job_files rejects non-UUID job identifiers."""
     with pytest.raises(ValueError, match='invalid job_uuid'):
         obj_store_utils.list_job_files(
             obj_store_utils.default_minio_config(), 'not-a-uuid'
@@ -107,6 +113,7 @@ def test_list_job_files_rejects_bad_uuid():
 
 
 def test_read_job_file_rejects_unsafe_name():
+    """read_job_file rejects path-traversal style file names."""
     with pytest.raises(ValueError, match='invalid file name'):
         obj_store_utils.read_job_file(
             obj_store_utils.default_minio_config(),
@@ -116,12 +123,14 @@ def test_read_job_file_rejects_unsafe_name():
 
 
 def test_cli_list_jobs_help():
+    """CLI --help exits successfully."""
     with pytest.raises(SystemExit) as exc:
         obj_store_utils._main(['--help'])
     assert exc.value.code == 0
 
 
 def test_write_job_scratch_writes_config_only(tmp_path):
+    """write_job_scratch writes object_store_config.json only (no Ray landing)."""
     store = obj_store_utils.ObjectStore(
         endpoint_host='http://127.0.0.1:9000',
         endpoint_pod='http://172.19.0.1:9000',
@@ -151,8 +160,8 @@ def test_write_job_scratch_writes_config_only(tmp_path):
 
 
 def test_load_obj_store_utils_from_structure_home():
-    structure_home = str(
-        REPO_ROOT / 'data' / 'input' / 'structure'
+    """load_obj_store_utils resolves ObjectStore from the Structure home tree."""
+    structure_home = str(        REPO_ROOT / 'data' / 'input' / 'structure'
     )
     mod = obj_store_utils.load_obj_store_utils(structure_home)
     assert hasattr(mod, 'ObjectStore')

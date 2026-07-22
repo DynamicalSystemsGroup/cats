@@ -42,6 +42,7 @@ class _FakeCompleted:
 
 
 def test_is_ready_true_when_api_ok(monkeypatch):
+    """is_ready is True when the Kubo HTTP id probe returns ok."""
     monkeypatch.setattr(
         csu.requests, 'post', lambda *a, **k: _FakeResponse(True)
     )
@@ -49,6 +50,7 @@ def test_is_ready_true_when_api_ok(monkeypatch):
 
 
 def test_is_ready_false_when_connection_refused(monkeypatch):
+    """is_ready is False when the probe raises ConnectionError."""
     def _raise(*a, **k):
         raise csu.requests.ConnectionError('refused')
 
@@ -57,6 +59,7 @@ def test_is_ready_false_when_connection_refused(monkeypatch):
 
 
 def test_is_ready_false_when_http_error(monkeypatch):
+    """is_ready is False when the probe response is not ok."""
     monkeypatch.setattr(
         csu.requests, 'post', lambda *a, **k: _FakeResponse(False)
     )
@@ -64,6 +67,7 @@ def test_is_ready_false_when_http_error(monkeypatch):
 
 
 def test_ensure_api_already_up_skips_heal_and_start(monkeypatch):
+    """ensure is a no-op for heal/daemon start when the API is already up."""
     heal_calls = []
     popen_calls = []
 
@@ -85,6 +89,7 @@ def test_ensure_api_already_up_skips_heal_and_start(monkeypatch):
 
 
 def test_heal_unlinks_stale_lock_when_no_daemon_process(monkeypatch, tmp_path):
+    """Heal removes a stale repo.lock when no holder or daemon PIDs exist."""
     lock_path = tmp_path / 'repo.lock'
     lock_path.write_text('stale')
 
@@ -104,6 +109,7 @@ def test_heal_unlinks_stale_lock_when_no_daemon_process(monkeypatch, tmp_path):
 
 
 def test_heal_terminates_lock_holders_then_unlinks(monkeypatch, tmp_path):
+    """Heal terminates lock-holder PIDs, then unlinks the repo lock."""
     lock_path = tmp_path / 'repo.lock'
     lock_path.write_text('held')
     terminated = []
@@ -136,16 +142,19 @@ def test_heal_terminates_lock_holders_then_unlinks(monkeypatch, tmp_path):
 
 
 def test_cli_status_ready(monkeypatch):
+    """CLI status exits 0 when ContentStore reports ready."""
     monkeypatch.setattr(csu.ContentStore, 'is_ready', lambda *a, **k: True)
     assert csu._main(['status']) == 0
 
 
 def test_cli_status_not_ready(monkeypatch):
+    """CLI status exits 1 when ContentStore reports not ready."""
     monkeypatch.setattr(csu.ContentStore, 'is_ready', lambda *a, **k: False)
     assert csu._main(['status']) == 1
 
 
 def test_cli_ensure_invokes_content_store(monkeypatch):
+    """CLI ensure delegates to ContentStore.ensure."""
     calls = []
     monkeypatch.setattr(
         csu.ContentStore, 'ensure', lambda **k: calls.append(True)
@@ -155,6 +164,7 @@ def test_cli_ensure_invokes_content_store(monkeypatch):
 
 
 def test_clients_no_longer_export_owned_daemon_api():
+    """cats.network.clients no longer exports Node-owned daemon lifecycle APIs."""
     import cats.network.clients as clients
 
     assert not hasattr(clients, 'shutdown_owned_daemon')
@@ -176,6 +186,7 @@ def test_ipfs_api_id_url_defaults_match_connect(monkeypatch):
 
 
 def test_ipfs_api_id_url_follows_ipfs_api_host_port(monkeypatch):
+    """Probe URL follows IPFS_API_HOST / IPFS_API_PORT when set."""
     monkeypatch.delenv('CATS_IPFS_API_ID_URL', raising=False)
     monkeypatch.setenv('IPFS_API_HOST', '10.0.0.9')
     monkeypatch.setenv('IPFS_API_PORT', '5009')
@@ -183,6 +194,7 @@ def test_ipfs_api_id_url_follows_ipfs_api_host_port(monkeypatch):
 
 
 def test_ipfs_api_id_url_full_override_wins(monkeypatch):
+    """CATS_IPFS_API_ID_URL overrides host/port env vars."""
     monkeypatch.setenv('CATS_IPFS_API_ID_URL', 'http://example:1/api/v0/id')
     monkeypatch.setenv('IPFS_API_HOST', '10.0.0.9')
     monkeypatch.setenv('IPFS_API_PORT', '5009')

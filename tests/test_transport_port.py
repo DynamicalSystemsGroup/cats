@@ -47,6 +47,7 @@ class _FakeTransport:
 
 
 def test_fake_and_facade_satisfy_transport_port_protocol():
+    """Fake transport and as_transport_port facade both satisfy TransportPort."""
     from data.input.function.process.transport_port import (
         TransportPort,
         as_transport_port,
@@ -62,6 +63,7 @@ def test_fake_and_facade_satisfy_transport_port_protocol():
 
 
 def test_as_transport_port_strips_structure_surface():
+    """as_transport_port exposes only migrate/stage_for_plant, not peering APIs."""
     from data.input.function.process.transport_port import as_transport_port
 
     tu = _load_transport_utils()
@@ -80,6 +82,7 @@ def test_as_transport_port_strips_structure_surface():
 
 
 def test_as_transport_port_idempotent():
+    """Wrapping an existing TransportPort facade returns the same object."""
     from data.input.function.process.transport_port import as_transport_port
 
     fake = _FakeTransport()
@@ -89,6 +92,7 @@ def test_as_transport_port_idempotent():
 
 
 def test_transport_port_module_has_no_infrastructure_imports():
+    """Function-owned transport_port must not import IaaS adapters."""
     text = TRANSPORT_PORT_PY.read_text(encoding='utf-8')
     assert 'import transport_utils' not in text
     assert 'from transport_utils' not in text
@@ -97,6 +101,7 @@ def test_transport_port_module_has_no_infrastructure_imports():
 
 
 def test_process_grep_guards_transport_port_surface():
+    """Process callables must not reference transport peering internals."""
     text = PROCESS_PY.read_text(encoding='utf-8')
     banned = (
         'ensure_docker_ipfs_peers',

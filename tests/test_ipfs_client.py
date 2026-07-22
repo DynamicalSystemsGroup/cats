@@ -22,6 +22,7 @@ requires_kubo = pytest.mark.skipif(not _kubo_up(), reason='Kubo daemon not reach
 
 @requires_kubo
 def test_connect_id():
+    """Smoke: connect(validate=True) returns a peer id from live Kubo."""
     client = connect(validate=True)
     peer = client.id()
     assert 'ID' in peer
@@ -29,6 +30,7 @@ def test_connect_id():
 
 @requires_kubo
 def test_add_str_roundtrip_via_rpc_cat():
+    """Smoke: add_str content round-trips through cat / cat_bytes."""
     client = connect()
     cid = client.add_str(json.dumps({'hello': 'cats'}))
     raw = client.cat(cid)
@@ -42,6 +44,7 @@ def _picklable_probe(value):
 
 @requires_kubo
 def test_add_json_and_pyobj():
+    """Smoke: add_json and add_pyobj return CIDs."""
     client = connect()
     cid = client.add_json({'a': 1})
     assert isinstance(cid, str) and cid.startswith('Qm')
@@ -52,6 +55,7 @@ def test_add_json_and_pyobj():
 
 @requires_kubo
 def test_add_directory_recursive_names_match_cidDir():
+    """Smoke: recursive add returns named entries including the root directory CID."""
     client = connect()
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / 'plant_mod'
@@ -69,6 +73,7 @@ def test_add_directory_recursive_names_match_cidDir():
 
 @requires_kubo
 def test_get_file_and_directory(tmp_path):
+    """Smoke: get materializes both single-file and directory CIDs to disk."""
     client = connect()
     cid = client.add_str('file-body')
     dest_file = tmp_path / 'out.txt'
@@ -87,6 +92,7 @@ def test_get_file_and_directory(tmp_path):
 
 @requires_kubo
 def test_ls_and_dag_export(tmp_path):
+    """Smoke: ls lists directory links and dag_export writes a non-empty CAR."""
     client = connect()
     root = tmp_path / 'tree'
     root.mkdir()
@@ -105,6 +111,7 @@ def test_ls_and_dag_export(tmp_path):
 
 @requires_kubo
 def test_post_upload_single_file():
+    """Smoke: post_upload adds a single file and returns its CID."""
     client = connect()
     with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False) as handle:
         handle.write('{"bom": true}')
@@ -117,6 +124,7 @@ def test_post_upload_single_file():
 
 
 def test_kubo_rpc_error_on_bad_port():
+    """CatsIPFSClient.id raises when Kubo RPC is unreachable on a bad port."""
     client = KuboRpcClient(host='127.0.0.1', port=1, timeout=1)
     wrapped = CatsIPFSClient(client)
     with pytest.raises(Exception):
@@ -124,6 +132,7 @@ def test_kubo_rpc_error_on_bad_port():
 
 
 def test_connect_respects_ipfs_api_env(monkeypatch):
+    """connect reads IPFS_API_* env, and explicit host/port kwargs override it."""
     monkeypatch.setenv('IPFS_API_HOST', '10.0.0.9')
     monkeypatch.setenv('IPFS_API_PORT', '5009')
     client = connect()

@@ -14,6 +14,7 @@ MESH_INIT = REPO_ROOT / 'cats' / 'network' / '__init__.py'
 
 
 def test_meshclient_has_no_ipfs_cli_subprocess_strings():
+    """MeshClient source must not shell out to the ipfs CLI."""
     text = MESH_INIT.read_text(encoding='utf-8')
     for needle in (
         'ipfs cat',
@@ -27,12 +28,14 @@ def test_meshclient_has_no_ipfs_cli_subprocess_strings():
 
 
 def test_node_init_endpoint_uses_cat_node_env(monkeypatch):
+    """_node_init_endpoint builds the URL from CAT_NODE_HOST / CAT_NODE_PORT."""
     monkeypatch.setenv('CAT_NODE_HOST', '192.168.1.10')
     monkeypatch.setenv('CAT_NODE_PORT', '6000')
     assert _node_init_endpoint() == 'http://192.168.1.10:6000/cat/node/init'
 
 
 def test_cat_and_cat_obj_delegate_to_ipfs_client(monkeypatch):
+    """cat / catObj delegate to CatsIPFSClient.cat / cat_bytes."""
     fake = MagicMock()
     fake.cat.return_value = '{"k": 1}'
     fake.cat_bytes.return_value = b'\x80\x04'
@@ -46,6 +49,7 @@ def test_cat_and_cat_obj_delegate_to_ipfs_client(monkeypatch):
 
 
 def test_get_and_get_car_delegate(monkeypatch, tmp_path):
+    """get / getCar delegate to CatsIPFSClient.get / dag_export."""
     fake = MagicMock()
     client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
@@ -58,6 +62,7 @@ def test_get_and_get_car_delegate(monkeypatch, tmp_path):
 
 
 def test_link_data_uses_ls_links(monkeypatch):
+    """linkData resolves the outputs subdirectory via ls links."""
     fake = MagicMock()
     fake.ls.return_value = [
         {'Name': 'inputs', 'Hash': 'QmIn'},
@@ -70,6 +75,7 @@ def test_link_data_uses_ls_links(monkeypatch):
 
 
 def test_fetch_ipfs_object_uses_bytes(monkeypatch):
+    """fetch_ipfs_object unpickles objects fetched via cat_bytes."""
     payload = pickle.dumps({'ok': True})
     fake = MagicMock()
     fake.cat_bytes.return_value = payload
@@ -79,6 +85,7 @@ def test_fetch_ipfs_object_uses_bytes(monkeypatch):
 
 
 def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
+    """create_order_request defaults endpoint to /cat/node/init."""
     fake = MagicMock()
     # Minimal stubs so create_order_request can run far enough to set endpoint.
     fake.add.return_value = [{'Name': 'data', 'Hash': 'QmData'}]
@@ -164,6 +171,7 @@ def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
 
 
 def test_cat_submit_uses_requests(monkeypatch, capsys):
+    """catSubmit POSTs the order_request JSON via requests and returns the BOM."""
     fake = MagicMock()
     fake.cat.return_value = json.dumps(
         {'endpoint': 'http://127.0.0.1:5000/cat/node/init', 'invoice_cid': 'QmI'}
