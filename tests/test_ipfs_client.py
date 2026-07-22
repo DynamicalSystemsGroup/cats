@@ -28,13 +28,12 @@ def test_connect_id():
 
 
 @requires_kubo
-def test_add_str_roundtrip_via_cli_cat():
-    import subprocess
-
+def test_add_str_roundtrip_via_rpc_cat():
     client = connect()
     cid = client.add_str(json.dumps({'hello': 'cats'}))
-    raw = subprocess.check_output(['ipfs', 'cat', cid], text=True)
+    raw = client.cat(cid)
     assert json.loads(raw) == {'hello': 'cats'}
+    assert json.loads(client.cat_bytes(cid).decode()) == {'hello': 'cats'}
 
 
 def _picklable_probe(value):
@@ -69,6 +68,42 @@ def test_add_directory_recursive_names_match_cidDir():
 
 
 @requires_kubo
+def test_get_file_and_directory(tmp_path):
+    client = connect()
+    cid = client.add_str('file-body')
+    dest_file = tmp_path / 'out.txt'
+    client.get(cid, str(dest_file))
+    assert dest_file.read_text() == 'file-body'
+
+    root = tmp_path / 'mod'
+    root.mkdir()
+    (root / 'a.txt').write_text('a')
+    entries = client.add(str(root), recursive=True)
+    dir_cid = [e for e in entries if e['Name'] == 'mod'][-1]['Hash']
+    dest_dir = tmp_path / 'got_mod'
+    client.get(dir_cid, str(dest_dir))
+    assert (dest_dir / 'a.txt').read_text() == 'a'
+
+
+@requires_kubo
+def test_ls_and_dag_export(tmp_path):
+    client = connect()
+    root = tmp_path / 'tree'
+    root.mkdir()
+    (root / 'outputs').mkdir()
+    (root / 'outputs' / 'x.csv').write_text('1\n')
+    entries = client.add(str(root), recursive=True)
+    dir_cid = [e for e in entries if e['Name'] == 'tree'][-1]['Hash']
+    links = client.ls(dir_cid)
+    names = {link['Name'] for link in links}
+    assert 'outputs' in names
+
+    car_path = tmp_path / 'tree.car'
+    client.dag_export(dir_cid, str(car_path))
+    assert car_path.stat().st_size > 0
+
+
+@requires_kubo
 def test_post_upload_single_file():
     client = connect()
     with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False) as handle:
@@ -86,3 +121,13 @@ def test_kubo_rpc_error_on_bad_port():
     wrapped = CatsIPFSClient(client)
     with pytest.raises(Exception):
         wrapped.id()
+
+
+def test_connect_respects_ipfs_api_env(monkeypatch):
+    monkeypatch.setenv('IPFS_API_HOST', '10.0.0.9')
+    monkeypatch.setenv('IPFS_API_PORT', '5009')
+    client = connect()
+    assert client._client.base_url == 'http://10.0.0.9:5009/api/v0'
+    # kwargs override env
+    client2 = connect(host='127.0.0.1', port=5001)
+    assert client2._client.base_url == 'http://127.0.0.1:5001/api/v0'
