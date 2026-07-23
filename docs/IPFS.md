@@ -8,7 +8,7 @@ and MinIO (T&D).
 
 The Python side talks to that daemon with a thin sync Kubo HTTP RPC client
 (`cats/network/clients/ipfs_client.py` → `http://{IPFS_API_HOST}:{IPFS_API_PORT}/api/v0/*`,
-defaults `127.0.0.1:5001`, via `requests`), not `ipfshttpclient`. **MeshClient** uses that client
+defaults `127.0.0.1:5001`, via `requests`), not `ipfshttpclient`. **ContentMesh** uses that client
 end-to-end for adds **and** reads (`cat` / `get` / `ls` / `dag export`) — it does not shell out to the
 `ipfs` CLI. The CLI remains operator-only (manual `ipfs daemon` / `ipfs shutdown` / debugging).
 
@@ -26,7 +26,7 @@ Host Kubo lifecycle is owned by **InfraStructure** directory-model code. The rep
 is the **source of truth**; it ships inside `infrastructure_cid`. After Order materialize, TF and
 Executor load the **Order-submitted** copy under `INPUT_STRUCTURE_HOME/.../content_store_utils.py`.
 
-The CAT Node and MeshClient are **clients** only — they must not `ipfs shutdown` the content store on
+The CAT Node and ContentMesh are **clients** only — they must not `ipfs shutdown` the content store on
 process exit. Structure `terraform destroy` tears down T&D (Docker peers / MinIO) and Plant but
 **does not** stop host Kubo.
 
@@ -34,7 +34,7 @@ process exit. Structure `terraform destroy` tears down T&D (Docker peers / MinIO
 
 One host Kubo (default `:5001`, one repo) serves **two traffic classes** on purpose:
 
-1. **Content-store** — durable mesh / provenance CIDs (Order, Invoice, BOM, …) via MeshClient.
+1. **Content-store** — durable mesh / provenance CIDs (Order, Invoice, BOM, …) via ContentMesh.
 2. **Bitswap peer of T&D** — Structure Docker peers (`TransportContext`) swarm-connect to that same host so migrate/stage can fetch host-added CIDs without a second `IPFS_PATH`.
 
 Peers are Structure-lifetime; the host daemon is not. Destroy / `node stop` never kill host Kubo. This is the soft plane (not a dual-daemon hard split). Details: [`STORAGE.md`](./STORAGE.md#one-daemon-two-traffic-classes).
@@ -53,7 +53,7 @@ jobs in this module.
 
 | Phase | When | Which tree |
 |-------|------|------------|
-| **Bootstrap** | Node `start` / `ensure`; MeshClient readiness check; operator CLI | Repo default under `CATS_HOME/data/input/structure/.../content_store_utils.py` |
+| **Bootstrap** | Node `start` / `ensure`; ContentMesh readiness check; operator CLI | Repo default under `CATS_HOME/data/input/structure/.../content_store_utils.py` |
 | **Execution (mutate)** | TF `shell_script.host_ipfs_daemon` create (bare `terraform apply` or via Executor) | Order-submitted under `INPUT_STRUCTURE_HOME/.../content_store_utils.py` |
 | **Execution (assert)** | `InfraStructure.apply` after `terraform apply` | Same Order-submitted tree (`ContentStore.is_ready`) |
 
@@ -61,7 +61,7 @@ jobs in this module.
   (assert-only; does not heal). Fail loud if Kubo is down — run `make content-store-ensure` /
   `cats/node.py ensure` first. `stop` kills Flask only — **Node stop ≠ content-store stop**.
 * **Node ensure** — operator heal facade: repo-tree `ContentStore.ensure` (no Flask).
-* **MeshClient bootstrap** (`ensure_bootstrap_content_store`) — **lazy** readiness soft-warn on the
+* **ContentMesh bootstrap** (`ensure_bootstrap_content_store`) — **lazy** readiness soft-warn on the
   default tree only; does **not** call `ensure`. **Not** Order-bound.
 * **Order execution** — TF `host_ipfs_daemon` create is the sole **automatic** Order-submitted ensure
   (Executor composes that à la carte unit). `InfraStructure.apply` only **asserts** readiness after TF.
@@ -96,7 +96,7 @@ uv run python cats/node.py ensure   # operator ContentStore.ensure, no Flask
 ```
 
 Content-store `status` exits 0 when the HTTP API is up, 1 otherwise. Node `status` exits 0 only when Flask
-is listening **and** ContentStore is ready. MeshClient runs a **lazy bootstrap readiness soft-warn** on
+is listening **and** ContentStore is ready. ContentMesh runs a **lazy bootstrap readiness soft-warn** on
 first IPFS use (no `ContentStore.ensure` / heal) if you skip Node start / the CLI — never on package
 import.
 

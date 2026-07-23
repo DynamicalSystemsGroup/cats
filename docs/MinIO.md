@@ -1,8 +1,12 @@
 ### Manage the Structure MinIO Shared Object Store
 
 CATs uses MinIO as InfraStructure [IaaS] **shared object store / scratch** for Plant-side parallel Ray
-writes (bucket `cats-scratch`). Durable post-run retrieval of integration outputs is via IPFS
-(`invoice.integration_data_cid`), not MinIO. See [`STORAGE.md`](./STORAGE.md).
+writes (bucket `cats-scratch`). **MinIO is [S3-compatible](https://min.io/product/s3-compatibility)** —
+it speaks the Amazon S3 API — so Plant workers and `ObjectStore` address scratch with standard S3
+semantics (`s3://cats-scratch/…`, bucket/key layout, S3 SDK/CLI tools). That is the interop surface for
+job landing; a future S3-compatible backend would still sit behind the same `ObjectStore` /
+`JobHandle` contract (see [`INTEROP.md`](./INTEROP.md)). Durable post-run retrieval of integration
+outputs is via IPFS (`invoice.integration_data_cid`), not MinIO. See [`STORAGE.md`](./STORAGE.md).
 
 MinIO access is **InfraStructure-as-Code** (directory model): the module under
 `data/input/structure/infrastructure/` is what `create_order_request()` CIDs as
@@ -37,9 +41,11 @@ the named volume (scratch is cleared with InfraStructure).
 
 #### Endpoints
 
+MinIO exposes an **S3-compatible API** on `:9000` (plus a web Console on `:9001`):
+
 | Surface | URL |
 |---------|-----|
-| S3 API | http://127.0.0.1:9000 |
+| S3 API (S3-compatible) | http://127.0.0.1:9000 |
 | Console | http://127.0.0.1:9001 |
 
 Default credentials (`local.minio_root_user` / `local.minio_root_password` in
@@ -98,4 +104,4 @@ Correlate jobs with `log.object_store_result_uri` from the BOM.
 - [`STORAGE.md`](./STORAGE.md) — MinIO vs IPFS roles under InfraStructure [IaaS]
 - [`IPFS.md`](./IPFS.md) — host Kubo content-store facet (`ContentStore.ensure`)
 - [`DASHBOARDS.md`](./DASHBOARDS.md) — MinIO Console link
-- [`BOM.md`](./BOM.md) — `infrastructure_snapshot_cid` and Invoice stage CIDs
+- [`BOM.md`](./BOM.md#cat-node-http-bom-response) — `object_store_as_executed_cid` under Invoice and stage CIDs

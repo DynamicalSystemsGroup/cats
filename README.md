@@ -9,39 +9,47 @@ Data Products with Data Provenance. CATs connect collaborators between organizat
 support scalable (big) data processing microservices with Scientific Computing capabilities. CATs are also integration 
 points which enable scaled data processing portability between client-server cloud platforms and mesh (p2p) networks 
 with minimal rework or modification.
-![CATs Chaordic Kernel](images/CATs_chaordic_kernel.jpeg)
+CATs Chaordic Kernel
+
 - **Techncal Use-Case Specification:** CATs' utilizes [Ray](https://www.ray.io/) as an execution middleware framework deployed on **[Kubernetes](https://kubernetes.io/)** for interoperable & parallelized distributed computing applications / Big Data processing with Scientific Computing enabled [ecosystem integrations](https://docs.ray.io/en/latest/ray-overview/ray-libraries.html) such as [Apache Spark](https://spark.apache.org/), and [PyTorch](https://pytorch.org/).
 
 ### How are CATs workloads processed as Data Provenance Records?
 
 CAT's (Data) Mesh is specified / reified by CATs executing **[Bills-Of-Materials (BOMs)](https://en.wikipedia.org/wiki/Bill_of_materials)** as specifications used to chain CAT Nodes' content-addressed records into a verifiable lineage of Data Provenance. (* **[Details](docs/LineageOfProvenance.md)**)
 
-CATs are submitted as content-addressed **Orders** of data processes (transformers) which are **Invoiced** for verification and logged as **BOMs** that serve as **Data Provenance records** that are unique identifiers of CAT workloads and their content. **BOMs** are CATs' Content-Addressed **Data Provenance records** for **verifiable data processing** with URIs for transport over a Mesh network of CATs. BOMs are also used as CAT’ input & output that contain CATs’ means of data processing between CAT Nodes.
+CATs are submitted as content-addressed **Orders** of data processes (transformers) which are **Invoiced** for verification and logged as **BOMs** that serve as **Data Provenance records** that are unique identifiers of CAT workloads and their content. **BOMs** are CATs' Content-Addressed **Data Provenance records** for **verifiable data processing** with URIs for transport over a Mesh network of CATs. BOMs are also used as CAT’ input & output that contain CATs’ means of data processing between CAT Nodes. Node HTTP BOM nesting (Invoice `structure_as_executed_cid` vs Order as-Code `structure_cid`): [`docs/BOM.md`](docs/BOM.md#cat-node-http-bom-response).
 
 **BOMs** employ **Content Identifiers (CIDs)** for CAS to provide a means of location-agnostic data transportation / retrieval of based on its content / CAT processes for [Data Verification](https://en.wikipedia.org/wiki/Data_verification). Therefore, the implementation of CATs' as content-addressed data processes establishes and self-services a scalable Data Platform as a Data Mesh network of interoperable distributed computing workloads deployable on [Kubernetes](https://kubernetes.io/) as CATs execution paradigm.
-![CATs BOM Activity](images/CATs_bom_activity.jpeg)
+CATs BOM Activity
+
 - BOM CIDs can be used to verify the means of processing data (input, transformation / process, output, infrastructure-as-code (IaC)) they can also make CATs resilient by enabling re-execution via retrieval. CATs certifies the accuracy of data processing on data products and pipelines by enabling maintenance and reporting of [data and process lineage & provenance](https://bi-insider.com/posts/data-lineage-and-data-provenance/) as chains of 
 evidence using CIDs.
 
 ### How do CATs enable colaborative Data Processing for Data Initiatives?
 
 CATs enables the **[continuous reification of Data Initiatives](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative-reification)** by cataloging discoverable, accessible, and re-executable workloads as **[Data Service Collaboration](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative-reification)** composable records between organizations. These records provide a reliable and efficient way to manage, share, and reference data processes via **[Content-Addressing](https://en.wikipedia.org/wiki/Content-addressable_storage)** Data Provenance records. **Data Initiatives** will be naturally reified as a result of **Data Service Collaboration** on CATs. CATs will be compiled and executed as interconnecting services on a Data Mesh that grows naturally when organizations communicate CATs provenance records within feedback loops of Data Initiatives.
-![CATs Initiative Aligmment](images/CATs_bom_ag.jpeg)
+CATs Initiative Aligmment
 
 ### What is Content Addressing & How does CATs use it?
 
 **Content-Addressing** is a method of uniquely identifying and retrieving data based on its content rather than its 
 location or address. CATs provides verifiable data processing and transport on a Mesh network of CATs interconnected by 
 Content-Addressing Data Provenance records with [IPFS](https://ipfs.io/) **[CIDs](https://docs.ipfs.io/concepts/content-addressing/)** (Content-Identifiers) as content addresses issued by IPFS **[client](https://docs.ipfs.io/install/command-line/#official-distributions)** to identify and retrieve inputs, transformations, outputs, and infrastructure (as code [IaC]) for verifying transformation accuracy given CIDs.
-![CID Example](images/cid_example.jpeg)
+CID Example
+
 - IPFS serves as CATs' Data Mesh's network layer to provide parallelized data ingress and egress for IPFS data. This network portability closes the gap between data analysis and operations by connecting the network planes of the cloud service model (SaaS, PaaS, IaaS) with IPFS. CATs connect these network planes by enabling the instantiation of FaaS with cloud services in AWS, GCP, Azure, etc. on a **Data Mesh** network of CATs. IPFS enables this connection as p2p distributed-computing job submission in addition to the client-server job submission provided by Ray.
 
 ## Get Started!:
 
 1. **Install [Dependencies](./docs/DEPS.md)** (including [uv](https://docs.astral.sh/uv/), which manages
   CATs' Python interpreter, virtual environment, and locked dependencies)
-  - Run `make deps` to install everything automatically on macOS or Linux (see the [`Makefile`](./Makefile) and
-    `make help`), or follow [`DEPS.md`](./docs/DEPS.md) to install each dependency manually.
+  ```bash
+  make deps-all
+  # core: make deps
+  # optional extras alone: make deps-helm / make deps-graphviz
+  ```
+  - Runs on macOS or Linux (see the `[Makefile](./Makefile)` and `make help`), or follow
+  `[DEPS.md](./docs/DEPS.md)` to install each dependency manually.
 2. **Install CATs:**
   ```bash
     git clone git@github.com:DynamicalSystemsGroup/cats.git
@@ -55,7 +63,7 @@ Content-Addressing Data Provenance records with [IPFS](https://ipfs.io/) **[CIDs
   make node-up
   # chains: make content-store-ensure && make node-start
   ```
-  See [`STORAGE.md`](./docs/STORAGE.md#node-up-vs-content-store-ensure-and-node-start)
+  See `[STORAGE.md](./docs/STORAGE.md#node-up-vs-content-store-ensure-and-node-start)`
   for why ensure and start are separate Make targets.
 4. **Check Node status** (Flask listen + ContentStore ready):
   ```bash
@@ -73,15 +81,28 @@ Content-Addressing Data Provenance records with [IPFS](https://ipfs.io/) **[CIDs
   # stop IPFS (Kubo) daemon via the following command:
   # ipfs shutdown
   ```
-8. **[Experiments](./experiments/EXP.md)**
+8. **Diagramming:** Both (code2flow + pyreverse): PNG output requires Graphviz
+  (`dot`) on `PATH` — `make deps-graphviz` (or `make deps-all`). See `[DEPS.md](./docs/DEPS.md)`.
+  ```bash
+  make diagrams
+
+  # Functional diagram via code2flow:
+  # uv run python utils/code2flow/diagram_c2f.py
+
+  # Class & Dependency diagram via pyreverse:
+  # uv run pyreverse -o png -p CATs -d images/pyreverse cats
+  ```
+9. **[Experiments](./experiments/EXP.md)**
 
 ### [Dashboards:](docs/DASHBOARDS.md)
 
 Once a Structure is deployed, three web dashboards are reachable at fixed `localhost` addresses: the
 [Ray Dashboard](http://127.0.0.1:8265) for the Plant's KubeRay cluster (job status, actors, logs), the
-[MinIO Console](http://127.0.0.1:9001) for the shared object store Ray Data's distributed writes land in,
-and the [IPFS WebUI](http://127.0.0.1:5001/webui) for browsing everything CID'ed into a BOM/Invoice/Order.
-See [`DASHBOARDS.md`](docs/DASHBOARDS.md) for URLs, credentials, and what each one is for.
+[MinIO Console](http://127.0.0.1:9001) for the [S3-compatible](https://min.io/product/s3-compatibility)
+shared object store Ray Data's distributed writes land in (see `[STORAGE.md](docs/STORAGE.md)` /
+`[MinIO.md](docs/MinIO.md)`),
+and the [IPFS WebUI](http://127.0.0.1:5001/webui) for browsing everything CID'ed into a BOM/Invoice/Order (Nest layout: [`docs/BOM.md`](docs/BOM.md#cat-node-http-bom-response)).
+See `[DASHBOARDS.md](docs/DASHBOARDS.md)` for URLs, credentials, and what each one is for.
 
 ### [Contribute!](docs/CONTRIBUTING.md)
 
@@ -90,12 +111,12 @@ See [`DASHBOARDS.md`](docs/DASHBOARDS.md) for URLs, credentials, and what each o
 Organizations and collaborators participating will employ CATs for rapid ratification of service agreements within collaborative feedback loops of **[Data Initiatives](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative)**. CATs' apply an **Architectural Quantum** Domain-Driven Design principle described in **[Data Mesh of Data Products](https://martinfowler.com/articles/data-mesh-principles.html)** to reify Data Initiatives.(* **[Design Description](docs/DESIGN.md)**)
 
 The Action Plane is the Analytical Data Processing interface. The Action Plane orchestrates and supervises how virtual resources owned by the Data Product should be managed, routed, and processed and is stored “offmesh” (“offline”). It supervises the exchange of data between sub-Process components within the Data sub-Plane (Process) in adherence to Data Contracting Standards of organizations participating in a Data Mesh.
-![CAT Kernel](images/CATkernel.jpeg)
+CAT Kernel
 
 #### Quantum Architecture Description as a [Minimal Federated Operating Model](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/)
 
 - **Function [FaaS]** is a Function-as-a-Service for scalable Data Processing and analytics whose **Process [REPL(aC)]** composes and submits transport callables plus a Transfer Higher-Order Function (tHOF) for **InfraFunction [FaaS]** to dispatch. *Functions* are deployed on **Structure [PaaS]**; mutating either *Process* or *InfraFunction* updates the CAT **Order** in alignment with CATs *Architectural Quantum’s* Functionality
-  - **Process [REPL(aC)]** is a *Read-Eval-Print Loop as Code* (such as a Marimo notebook UI, e.g. [`cats_demo.py`](cats_demo.py)) that composes **ingress / integration_cache / egress** (transport) and **`integrated_subproc`** — the tHOF, i.e. the input→output data transform ([transfer function](https://en.wikipedia.org/wiki/Transfer_function)), often higher-order because it applies a batch function (e.g. via Ray `map_batches`). Process is the composer/submitter, not itself a tHOF. Mutating a ***Function's* Process [REPL(aC)]** composition produces a new **Order** whose `function_cid` reflects that update, for the Node's Factory to process on the next execution (*)
+  - **Process [REPL(aC)]** is a *Read-Eval-Print Loop as Code* (such as a Marimo notebook UI, e.g. `[cats_demo.py](cats_demo.py)`) that composes **ingress / integration_cache / egress** (transport) and `**integrated_subproc`** — the tHOF, i.e. the input→output data transform ([transfer function](https://en.wikipedia.org/wiki/Transfer_function)), often higher-order because it applies a batch function (e.g. via Ray `map_batches`). Process is the composer/submitter, not itself a tHOF. Mutating a ***Function's* Process [REPL(aC)]** composition produces a new **Order** whose `function_cid` reflects that update, for the Node's Factory to process on the next execution (*)
   - **InfraFunction [FaaS]** is the actuator / Data Processing Orchestrator that receives the tHOF **Process [REPL(aC)]** submits and dispatches it onto the Plant (SaaS); transport callables run locally around that dispatch, not as Plant jobs
     - Mutating InfraFunction (FaaS)'s dispatch configuration produces a new Order whose updated `function_cid` carries the updated actuator, alongside any Process-composed callable CIDs and any resulting `structure_cid` update reflecting the **Plant [SaaS]** it now targets (*)
 - **Structure [PaaS(as IaC)]** provisions and maintains the **Plant [SaaS]** as **Function’s [FaaS]** scalable execution environment. 
@@ -127,7 +148,7 @@ CAT Nodes are **Data Products** - peer-nodes on a mesh network that encapsulate 
 - "D" ovals are Analytical Data web service endpoints
 - Source: [Data Mesh Principles and Logical Architecture](https://martinfowler.com/articles/data-mesh-principles.html) - Zhamak 
 Dehghani, et al.
-![Data Product Domain](images/data_product_domain.jpeg)
+Data Product Domain
 
 ## Key Concepts:
 
@@ -165,3 +186,4 @@ CATs was developed by the [Dynamical Systems Group (DSG)](https://github.com/Dyn
 - **Lead Solutions Architect / Distributed Systems & Software Engineer** 
   - [Joshua E. Jodesty](https://github.com/JEJodesty)
 - **Testing:** Danilo
+

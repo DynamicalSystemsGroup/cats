@@ -5,6 +5,11 @@ execution and provenance. That substrate includes both **IPFS** and **MinIO** (p
 They are not separate Architectural Quantum components — they are two operational stores inside
 **InfraStructure [IaaS]**. See [`PLANTs.md`](./PLANTs.md) and [`BOM.md`](./BOM.md).
 
+**MinIO is [S3-compatible](https://min.io/product/s3-compatibility):** Plant scratch uses the S3 API
+(`s3://…` URIs, bucket/key layout) via InfraStructure’s `ObjectStore` / `JobHandle`. That compatibility is
+why Ray (and other S3 clients) can write job results to MinIO without a proprietary store API. Object-store
+config is **not** a Service field — see [`MinIO.md`](./MinIO.md) and [`INTEROP.md`](./INTEROP.md).
+
 ## Facets inside InfraStructure (still one Quantum component)
 
 | Facet | What | Lifetime |
@@ -18,14 +23,19 @@ A **single** host Kubo (default `127.0.0.1:5001`, one `IPFS_PATH`) carries two t
 
 | Traffic class | Role | Lifetime |
 |---------------|------|----------|
-| **Content-store** | Mesh / Control-Feedback CIDs (Order, Invoice, BOM, Function/Structure-as-Code) via MeshClient | Long-lived; outlives Structure destroy and `node stop` |
+| **Content-store** | Mesh / Control-Feedback CIDs (Order, Invoice, BOM, Function/Structure-as-Code) via ContentMesh | Long-lived; outlives Structure destroy and `node stop` |
 | **Bitswap peer of T&D** | Host is peered to Structure Docker Kubo peers so migrate/stage can resolve host-added CIDs | Peering is Structure-lifetime; the host daemon itself is not |
+
+**ContentMesh** (`cats.network.content_mesh`) owns content-store mesh I/O and Order compose/submit via `CatsIPFSClient` (Kubo RPC).
+Unsigned BOM packaging and Node `node_uri` live under `cats.network.feedback` / `identity` (W3C DID/VC later — not Plant). An `AddressStore` adapter seam is deferred.
+Plant CoD transport (IPFS↔MinIO job orchestration) is separate —
+`cats.network.plant_transport.CoDTransport` (forthcoming; not ContentMesh).
 
 That soft plane is intentional (Big Data–friendly Bitswap without a second swarm). Structure destroy and Node stop tear down T&D peers / Flask only — they **never** shut down host Kubo. A hard split into two Kubo swarms (isolation / firewall) is optional and out of scope unless isolation demand is concrete; see [`IPFS.md`](./IPFS.md).
 
 Content-store is **two-phase** across **two on-disk copies** of the same helper (see [`IPFS.md`](./IPFS.md)):
 
-- **Bootstrap (repo default):** `{CATS_HOME}/data/input/structure/.../content_store_utils.py` — Node `start` asserts `is_ready`; MeshClient soft-warns if not ready (no auto-ensure); operator heal via `make content-store-ensure` / `node ensure`.
+- **Bootstrap (repo default):** `{CATS_HOME}/data/input/structure/.../content_store_utils.py` — Node `start` asserts `is_ready`; ContentMesh soft-warns if not ready (no auto-ensure); operator heal via `make content-store-ensure` / `node ensure`.
 - **Order-submitted:** `{INPUT_STRUCTURE_HOME}/.../content_store_utils.py` — TF `shell_script.host_ipfs_daemon` create is the sole **automatic** ensure; `InfraStructure.apply` only asserts.
 
 **Republish lag:** repo edits do not affect live Orders until Structure is re-CID’d. Keep `ContentStore.ensure` thin (probe + heal + start). Node never owns shutdown.
@@ -77,21 +87,21 @@ same soft plane.
 | Store | Component (Architectural Quantum) | Role name in CATs docs |
 |-------|-----------------------------------|------------------------|
 | **IPFS** | InfraStructure [IaaS] | **Content-addressed storage** (CID / Data Provenance Records) — content-store facet (host Kubo); transport peers are T&D |
-| **MinIO** | InfraStructure [IaaS] | **Shared object store** / **shared store** (bucket `cats-scratch`) — T&D facet |
+| **MinIO** | InfraStructure [IaaS] | **S3-compatible shared object store** / **shared store** (bucket `cats-scratch`) — T&D facet |
 
 ## What each store is for
 
-| | **MinIO** (shared object store / scratch) | **IPFS** (content-addressed storage) |
+| | **MinIO** (S3-compatible shared object store / scratch) | **IPFS** (content-addressed storage) |
 |---|-------------------------------------------|--------------------------------------|
-| **Type** | S3-compatible shared object store | Content-addressed store (CID graph) |
+| **Type** | [S3-compatible](https://min.io/product/s3-compatibility) object store (MinIO implements the S3 API) | Content-addressed store (CID graph) |
 | **Role** | Plant parallel-write landing zone during a job | Durable provenance / retrieval of CAT products |
 | **What lands there** | Ray result CSV shards under `cats-scratch/jobs/<uuid>/result/` | Order, Invoice, BOM, stage data (`integration_data_cid`, `data_cid`, …), Function/Structure as Code |
 | **Addressing** | Bucket + key (`s3://…`) | Content hash (CID) |
 | **Lifetime** | Structure lifetime (until destroy) | Host Kubo content-store outlives Structure destroy; CIDs survive as long as the node still has them |
 | **Who writes** | Ray workers (distributed) | Host after stages (`cidDir` / `add_json` / etc.) |
 
-**One line:** MinIO is temporary shared disk for parallel Ray writes; IPFS is the content-addressed record you
-use after the run (`integration_data_cid` and related Invoice/BOM CIDs).
+**One line:** MinIO is temporary **S3-compatible** shared disk for parallel Ray writes; IPFS is the
+content-addressed record you use after the run (`integration_data_cid` and related Invoice/BOM CIDs).
 
 ## How they connect in one CAT execution
 
@@ -102,7 +112,7 @@ use after the run (`integration_data_cid` and related Invoice/BOM CIDs).
 3. The host downloads that **JobHandle** prefix into `…/integration/outputs/`.
 4. `cidDir` adds that directory to IPFS → `invoice.integration_data_cid` (and the BOM `log` mirror).
 
-Post-run retrieval of integration outputs is via **IPFS** and that CID — not by reading MinIO. MinIO’s observed endpoints (without credentials) come from `ObjectStore.snapshot()` after `InfraStructure.obj_store_context()` and are recorded on `bom.infrastructure_snapshot_cid` so verifiers can see which shared store the distributed write landed in. Object-store, Plant, and transport config are **not** Service fields — Executor passes `object_store`, **`PlantPort`** (`Plant.plant_port()`), and a narrowed **`TransportPort`** into Function stages. Structure-lifetime scratch inspection uses the MinIO Console / S3 API or InfraStructure’s directory-model CLI (`obj_store_utils.py`) — not a CAT Node HTTP API:
+Post-run retrieval of integration outputs is via **IPFS** and that CID — not by reading MinIO. MinIO’s observed endpoints (without credentials) come from `ObjectStore.snapshot()` after `InfraStructure.obj_store_context()` and are recorded as `object_store_as_executed_cid` under Invoice `structure_as_executed_cid` (see [`BOM.md` Nest tree](BOM.md#cat-node-http-bom-response)) so verifiers can see which shared store the distributed write landed in. Object-store, Plant, and transport config are **not** Service fields — Executor passes `object_store`, **`PlantPort`** (`Plant.plant_port()`), and a narrowed **`TransportPort`** into Function stages. Structure-lifetime scratch inspection uses the MinIO Console / S3 API or InfraStructure’s directory-model CLI (`obj_store_utils.py`) — not a CAT Node HTTP API:
 
 ```bash
 # from repo root, with Structure MinIO up

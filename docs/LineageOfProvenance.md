@@ -25,4 +25,4 @@ See also: [README: How are CATs workloads processed as Data Provenance Records?]
 
 ## What's inside a BOM's CIDs
 
-See **[`BOM.md`](BOM.md)** for exactly what each of an Order's and BOM's CIDs resolves to: how `order.function_cid`/`order.structure_cid` nest their Process/InfraFunction and Plant/InfraStructure pairs (with concrete example payloads pulled live from IPFS), and how the output-side `bom.plant_snapshot_cid`/`bom.infrastructure_snapshot_cid` differ from those input-side, specified-as-code CIDs.
+See **[`BOM.md`](BOM.md)** (especially [CAT Node HTTP BOM response](BOM.md#cat-node-http-bom-response)) for exactly what each of an Order's and BOM's CIDs resolves to: how `order.function_cid`/`order.structure_cid` nest their Process/InfraFunction and Plant/InfraStructure pairs (with concrete example payloads), and how Invoice `structure_as_executed_cid` (observed Plant / ObjectStore nest) differs from those input-side, specified-as-code CIDs.
