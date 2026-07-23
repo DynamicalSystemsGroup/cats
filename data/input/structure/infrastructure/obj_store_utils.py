@@ -74,7 +74,7 @@ class ObjectStore:
         return f's3://{self.bucket}/{handle.result_key()}'
 
     def snapshot(self) -> dict:
-        """Credential-free dict for BOM infrastructure_snapshot (JSON keys stable)."""
+        """Credential-free dict for object_store_as_executed (JSON keys stable)."""
         return {
             'minio_endpoint_host': self.endpoint_host,
             'minio_endpoint_pod': self.endpoint_pod,

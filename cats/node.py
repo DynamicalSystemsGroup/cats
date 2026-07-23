@@ -39,7 +39,7 @@ from cats.network import _load_bootstrap_content_store_module
 catNode = Flask(__name__)
 
 # Overridable so multiple CAT Node peers can eventually run side-by-side
-# (e.g. simulating a local mesh). MeshClient Order endpoints use the same
+# (e.g. simulating a local mesh). ContentMesh Order endpoints use the same
 # CAT_NODE_HOST / CAT_NODE_PORT defaults via `_node_base_url()`.
 HOST = os.environ.get('CAT_NODE_HOST', '127.0.0.1')
 PORT = int(os.environ.get('CAT_NODE_PORT', 5000))
@@ -130,12 +130,12 @@ def _free_stale_port(host: str, port: int) -> None:
 def _bootstrap_content_store_ensure():
     """Operator heal: bootstrap-tree ContentStore.ensure (default tree).
 
-    Used by ``node ensure`` only — not by ``node start``. MeshClient does not
+    Used by ``node ensure`` only — not by ``node start``. ContentMesh does not
     call this. Fail loud if utils missing or ensure raises.
     """
     module = _load_bootstrap_content_store_module(CATS_HOME)
     module.ContentStore.ensure(cwd=CATS_HOME)
-    SERVICE.meshClient._bootstrap_content_store_ensured = True
+    SERVICE.contentMesh._bootstrap_content_store_ensured = True
 
 
 def _bootstrap_content_store_assert_ready():
@@ -146,7 +146,7 @@ def _bootstrap_content_store_assert_ready():
     """
     module = _load_bootstrap_content_store_module(CATS_HOME)
     if module.ContentStore.is_ready():
-        SERVICE.meshClient._bootstrap_content_store_ensured = True
+        SERVICE.contentMesh._bootstrap_content_store_ensured = True
         return
     raise RuntimeError(
         'Host Kubo ContentStore API not ready. Run '
@@ -160,8 +160,8 @@ def _bootstrap_content_store_assert_ready():
 def execute_init_cat():
     try:
         order_request = request.get_json()
-        order_request["order"] = json.loads(SERVICE.meshClient.cat(order_request["order_cid"]))
-        order_request['invoice'] = json.loads(SERVICE.meshClient.cat(order_request['order']['invoice_cid']))
+        order_request["order"] = json.loads(SERVICE.contentMesh.cat(order_request["order_cid"]))
+        order_request['invoice'] = json.loads(SERVICE.contentMesh.cat(order_request['order']['invoice_cid']))
 
         # IPFS checks
         # if 'bom_cid' not in bom:

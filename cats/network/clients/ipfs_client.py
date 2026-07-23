@@ -2,7 +2,7 @@
 
 Talks to the host daemon at http://{host}:{port}/api/v0/* with plain
 `requests` POSTs — no ipfshttpclient / http+ip4 multiaddr stack.
-MeshClient reads and writes both go through this client (no `ipfs` CLI).
+ContentMesh reads and writes both go through this client (no `ipfs` CLI).
 """
 from __future__ import annotations
 

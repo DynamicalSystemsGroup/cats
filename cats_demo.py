@@ -25,10 +25,10 @@ def _():
     from pprint import pprint
     import pandas as pd
 
-    from cats import MESH_CLIENT as meshClient
+    from cats import CONTENT_MESH as contentMesh
     from cats import INPUT_STRUCTURE_HOME, INPUT_DATA_HOME
 
-    return INPUT_DATA_HOME, INPUT_STRUCTURE_HOME, meshClient, pprint
+    return INPUT_DATA_HOME, INPUT_STRUCTURE_HOME, contentMesh, pprint
 
 
 @app.cell(hide_code=True)
@@ -40,7 +40,7 @@ def _(mo):
 
 
 @app.cell
-def _(INPUT_DATA_HOME, INPUT_STRUCTURE_HOME, meshClient, pprint):
+def _(INPUT_DATA_HOME, INPUT_STRUCTURE_HOME, contentMesh, pprint):
     from data.input.function.process import (
         egress,
         ingress,
@@ -50,7 +50,7 @@ def _(INPUT_DATA_HOME, INPUT_STRUCTURE_HOME, meshClient, pprint):
     )
     from data.input.function.infrafunction import infrafunction_subproc
 
-    cat_order_request_0 = meshClient.create_order_request(
+    cat_order_request_0 = contentMesh.create_order_request(
         ingress_subproc=ingress,
         integrated_subproc=process_0,
         egress_subproc=egress,
@@ -80,10 +80,10 @@ def _(mo):
 
 
 @app.cell
-def _(cat_order_request_0, meshClient, pprint):
-    cat_invoiced_response_0 = meshClient.catSubmit(cat_order_request_0)
+def _(cat_order_request_0, contentMesh, pprint):
+    cat_invoiced_response_0 = contentMesh.catSubmit(cat_order_request_0)
     pprint(cat_invoiced_response_0)
-    flat_cat_invoiced_response_0 = meshClient.flatten_bom(cat_invoiced_response_0)
+    flat_cat_invoiced_response_0 = contentMesh.flatten_bom(cat_invoiced_response_0)
     pprint(flat_cat_invoiced_response_0)
     return
 
@@ -105,11 +105,11 @@ def _(
     infrafunction_subproc,
     ingress,
     integration_cache,
-    meshClient,
+    contentMesh,
     pprint,
     process_1,
 ):
-    cat_order_request_1 = meshClient.create_order_request(
+    cat_order_request_1 = contentMesh.create_order_request(
         ingress_subproc=ingress,
         integrated_subproc=process_1,
         egress_subproc=egress,
@@ -132,10 +132,10 @@ def _(mo):
 
 
 @app.cell
-def _(cat_order_request_1, meshClient, pprint):
-    cat_invoiced_response_1 = meshClient.catSubmit(cat_order_request_1)
+def _(cat_order_request_1, contentMesh, pprint):
+    cat_invoiced_response_1 = contentMesh.catSubmit(cat_order_request_1)
     pprint(cat_invoiced_response_1)
-    flat_cat_invoiced_response_1 = meshClient.flatten_bom(cat_invoiced_response_1)
+    flat_cat_invoiced_response_1 = contentMesh.flatten_bom(cat_invoiced_response_1)
     pprint(flat_cat_invoiced_response_1)
     return
 
