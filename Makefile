@@ -78,8 +78,10 @@ endef
 
 .PHONY: help deps deps-all \
 	deps-docker deps-uv deps-kind deps-kubectl deps-terraform deps-go deps-ipfs deps-helm \
+	deps-graphviz \
 	check-pkg-manager print-versions \
-	node-start node-stop node-status node-up content-store-ensure
+	node-start node-stop node-status node-up content-store-ensure \
+	execute-order diagrams
 
 CONTENT_STORE_UTILS := data/input/structure/infrastructure/content_store_utils.py
 
@@ -89,7 +91,7 @@ help:
 	@echo ""
 	@echo "  make deps            Install all required dependencies (Docker check, uv, kind,"
 	@echo "                       kubectl, Terraform, Go, IPFS Kubo)"
-	@echo "  make deps-all        Same as 'deps', plus the optional helm CLI"
+	@echo "  make deps-all        Same as 'deps', plus optional helm + Graphviz"
 	@echo "  make deps-docker     Verify/install Docker"
 	@echo "  make deps-uv         Install uv + the pinned Python interpreter"
 	@echo "  make deps-kind       Install latest kind (>= $(KIND_MIN_VERSION))"
@@ -100,6 +102,8 @@ help:
 	@echo "  make deps-ipfs       Install latest IPFS Kubo (>= $(IPFS_MIN_VERSION))"
 	@echo "  make deps-helm       Install the optional helm CLI (>= $(HELM_MIN_VERSION));"
 	@echo "                       manual debugging only, not required by 'terraform apply'"
+	@echo "  make deps-graphviz   Install optional Graphviz (\`dot\`) for make diagrams /"
+	@echo "                       code2flow / pyreverse PNG output"
 	@echo "  make print-versions  Print installed versions of all dependencies"
 	@echo ""
 	@echo "Node lifecycle (AQ-safe: start asserts ContentStore; ensure heals; stop = Flask only):"
@@ -108,13 +112,18 @@ help:
 	@echo "  make node-start            Assert bootstrap ContentStore ready, then bind Flask"
 	@echo "  make node-stop             Stop Flask Node only (never host Kubo)"
 	@echo "  make node-status           Flask listen + ContentStore ready"
+	@echo "  make execute-order ORDER_CID=<cid>  In-process Order execute (no Flask)"
+	@echo ""
+	@echo "Diagramming (requires Graphviz \`dot\` on PATH; see docs/DEPS.md):"
+	@echo "  make diagrams              code2flow + pyreverse PNGs under images/"
 
 deps: deps-docker deps-uv deps-kind deps-kubectl deps-terraform deps-go deps-ipfs
 	@echo ""
-	@echo "Core dependencies installed. Run 'make deps-helm' if you also want the"
-	@echo "optional helm CLI for manual 'helm list'/'helm get' debugging."
+	@echo "Core dependencies installed. Optional extras:"
+	@echo "  make deps-helm       helm CLI (manual cluster debugging)"
+	@echo "  make deps-graphviz   Graphviz \`dot\` (make diagrams / PNG output)"
 
-deps-all: deps deps-helm
+deps-all: deps deps-helm deps-graphviz
 
 check-pkg-manager:
 	@if [ -z "$(PKG_MANAGER)" ]; then \
@@ -292,6 +301,29 @@ deps-helm:
 		rm -f /tmp/get_helm.sh; \
 	fi
 
+# Graphviz (docs/DEPS.md, optional) - provides \`dot\` for code2flow / pyreverse
+# PNG output (`make diagrams`). System package only; not installed by uv.
+deps-graphviz: check-pkg-manager
+	@if command -v dot >/dev/null; then \
+		echo "graphviz already installed: $$(dot -V 2>&1)"; \
+	elif [ "$(PKG_MANAGER)" = "brew" ]; then \
+		brew install graphviz; \
+	elif [ "$(PKG_MANAGER)" = "apt-get" ]; then \
+		$(SUDO) apt-get update && $(SUDO) apt-get install -y graphviz; \
+	elif [ "$(PKG_MANAGER)" = "dnf" ]; then \
+		$(SUDO) dnf install -y graphviz; \
+	elif [ "$(PKG_MANAGER)" = "yum" ]; then \
+		$(SUDO) yum install -y graphviz; \
+	elif [ "$(PKG_MANAGER)" = "pacman" ]; then \
+		$(SUDO) pacman -S --noconfirm graphviz; \
+	elif [ "$(PKG_MANAGER)" = "apk" ]; then \
+		$(SUDO) apk add graphviz; \
+	else \
+		echo "Unsupported package manager for Graphviz: $(PKG_MANAGER)"; \
+		echo "Install manually: https://graphviz.org/download/"; \
+		exit 1; \
+	fi
+
 print-versions:
 	@command -v docker    >/dev/null && printf "%-10s %s\n" docker    "$$(docker --version)"           || printf "%-10s not installed\n" docker
 	@command -v uv        >/dev/null && printf "%-10s %s\n" uv        "$$(uv --version)"                || printf "%-10s not installed\n" uv
@@ -301,6 +333,7 @@ print-versions:
 	@command -v go        >/dev/null && printf "%-10s %s\n" go        "$$(go version)"                  || printf "%-10s not installed\n" go
 	@command -v ipfs      >/dev/null && printf "%-10s %s\n" ipfs      "$$(ipfs version)"                || printf "%-10s not installed\n" ipfs
 	@command -v helm      >/dev/null && printf "%-10s %s\n" helm      "$$(helm version --short)"        || printf "%-10s not installed (optional)\n" helm
+	@command -v dot       >/dev/null && printf "%-10s %s\n" graphviz  "$$(dot -V 2>&1)"                 || printf "%-10s not installed (optional)\n" graphviz
 
 node-up: content-store-ensure node-start
 
@@ -315,3 +348,14 @@ node-status:
 
 content-store-ensure:
 	uv run python $(CONTENT_STORE_UTILS) ensure
+
+# In-process Service.execute (same path as POST /cat/node/init, no Flask).
+# Example order_cid: QmNU5EAmWNDc7U3bjZ8X2rzjD3iN83KXcarsvnyk8AXA9o
+# Usage: make execute-order ORDER_CID=<cid>
+execute-order:
+	@test -n "$(ORDER_CID)" || { echo "ORDER_CID is required, e.g. make execute-order ORDER_CID=<cid>"; exit 1; }
+	uv run python -m cats.execute_order $(ORDER_CID)
+
+diagrams:
+	uv run python utils/code2flow/diagram_c2f.py
+	uv run pyreverse -o png -p CATs -d images/pyreverse cats
