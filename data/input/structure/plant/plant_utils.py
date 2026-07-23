@@ -49,7 +49,7 @@ class PlantContext:
     ray_dashboard_address: Optional[str]
 
     def snapshot(self, *, rebuilt, applied_structure_cid) -> dict:
-        """Credential-free dict for BOM plant_snapshot (JSON keys stable)."""
+        """Credential-free dict for plant_as_executed (JSON keys stable)."""
         return {
             'kind_cluster_name': self.kind_cluster_name,
             'kubeconfig_context': self.kubeconfig_context,

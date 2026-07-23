@@ -12,7 +12,7 @@ the source of truth; Order-submitted trees are the same file after Structure
 CID materialize (republish lag until re-CID). Keep ``ContentStore.ensure``
 thin: probe + heal + start only.
 
-MeshClient does not call ensure (readiness soft-warn only). Terraform
+ContentMesh does not call ensure (readiness soft-warn only). Terraform
 ``shell_script.host_ipfs_daemon`` create and operator CLI / ``node ensure``
 call ``ContentStore.ensure()``. The CAT Node process must not shut down this
 daemon on exit.
