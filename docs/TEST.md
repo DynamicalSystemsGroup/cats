@@ -8,12 +8,12 @@
   InfraStructure snapshots) and CAT0/CAT1 `data_cid` lineage equality. Needs Session 1 below.
   See [`BOM.md`](./BOM.md) and [`LineageOfProvenance.md`](./LineageOfProvenance.md).
 - **Unit** — the other `tests/test_*.py` modules: mocked / in-process / source guards
-  (lineage helpers, named binds, ports, IaaS utils, MeshClient RPC, Node CLI, etc.).
+  (lineage helpers, named binds, ports, IaaS utils, ContentMesh RPC, Node CLI, etc.).
   No live Node required. [`tests/test_ipfs_client.py`](../tests/test_ipfs_client.py) is thin Kubo smoke (`@requires_kubo`; skips if `:5001` is down).
 
 1. **[Install CATs](https://github.com/DynamicalSystemsGroup/cats/tree/cats2?tab=readme-ov-file#get-started)** (`uv sync --extra ops --group dev` for mesh demos and tests; `dev` provides `pytest`)
   - **Root Dependency**: see `[IPFS.md](./IPFS.md)` — run `make content-store-ensure` before
-  `make node-start` (start asserts only). MeshClient soft-warns if the API is down. Order-submitted
+  `make node-start` (start asserts only). ContentMesh soft-warns if the API is down. Order-submitted
   TF `host_ipfs_daemon` create is the sole automatic `ContentStore.ensure`; Structure `apply` asserts
   readiness after TF.
 2. **Session 1**
@@ -52,7 +52,7 @@
   # ComputePort / PlantPort / JobHandle + Process/InfraFunction surface guards
   uv run pytest -s tests/test_compute_plant_ports.py
 
-  # Order-submitted vs MeshClient bootstrap ContentStore binding
+  # Order-submitted vs ContentMesh bootstrap ContentStore binding
   uv run pytest -s tests/test_content_store_ensure_binding.py
 
   # Function source directory CIDs + pickle/named-bind hybrid on function_cid
@@ -70,13 +70,13 @@
   # CatsIPFSClient Kubo RPC (smoke skips if :5001 down)
   uv run pytest -s tests/test_ipfs_client.py
 
-  # MeshClient.linkOrder — combined Function/Structure lineage helper
+  # ContentMesh.linkOrder — combined Function/Structure lineage helper
   uv run pytest -s tests/test_link_order.py
 
-  # MeshClient.linkStructure — Structure lineage twin of linkProcess
+  # ContentMesh.linkStructure — Structure lineage twin of linkProcess
   uv run pytest -s tests/test_link_structure.py
 
-  # MeshClient Kubo RPC + CAT_NODE_* endpoints (no ipfs CLI)
+  # ContentMesh Kubo RPC + CAT_NODE_* endpoints (no ipfs CLI)
   uv run pytest -s tests/test_meshclient_rpc_surface.py
 
   # Named-bind JSON leaves vs pickle for Function Order slots

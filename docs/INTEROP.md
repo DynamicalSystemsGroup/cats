@@ -78,7 +78,7 @@ Process public surface is locked by `process.__all__` and
 | Sub-component | Contract | Status | Prove plan |
 |---------------|----------|--------|------------|
 | **Plant [SaaS]** | Implements `PlantPort`; BOM snapshot may stay tool-specific | Demo-proved (KubeRay only) | **2f**: second Plant module (non-Ray) with `plant_port_from_context` equivalent |
-| **InfraStructure [IaaS] — content-store** | Host Kubo facet; MeshClient client; TF ensure / apply assert | Demo-proved; soft dual-job documented | Interop = mesh CIDs remain valid across Structure swaps; destroy must not kill host Kubo (already). Optional hard dual-daemon isolation is **not** required for Function interop |
+| **InfraStructure [IaaS] — content-store** | Host Kubo facet; ContentMesh client; TF ensure / apply assert | Demo-proved; soft dual-job documented | Interop = mesh CIDs remain valid across Structure swaps; destroy must not kill host Kubo (already). Optional hard dual-daemon isolation is **not** required for Function interop |
 | **InfraStructure [IaaS] — T&D transport** | `TransportContext` / `TransportPort` | Demo-proved (Compose peers) | Optional second transport adapter only if a Plant cannot use Docker Kubo peers; Function stays on `TransportPort` |
 | **InfraStructure [IaaS] — object store** | `ObjectStore` / `JobHandle` | Demo-proved (MinIO); **2g** JobHandle-only `result_uri` / `download_job_result` | **2f** may keep MinIO; alternate scratch backend needs `begin_job` / `download_job_result` / Plant-owned entrypoint landing |
 

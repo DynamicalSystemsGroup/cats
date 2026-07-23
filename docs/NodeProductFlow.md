@@ -17,7 +17,7 @@
 4. The Executor is a composition of Architectural Quantum execution that executes and Invoices the ephemeral execution of the Architectural Quantum.
    - **A.** the Executor executes the aforemention composition as a Function [FaaS] executing on Structure [PaaS]: transport port callables run locally with a narrowed `TransportPort`; InfraFunction [FaaS] (the actuator) dispatches the tHOF onto Plant via `PlantPort` (`Plant.plant_port()` → `RayPlantPort` for this demo) with scratch via `ObjectStore` / `JobHandle`; in-job entrypoint wires `ComputePort`
    - **B.** the Executor Invoices the ephemeral execution of the Architectural Quantum by producing a CID-ed Invoice containing the original CID-ed Order, the CID-ed output Data (`data_cid`), interim stage CIDs (`ingress_data_cid`, `integration_data_cid`), and a (non-deterministic processing) Seed (dictionary for Process [REPL(aC)]) — **Seed is specified but not yet populated** (`seed_cid` remains null; tracked by [#187](https://github.com/DynamicalSystemsGroup/cats/issues/187)); stage CIDs on the Invoice are the interim feedback surface
-5. The Node produces a CID-ed BOM containing an CID-ed Invoice and CID-ed Executor execution "logs" (*)
+5. The Node produces a CID-ed BOM containing an CID-ed Invoice (with `structure_as_executed_cid` nesting observed Plant / ObjectStore state), CID-ed Executor execution "logs", and `node_uri` (*). Full Nest tree: [`BOM.md` CAT Node HTTP BOM response](BOM.md#cat-node-http-bom-response).
 
 ### Notes (*):
 

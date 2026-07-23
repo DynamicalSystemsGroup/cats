@@ -30,7 +30,8 @@ the Structure's lifetime.
 - Runtime config is `ObjectStore` from `InfraStructure.obj_store_context()` (Order-submitted
   `infrastructure/obj_store_utils.py`) — **not** Service fields. BOM `log` may record
   `object_store_result_uri` for Structure-lifetime correlation; credential-free endpoints land in
-  `bom.infrastructure_snapshot_cid` via `ObjectStore.snapshot()` (see [`BOM.md`](./BOM.md)).
+  Invoice `object_store_as_executed_cid` via `ObjectStore.snapshot()` (see
+  [`BOM.md` Nest tree](./BOM.md#cat-node-http-bom-response)).
 - There is **no CAT Node HTTP API** for scratch — use this Console, the S3 API, or:
 
   ```bash

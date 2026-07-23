@@ -7,7 +7,7 @@
 ##### 1. IPFS content store (InfraStructure): see `[IPFS.md](./IPFS.md)`
 
 Host Kubo is InfraStructure’s long-lived **content-store facet**. **Before** `make node-start`, ensure
-the ContentStore API is up (Node start **asserts** only — it does not heal). MeshClient soft-warns if
+the ContentStore API is up (Node start **asserts** only — it does not heal). ContentMesh soft-warns if
 the API is down and does **not** auto-ensure. Order-submitted TF `host_ipfs_daemon` create is the sole
 **automatic** ensure during Structure apply; `apply` then asserts readiness.
 
