@@ -1,14 +1,4 @@
 import os, time, subprocess
-import shutil
-import stat
-
-
-class Text2Python:
-    def __init__(self, python_txt):
-        self.python_txt = python_txt
-
-    def greet(self):
-        return f"Hello, {self.python_txt}!"
 
 
 class Dict2Class(object):
@@ -91,17 +81,6 @@ def read_exit_code(file_path):
         return None
 
 
-def remove_directory(dir_path):
-    if os.path.exists(dir_path):
-        try:
-            shutil.rmtree(dir_path)
-            print(f"Deleted: {dir_path}")
-        except Exception as e:
-            print(f"Error: {e}")
-    else:
-        print(f"Directory does not exist: {dir_path}")
-
-
 def wait_for_directory_to_be_populated(directory_path, check_interval=1, timeout=None):
     """
     Waits until the specified directory contains at least one file.
@@ -126,19 +105,3 @@ def wait_for_directory_to_be_populated(directory_path, check_interval=1, timeout
 
         # Wait for the specified interval before checking again
         time.sleep(check_interval)
-
-
-def filter_cid(data, result=None):
-    if result is None:
-        result = {}
-    if isinstance(data, dict):
-        for key, value in data.items():
-            if '_cid' in key:
-                result[key] = value
-            else:
-                if isinstance(value, dict) or isinstance(value, list):
-                    filter_cid(value, result)
-    elif isinstance(data, list):
-        for item in data:
-            filter_cid(item, result)
-    return result

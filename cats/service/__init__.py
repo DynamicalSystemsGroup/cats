@@ -1,63 +1,39 @@
-import json, os
+import json
 from pathlib import Path
-import boto3 as boto3
 
 from cats.factory import Factory
-from cats.network import MeshClient
-from cats.service.k8s import KubeService
+from cats.network import ContentMesh
+from cats.network.feedback import build_execution_bom
+from cats.network.identity import node_uri as resolve_node_uri
 from cats.utils import subproc_run, executeCMD
 
 
 class Service:
     def __init__(self,
-        meshClient: MeshClient,
+        contentMesh: ContentMesh,
         CATS_HOME: str
     ):
-        self.meshClient: MeshClient = meshClient
-        self.kubeService: KubeService = KubeService
+        self.contentMesh: ContentMesh = contentMesh
 
-        self.AWS_ACCESS_KEY_ID = None
-        self.AWS_SECRET_ACCESS_KEY = None
-        self.S3_CLIENT = None
-        try:
-            self.AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
-            self.AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-            self.S3_CLIENT = boto3.client(
-                's3',
-                region_name='us-east-2',
-                aws_access_key_id=self.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=self.AWS_SECRET_ACCESS_KEY
-            )
-        except:
-            self.S3_CLIENT = None
-        self.CATS_HOME = self.meshClient.CATS_HOME = CATS_HOME
-        self.DATA_HOME = self.meshClient.DATA_HOME = self.CATS_HOME + '/data'
-        self.JOB_HOME = self.meshClient.JOB_HOME = self.DATA_HOME + '/jobs'
-        self.CACHE_HOME = self.meshClient.CACHE_HOME = self.DATA_HOME + "/cache"
-        self.INPUT_HOME = self.meshClient.INPUT_HOME = self.DATA_HOME + '/input'
-        self.OUTPUT_HOME = self.meshClient.OUTPUT_HOME = self.DATA_HOME + '/output'
-        self.OUTPUT_DATA_HOME = self.meshClient.OUTPUT_DATA_HOME = self.OUTPUT_HOME + '/data'
-        self.INPUT_STRUCTURE_HOME = self.meshClient.INPUT_STRUCTURE_HOME = self.INPUT_HOME + '/structure'
-        self.INPUT_DATA_HOME = self.meshClient.INPUT_DATA_HOME = self.INPUT_HOME + '/data'
-        self.INTEGRATION_INPUT_CACHE = self.meshClient.INTEGRATION_INPUT_CACHE = \
+        self.CATS_HOME = self.contentMesh.CATS_HOME = CATS_HOME
+        self.DATA_HOME = self.contentMesh.DATA_HOME = self.CATS_HOME + '/data'
+        self.JOB_HOME = self.contentMesh.JOB_HOME = self.DATA_HOME + '/jobs'
+        self.CACHE_HOME = self.contentMesh.CACHE_HOME = self.DATA_HOME + "/cache"
+        self.INPUT_HOME = self.contentMesh.INPUT_HOME = self.DATA_HOME + '/input'
+        self.OUTPUT_HOME = self.contentMesh.OUTPUT_HOME = self.DATA_HOME + '/output'
+        self.OUTPUT_DATA_HOME = self.contentMesh.OUTPUT_DATA_HOME = self.OUTPUT_HOME + '/data'
+        self.INPUT_STRUCTURE_HOME = self.contentMesh.INPUT_STRUCTURE_HOME = self.INPUT_HOME + '/structure'
+        self.INPUT_DATA_HOME = self.contentMesh.INPUT_DATA_HOME = self.INPUT_HOME + '/data'
+        self.INTEGRATION_INPUT_CACHE = self.contentMesh.INTEGRATION_INPUT_CACHE = \
             f"{self.CACHE_HOME}/integration"
-        self.INTEGRATION_INPUT_DATA_CACHE = self.meshClient.INTEGRATION_INPUT_DATA_CACHE = \
+        self.INTEGRATION_INPUT_DATA_CACHE = self.contentMesh.INTEGRATION_INPUT_DATA_CACHE = \
             f"{self.INTEGRATION_INPUT_CACHE}/outputs"
-        self.bucket_name = self.DATA_HOME.split('/')[-1]
-        self.job_directory_path = f"{self.JOB_HOME.split('/')[-1]}/"
-        self.cache_directory_path = f"{self.CACHE_HOME.split('/')[-1]}/"
         self.catStore()
 
         self.CAT_HOME = None
         self.INGRESS_HOME = None
-        self.INGRESS_DATA_HOME = None
-        self.INGRESS_DATA_PATH = None
-        self.INGRESS_EXIT_CODE = None
-        self.INGRESS_JOB_STATUS = None
         self.INTEGRATION_HOME = None
         self.EGRESS_HOME = None
-        self.EGRESS_EXIT_CODE = None
-        self.EGRESS_JOB_STATUS = None
 
         self.init_bom_json_cid = None
         self.bom_json_cid = None
@@ -82,30 +58,18 @@ class Service:
         Path(self.INPUT_DATA_HOME).mkdir(parents=True, exist_ok=True)
 
     def initFactory(self, order_request, ipfs_uri):
-        self.initBOMcar(
-            structure_cid=order_request['order']['structure_cid'],
-            structure_filepath=order_request['order']['structure_filepath'],
-            function_cid=order_request['order']['function_cid'],
-            init_data_cid=ipfs_uri,
-            init_bom_filename=f"{self.OUTPUT_HOME}/bom.car",
-            # Real, already-submitted Order CID - already known before any
-            # BOM/Order processing happens. Threading it straight through
-            # (rather than letting initBOMjson mint its own placeholder
-            # Order) is what makes the locally-materialized order.json and
-            # the order_cid Executor.execute() later backfills into the
-            # final Invoice the exact same CID (see docs/NodeProductFlow.md#2b).
-            order_cid=order_request['order_cid'],
-        )
-        return Factory(self, order_request), order_request
+        """Platform entry: delegate Order intake to Factory manufacturing cell."""
+        factory = Factory(self).accept(order_request, ipfs_uri)
+        return factory, order_request
 
     def initBOMcar(self,
         function_cid, init_data_cid, init_bom_filename,
         structure_cid=None, structure_filepath=None, order_cid=None
     ):
         if init_bom_filename is None:
-            init_bom_filename = self.meshClient.CAR_HOME
+            init_bom_filename = self.contentMesh.CAR_HOME
 
-        self.init_bom_car_cid, self.init_bom_json_cid = self.meshClient.initBOMcar(
+        self.init_bom_car_cid, self.init_bom_json_cid = self.contentMesh.initBOMcar(
             structure_cid=structure_cid,
             structure_filepath=structure_filepath,
             function_cid=function_cid,
@@ -113,7 +77,7 @@ class Service:
             init_bom_filename=init_bom_filename,
             order_cid=order_cid,
         )
-        self.enhanced_bom, init_bom = self.meshClient.getEnhancedBom(
+        self.enhanced_bom, init_bom = self.contentMesh.getEnhancedBom(
             bom_json_cid=self.init_bom_json_cid,
             INPUT_HOME=self.INPUT_HOME,
             OUTPUT_HOME=self.OUTPUT_HOME
@@ -125,25 +89,19 @@ class Service:
 
     def execute(self, catFactory, order_request):
         executor = catFactory.produce()
-        # invoice_cid (and the order_cid backfill it depends on) is
-        # produced by Executor.execute() itself now - Service.execute()
-        # just assembles it alongside the Plant/InfraStructure snapshot
-        # CIDs into the final bom/bom_cid.
+        # invoice_cid (and structure_as_executed nesting / order_cid
+        # backfill) is produced by Executor.execute() — Service.execute()
+        # only wraps invoice_cid + log_cid + node_uri into bom/bom_cid.
         enhanced_bom, invoice_cid = executor.execute(order_request)
 
-        bom = {
-            'log_cid': enhanced_bom['log_cid'],
-            # Distinct from order.structure_cid.plant_cid (the input-side
-            # Terraform module CID) - this is the output-side snapshot of
-            # what Plant.snapshot() actually observed after reconcile().
-            'plant_snapshot_cid': self.meshClient.ipfsClient.add_json(enhanced_bom['plant']),
-            # Output-side counterpart to order.structure_cid.infrastructure_cid,
-            # mirroring plant_snapshot_cid above.
-            'infrastructure_snapshot_cid': self.meshClient.ipfsClient.add_json(enhanced_bom['infrastructure']),
-            'invoice_cid': invoice_cid
-        }
+        # Structure as-executed nesting is on the Invoice (Executor-minted).
+        bom = build_execution_bom(
+            log_cid=enhanced_bom['log_cid'],
+            invoice_cid=invoice_cid,
+            node_uri=resolve_node_uri(),
+        )
         bom_response = {
             'bom': bom,
-            'bom_cid': self.meshClient.ipfsClient.add_str(json.dumps(bom))
+            'bom_cid': self.contentMesh.ipfsClient.add_str(json.dumps(bom)),
         }
         return bom_response
