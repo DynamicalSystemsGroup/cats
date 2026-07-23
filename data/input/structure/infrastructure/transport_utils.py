@@ -5,7 +5,7 @@ Ships inside `infrastructure/` so it is part of `infrastructure_cid`
 CID migrate (get→re-add), and Plant-facing staging. Structure lifetime — torn
 down with Compose peers; distinct from the long-lived ContentStore (host Kubo).
 
-Process [REPL(aC)] transport callables are clients of Function-owned
+Process [Composed Function] transport callables are clients of Function-owned
 ``TransportPort`` (migrate / stage_for_plant only). The Executor narrows this
 ``TransportContext`` with ``as_transport_port`` before invoking those callables.
 Peering mutate is Structure-owned Option B: TF

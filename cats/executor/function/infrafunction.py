@@ -10,9 +10,9 @@ class InfraFunction:
         self.function_cid = function_cid
         self.function = json.loads(self.service.contentMesh.cat(self.function_cid))
 
-        # Process [REPL(aC)]: transport callables (ingress, integration_cache,
-        # egress) plus the tHOF (integrated_subproc) a REPL as Code composes
-        # and submits. Process is the composer, not itself a tHOF.
+        # Process [Composed Function]: transport callables (ingress,
+        # integration_cache, egress) plus the tHOF (integrated_subproc).
+        # Process is the composition, not the REPLaC UI and not itself a tHOF.
         self.process_cid = self.function['process_cid']
         self.process = json.loads(self.service.contentMesh.cat(self.process_cid))
         self.ingress_subproc_cid = self.process['ingress_subproc_cid']
@@ -20,8 +20,8 @@ class InfraFunction:
         self.egress_subproc_cid = self.process['egress_subproc_cid']
         self.integration_cache_subproc_cid = self.process['integration_cache_subproc_cid']
 
-        # InfraFunction (FaaS): actuator that dispatches the tHOF
-        # (integrated_subproc) onto the Plant (SaaS) - see Integration().
+        # InfraFunction [Actuator]: dispatches the tHOF (integrated_subproc)
+        # onto the Plant (SaaS) - see Integration().
         self.infrafunction_cid = self.function['infrafunction_cid']
         self.infrafunction = json.loads(self.service.contentMesh.cat(self.infrafunction_cid))
         self.infrafunction_subproc_cid = self.infrafunction['infrafunction_subproc_cid']

@@ -1,4 +1,4 @@
-"""InfraFunction [FaaS] public surface — named imports only (never ``import *``)."""
+"""InfraFunction [Actuator] public surface — named imports only (never ``import *``)."""
 
 from data.input.function.infrafunction.actuator import infrafunction_subproc
 

@@ -1,4 +1,4 @@
-"""Process [REPL(aC)] public surface — named imports only (never ``import *``)."""
+"""Process [Composed Function] public surface — named imports only (never ``import *``)."""
 
 from data.input.function.process.callables import (
     egress,

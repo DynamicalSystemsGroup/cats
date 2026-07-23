@@ -1,4 +1,4 @@
-"""Function-owned plant port contract for InfraFunction [FaaS] actuators.
+"""Function-owned plant port contract for InfraFunction [Actuator].
 
 InfraFunction dispatches the tHOF onto Plant via ``PlantPort`` only —
 ``submit_job`` / ``wait``. It must not import Ray Job Submission clients.

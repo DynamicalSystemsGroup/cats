@@ -1,5 +1,5 @@
-# Process [REPL(aC)] callables a Read-Eval-Print Loop as Code (e.g. cats_demo.py
-# Marimo notebook) composes and submits:
+# Process [Composed Function] callables (composed via the REPLaC Workflow UI of
+# Function [FaaS] — this demo: Marimo / cats_demo.py):
 #   - ingress / integration_cache / egress — transport *port* callables; they
 #     receive a Function-owned TransportPort as `transport` and only call
 #     migrate / stage_for_plant. Process does not own Docker/IPFS peers or
@@ -9,8 +9,9 @@
 #     Higher-Order Function (tHOF): input→output data transform via
 #     ComputePort.run_transfer (Plant-agnostic). Ray Data orchestration lives
 #     in Plant RayComputePort, wired by the Plant-owned job entrypoint.
-# InfraFunction [FaaS] dispatches only the tHOF onto Plant [SaaS]; transport runs
-# locally around that dispatch. Executor wires `transport` like object_store/plant.
+# InfraFunction [Actuator] dispatches only the tHOF onto Plant [SaaS]; transport
+# runs locally around that dispatch. Executor wires `transport` like
+# object_store/plant.
 #
 # Port types are TYPE_CHECKING-only: Ray job workers unpickle this module by
 # value and do not have the repo ``data`` package on sys.path.

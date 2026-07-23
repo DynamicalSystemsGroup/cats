@@ -1,4 +1,4 @@
-"""Function-owned compute port contract for Process [REPL(aC)] tHOFs.
+"""Function-owned compute port contract for Process [Composed Function] tHOFs.
 
 Process ``integrated_subproc`` callables depend on ``ComputePort`` only —
 ``run_transfer(batch_fn, input_path, ...)``. They must not import Ray or

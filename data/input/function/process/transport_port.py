@@ -1,4 +1,4 @@
-"""Function-owned transport port contract for Process [REPL(aC)].
+"""Function-owned transport port contract for Process [Composed Function].
 
 Process transport callables (ingress / integration_cache / egress) depend on
 ``TransportPort`` only — ``migrate`` / ``stage_for_plant``. They must not import

@@ -11,11 +11,11 @@ os.environ.setdefault('RAY_ENABLE_UV_RUN_RUNTIME_ENV', '0')
 
 # Running this file by path (`python cats/node.py`) only puts its own
 # directory - not the repo root - on sys.path. `data/` (holding Process
-# [REPL(aC)] under data/input/function/process/ and InfraFunction [FaaS]
-# under data/input/function/infrafunction/) lives at the repo root, sibling
-# to `cats/`, and isn't part of the installed `cats` package - so it's
-# only importable once the repo root is on sys.path. That's needed here
-# because InfraFunction unpickles those functions by their
+# [Composed Function] under data/input/function/process/ and InfraFunction
+# [Actuator] under data/input/function/infrafunction/) lives at the repo
+# root, sibling to `cats/`, and isn't part of the installed `cats` package
+# - so it's only importable once the repo root is on sys.path. That's
+# needed here because InfraFunction unpickles those functions by their
 # `data.input.function.process`/`data.input.function.infrafunction`
 # module paths (see cats/executor/function/__init__.py), which requires
 # `import data` to succeed in *this* process.

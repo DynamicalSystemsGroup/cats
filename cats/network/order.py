@@ -350,9 +350,9 @@ class OrderOps:
             infrafunction_source_cid, _ = self.cidDir(infrafunction_staging)
         finally:
             shutil.rmtree(staging_parent, ignore_errors=True)
-        # Process [REPL(aC)]: composes transport callables (ingress,
+        # Process [Composed Function]: transport callables (ingress,
         # integration_cache, egress) plus the tHOF (integrated_subproc —
-        # input→output data transform). Process is the composer, not a tHOF.
+        # input→output data transform). Process is the composition, not a tHOF.
         process = {
             'ingress_subproc_cid': self.bind_subproc(
                 ingress_subproc, process_source_cid
@@ -367,8 +367,8 @@ class OrderOps:
                 integration_cache_subproc, process_source_cid
             ),
         }
-        # InfraFunction (FaaS): actuator that dispatches the tHOF
-        # (integrated_subproc) onto the Plant (see Processor.Integration() in
+        # InfraFunction [Actuator]: dispatches the tHOF (integrated_subproc)
+        # onto the Plant (see Processor.Integration() in
         # cats/executor/function/__init__.py). Transport callables are not
         # Plant jobs.
         infrafunction = {

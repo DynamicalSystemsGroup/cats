@@ -1,6 +1,6 @@
-"""InfraFunction (FaaS): Plant-agnostic actuator for Process tHOFs.
+"""InfraFunction [Actuator]: Plant-agnostic actuator for Process tHOFs.
 
-Receives Process [REPL(aC)] ``integrated_subproc`` and dispatches it onto
+Receives Process [Composed Function] ``integrated_subproc`` and dispatches it onto
 Plant via Function-owned ``PlantPort`` (submit_job / wait). Scratch correlator
 is InfraStructure ``ObjectStore.begin_job()`` → ``JobHandle``.
 

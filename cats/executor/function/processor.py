@@ -63,10 +63,10 @@ class Processor:
                 "INTEGRATION_INPUT_DATA_CACHE for the Plant to read."
             )
         wait_for_directory(process_input, check_interval=1)
-        # InfraFunction actuator: dispatches the tHOF from Process [REPL(aC)]
-        # (integrated_subproc only) onto the deployed Plant, rather than
-        # running it in this (ephemeral executor) process. Plant dispatch
-        # surface and object-store come from Plant.context() /
+        # InfraFunction [Actuator]: dispatches the tHOF from Process
+        # [Composed Function] (integrated_subproc only) onto the deployed
+        # Plant, rather than running it in this (ephemeral executor) process.
+        # Plant dispatch surface and object-store come from Plant.context() /
         # InfraStructure.obj_store_context(), not Service fields.
         _output, job_handle = self.infraFunction.infrafunction_subproc(
             self.infraFunction.integrated_subproc,
