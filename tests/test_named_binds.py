@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from cats.network import (
-    MeshClient,
+    ContentMesh,
     is_stock_function_callable,
     named_bind_payload,
     parse_named_bind_leaf,
@@ -54,7 +54,7 @@ def test_bind_subproc_stock_vs_lambda(monkeypatch, tmp_path):
     fake.add_str.side_effect = lambda s: f'named-{hash(s) & 0xFFFF:x}'
     fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmPickle'
 
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
 
     cid = client.bind_subproc(process_0, 'QmProcSrc')
@@ -75,7 +75,7 @@ def test_bind_subproc_stock_vs_lambda(monkeypatch, tmp_path):
 def test_resolve_subproc_named_and_pickle(tmp_path, monkeypatch):
     """resolve_subproc loads named-bind leaves and pickle leaves correctly."""
     fake = MagicMock()
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(Path(__file__).resolve().parents[1]))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(Path(__file__).resolve().parents[1]))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
 
     named = named_bind_payload(
@@ -102,7 +102,7 @@ def test_resolve_subproc_named_and_pickle(tmp_path, monkeypatch):
 def test_resolve_subproc_source_mismatch(tmp_path, monkeypatch):
     """resolve_subproc rejects named binds whose source_cid does not match."""
     fake = MagicMock()
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     named = named_bind_payload(
         'QmWrong',
@@ -147,7 +147,7 @@ def test_create_order_request_stock_emits_named_bind_leaves(monkeypatch, tmp_pat
         name = Path(path).name
         return f'Qm{name}', name
 
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     monkeypatch.setattr(client, 'cidDir', _cid_dir)
 
@@ -201,7 +201,6 @@ def test_link_process_rewrites_stock_named_bind(monkeypatch, tmp_path):
         'bom': {
             'invoice_cid': 'QmInv',
             'log_cid': 'QmLog',
-            'plant_snapshot_cid': 'QmPlantSnap',
         }
     }
 
@@ -232,11 +231,9 @@ def test_link_process_rewrites_stock_named_bind(monkeypatch, tmp_path):
             return json.dumps(prev_infrafunction)
         if cid == 'QmLog':
             return json.dumps({})
-        if cid == 'QmPlantSnap':
-            return json.dumps({'rebuilt': False})
         return '{}'
 
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     monkeypatch.setattr(client, 'cat', _cat)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')

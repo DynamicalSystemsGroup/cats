@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from cats.network import (
-    MeshClient,
+    ContentMesh,
     resolve_function_package_dirs,
     stage_function_package,
 )
@@ -85,7 +85,7 @@ def test_create_order_request_emits_source_cids(monkeypatch, tmp_path):
         name = Path(path).name
         return f'Qm{name}', name
 
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     monkeypatch.setattr(client, 'cidDir', _cid_dir)
 
@@ -115,7 +115,7 @@ def test_create_order_request_emits_source_cids(monkeypatch, tmp_path):
 def test_get_enhanced_bom_requires_function_source_cids(monkeypatch, tmp_path):
     """getEnhancedBom fails when function_cid lacks source CIDs."""
     fake = MagicMock()
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
 
     input_home = tmp_path / 'input'
@@ -180,7 +180,7 @@ def test_get_enhanced_bom_requires_function_source_cids(monkeypatch, tmp_path):
 def test_get_enhanced_bom_materializes_function_sources(monkeypatch, tmp_path):
     """getEnhancedBom fetches process/infrafunction source trees by source CID."""
     fake = MagicMock()
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
 
     input_home = tmp_path / 'input'
@@ -294,7 +294,6 @@ def test_link_process_carries_source_cids(monkeypatch, tmp_path):
         'bom': {
             'invoice_cid': 'QmInv',
             'log_cid': 'QmLog',
-            'plant_snapshot_cid': 'QmPlantSnap',
         }
     }
 
@@ -325,11 +324,9 @@ def test_link_process_carries_source_cids(monkeypatch, tmp_path):
             return json.dumps(prev_infrafunction)
         if cid == 'QmLog':
             return json.dumps({})
-        if cid == 'QmPlantSnap':
-            return json.dumps({'rebuilt': False})
         return '{}'
 
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     monkeypatch.setattr(client, 'cat', _cat)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
@@ -362,7 +359,6 @@ def test_link_process_fails_without_source_cids(monkeypatch, tmp_path):
         'bom': {
             'invoice_cid': 'QmInv',
             'log_cid': 'QmLog',
-            'plant_snapshot_cid': 'QmPlantSnap',
         }
     }
 
@@ -388,11 +384,9 @@ def test_link_process_fails_without_source_cids(monkeypatch, tmp_path):
             return json.dumps({'data_cid': 'QmData'})
         if cid == 'QmLog':
             return json.dumps({})
-        if cid == 'QmPlantSnap':
-            return json.dumps({'rebuilt': False})
         return '{}'
 
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     monkeypatch.setattr(client, 'cat', _cat)
 

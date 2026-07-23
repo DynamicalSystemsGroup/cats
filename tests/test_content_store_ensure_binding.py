@@ -1,4 +1,4 @@
-"""Tests for Order-submitted vs MeshClient bootstrap ContentStore binding."""
+"""Tests for Order-submitted vs ContentMesh bootstrap ContentStore binding."""
 import hashlib
 import importlib
 import importlib.util
@@ -13,7 +13,7 @@ import pytest
 
 from cats.executor.structure import InfraStructure
 from cats.network import (
-    MeshClient,
+    ContentMesh,
     _bootstrap_content_store_utils_path,
 )
 from cats import CATS_HOME
@@ -208,19 +208,19 @@ def test_apply_does_not_call_content_store_ensure(tmp_path, monkeypatch):
         lambda *a, **k: ensure_calls.append((a, k)),
     )
     monkeypatch.setattr(
-        'cats.executor.structure.configure_terraform_data_dir',
+        'cats.executor.structure.infrastructure.configure_terraform_data_dir',
         lambda *_a, **_k: None,
     )
     monkeypatch.setattr(
-        'cats.executor.structure.ensure_integration_cache_env',
+        'cats.executor.structure.infrastructure.ensure_integration_cache_env',
         lambda *_a, **_k: None,
     )
     monkeypatch.setattr(
-        'cats.executor.structure.cleanup_stale_docker_compose_ipfs_transport_state',
+        'cats.executor.structure.infrastructure.cleanup_stale_docker_compose_ipfs_transport_state',
         lambda *_a, **_k: None,
     )
     monkeypatch.setattr(
-        'cats.executor.structure.terraform_bin',
+        'cats.executor.structure.infrastructure.terraform_bin',
         lambda *_a, **_k: 'terraform',
     )
 
@@ -268,15 +268,15 @@ def test_apply_does_not_call_content_store_ensure(tmp_path, monkeypatch):
 
 
 def test_meshclient_init_does_not_call_bootstrap_ensure(tmp_path, monkeypatch):
-    """MeshClient construction does not probe or ensure ContentStore."""
+    """ContentMesh construction does not probe or ensure ContentStore."""
     calls = []
 
     def _spy(self):
         calls.append('ensure')
         self._bootstrap_content_store_ensured = True
 
-    monkeypatch.setattr(MeshClient, 'ensure_bootstrap_content_store', _spy)
-    client = MeshClient(ipfsClient=MagicMock(), CATS_HOME=str(tmp_path))
+    monkeypatch.setattr(ContentMesh, 'ensure_bootstrap_content_store', _spy)
+    client = ContentMesh(ipfsClient=MagicMock(), CATS_HOME=str(tmp_path))
     assert calls == []
     assert client._bootstrap_content_store_ensured is False
 
@@ -289,11 +289,11 @@ def test_meshclient_ciddir_triggers_bootstrap_readiness_once(tmp_path, monkeypat
         calls.append('ready_check')
         self._bootstrap_content_store_ensured = True
 
-    monkeypatch.setattr(MeshClient, 'ensure_bootstrap_content_store', _spy)
+    monkeypatch.setattr(ContentMesh, 'ensure_bootstrap_content_store', _spy)
 
     fake_ipfs = MagicMock()
     fake_ipfs.add.return_value = {'Hash': 'bafyFake', 'Name': 'payload'}
-    client = MeshClient(ipfsClient=fake_ipfs, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake_ipfs, CATS_HOME=str(tmp_path))
     assert calls == []
 
     payload = tmp_path / 'payload'
@@ -321,7 +321,7 @@ def test_meshclient_bootstrap_probes_is_ready_not_ensure(tmp_path):
     )
     _write_fake_content_store_utils(utils_path, 'bootstrap', ready=True)
 
-    client = MeshClient(ipfsClient=MagicMock(), CATS_HOME=str(cats_home))
+    client = ContentMesh(ipfsClient=MagicMock(), CATS_HOME=str(cats_home))
     assert client._bootstrap_content_store_ensured is False
 
     client.ensure_bootstrap_content_store()
@@ -339,6 +339,6 @@ def test_meshclient_bootstrap_skips_when_utils_missing(tmp_path):
     """Missing bootstrap utils soft-skips and marks bootstrap as checked."""
     cats_home = tmp_path / 'empty_home'
     cats_home.mkdir()
-    client = MeshClient(ipfsClient=MagicMock(), CATS_HOME=str(cats_home))
+    client = ContentMesh(ipfsClient=MagicMock(), CATS_HOME=str(cats_home))
     client.ensure_bootstrap_content_store()
     assert client._bootstrap_content_store_ensured is True

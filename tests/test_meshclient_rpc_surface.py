@@ -1,4 +1,4 @@
-"""MeshClient uses CatsIPFSClient RPC + CAT_NODE_* endpoints (no ipfs CLI)."""
+"""ContentMesh uses CatsIPFSClient RPC + CAT_NODE_* endpoints (no ipfs CLI)."""
 import json
 import pickle
 from pathlib import Path
@@ -6,16 +6,19 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from cats.network import MeshClient, _node_init_endpoint
-import cats.network as network_mod
+from cats.network import ContentMesh, _node_init_endpoint
+import cats.network.content_mesh as content_mesh_mod
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MESH_INIT = REPO_ROOT / 'cats' / 'network' / '__init__.py'
+CONTENT_MESH_SRC = REPO_ROOT / 'cats' / 'network' / 'content_mesh.py'
+ORDER_SRC = REPO_ROOT / 'cats' / 'network' / 'order.py'
 
 
 def test_meshclient_has_no_ipfs_cli_subprocess_strings():
-    """MeshClient source must not shell out to the ipfs CLI."""
-    text = MESH_INIT.read_text(encoding='utf-8')
+    """ContentMesh / OrderOps source must not shell out to the ipfs CLI."""
+    text = CONTENT_MESH_SRC.read_text(encoding='utf-8') + ORDER_SRC.read_text(
+        encoding='utf-8'
+    )
     for needle in (
         'ipfs cat',
         'ipfs get',
@@ -39,7 +42,7 @@ def test_cat_and_cat_obj_delegate_to_ipfs_client(monkeypatch):
     fake = MagicMock()
     fake.cat.return_value = '{"k": 1}'
     fake.cat_bytes.return_value = b'\x80\x04'
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(REPO_ROOT))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(REPO_ROOT))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
 
     assert client.cat('QmX') == '{"k": 1}'
@@ -51,7 +54,7 @@ def test_cat_and_cat_obj_delegate_to_ipfs_client(monkeypatch):
 def test_get_and_get_car_delegate(monkeypatch, tmp_path):
     """get / getCar delegate to CatsIPFSClient.get / dag_export."""
     fake = MagicMock()
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
 
     assert client.get('QmZ', 'bom.json', output=str(tmp_path)) == 'bom.json'
@@ -68,7 +71,7 @@ def test_link_data_uses_ls_links(monkeypatch):
         {'Name': 'inputs', 'Hash': 'QmIn'},
         {'Name': 'outputs', 'Hash': 'QmOut'},
     ]
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(REPO_ROOT))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(REPO_ROOT))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     assert client.linkData('QmRoot') == 'QmOut'
     assert client.linkData('QmRoot', subdir=' - outputs/') == 'QmOut'
@@ -79,7 +82,7 @@ def test_fetch_ipfs_object_uses_bytes(monkeypatch):
     payload = pickle.dumps({'ok': True})
     fake = MagicMock()
     fake.cat_bytes.return_value = payload
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(REPO_ROOT))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(REPO_ROOT))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     assert client.fetch_ipfs_object('QmP') == {'ok': True}
 
@@ -116,7 +119,7 @@ def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
         name = Path(path).name
         return f'Qm{name}', name
 
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     monkeypatch.setattr(client, 'cidDir', _cid_dir)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
@@ -176,7 +179,7 @@ def test_cat_submit_uses_requests(monkeypatch, capsys):
     fake.cat.return_value = json.dumps(
         {'endpoint': 'http://127.0.0.1:5000/cat/node/init', 'invoice_cid': 'QmI'}
     )
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(REPO_ROOT))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(REPO_ROOT))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
 
     class _Resp:
@@ -195,7 +198,7 @@ def test_cat_submit_uses_requests(monkeypatch, capsys):
         posts.append((url, json))
         return _Resp()
 
-    monkeypatch.setattr(network_mod.requests, 'post', _post)
+    monkeypatch.setattr(content_mesh_mod.requests, 'post', _post)
     out = client.catSubmit({'order_cid': 'QmOrder'})
     assert out['bom'] is True
     assert posts == [

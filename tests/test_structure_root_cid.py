@@ -7,7 +7,7 @@ import pytest
 
 from cats.network import (
     STRUCTURE_ROOT_FILES,
-    MeshClient,
+    ContentMesh,
     materialize_structure_root_files,
     stage_structure_root,
 )
@@ -74,7 +74,7 @@ def test_materialize_structure_root_files_preserves_siblings(tmp_path):
 def test_get_enhanced_bom_requires_root_cid(monkeypatch, tmp_path):
     """getEnhancedBom fails when structure_cid lacks root_cid."""
     fake = MagicMock()
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
 
     input_home = tmp_path / 'input'
@@ -133,7 +133,7 @@ def test_get_enhanced_bom_requires_root_cid(monkeypatch, tmp_path):
 def test_get_enhanced_bom_materializes_root_then_modules(monkeypatch, tmp_path):
     """getEnhancedBom materializes root_cid files then plant/infrastructure modules."""
     fake = MagicMock()
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
 
     input_home = tmp_path / 'input'
