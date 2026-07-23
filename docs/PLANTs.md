@@ -47,7 +47,7 @@ The CAT Node doesn't reduce to one single type from the "Heavy industry and engi
 | Layer                                                          | Type match                            |
 | -------------------------------------------------------------- | ------------------------------------- |
 | Factory (assembles the Executor from Order components)         | **Manufacturing Plant**               |
-| Function [FaaS] (Process [REPL(aC)] + InfraFunction [FaaS])    | **Plant (control theory)**            |
+| Function [FaaS] (Process [Composed Function] + InfraFunction [Actuator]) | **Plant (control theory)**     |
 | Structure [PaaS] (Plant [SaaS] + InfraStructure [IaaS])        | **Power Plant** (Power Station sense) |
 
 
@@ -74,11 +74,11 @@ Per `[NodeProductFlow.md](NodeProductFlow.md)` step 0B, the Architectural Quantu
 `Structure [PaaS]`. It isn't a single type; it's the *union* of the next two rows, since it's defined as
 Function's dependency on Structure, not a standalone facility:
 
-- **Function [FaaS]** (`Process [REPL(aC)]` + `InfraFunction [FaaS]`) -> **Plant (control theory)** as a whole -
-"the combination of process and actuator" is verbatim Function's own composition (Process [REPL(aC)] = the
-Read-Eval-Print Loop as Code that composes and submits transport/`ComputePort` callables plus a Plant-agnostic tHOF = the "process"; InfraFunction = the actuator dispatching that tHOF onto compute via `PlantPort`).
-  - `Process [REPL(aC)]` alone -> the **process** half of Plant (control theory)
-  - `InfraFunction [FaaS]` alone -> the **actuator** half of Plant (control theory)
+- **Function [FaaS]** (`Process [Composed Function]` + `InfraFunction [Actuator]`) -> **Plant (control theory)** as a whole -
+"the combination of process and actuator" is verbatim Function's own composition (Process [Composed Function] = the
+composed callable graph / FaaS-composer analogue: transport/`ComputePort` callables plus a Plant-agnostic tHOF = the "process"; InfraFunction [Actuator] = the actuator dispatching that tHOF onto compute via `PlantPort`). Orders are authored via the REPLaC Workflow UI of Function [FaaS] (Marimo in this demo).
+  - `Process [Composed Function]` alone -> the **process** half of Plant (control theory)
+  - `InfraFunction [Actuator]` alone -> the **actuator** half of Plant (control theory)
 - **Structure [PaaS]** (`Plant [SaaS]` + `InfraStructure [IaaS]`) -> **Power plant**, specifically the Power
 Station generation + Transmission & Distribution (T&D) model (per the caveat above).
   - `Plant [SaaS]` alone (this demo: Ray/KubeRay via `RayPlantPort`) -> the **generation** side of that Power Station model - not a
@@ -93,7 +93,7 @@ Station generation + Transmission & Distribution (T&D) model (per the caveat abo
 
 Doesn't fit any of the six categories itself. It doesn't generate, transmit, manufacture, or process anything on
 its own; it's the *runtime that operates* the other plants - dispatching Function [FaaS] onto Structure [PaaS]
-via InfraFunction orchestrating Plant [SaaS] (`[NodeProductFlow.md](NodeProductFlow.md)` step 2a). Structurally
+via InfraFunction [Actuator] dispatching onto Plant [SaaS] (`[NodeProductFlow.md](NodeProductFlow.md)` step 2a). Structurally
 it's closer to a plant *operator/control-room process* than to a plant itself - it's the thing standing between
 the Manufacturing-plant output (a composed Function+Structure pair) and those components' own actual execution.
 
@@ -105,8 +105,8 @@ the Manufacturing-plant output (a composed Function+Structure pair) and those co
 | CAT Node (whole)      | ✓ (via Function)       | ✓ (via Factory)     | -              | ✓ (via Structure)   | -              | -               |
 | Factory               | -                      | **✓**               | -              | -                   | -              | -               |
 | Architectural Quantum | ✓ (Function half)      | -                   | -              | ✓ (Structure half)  | -              | -               |
-| Process [REPL(aC)]    | ✓ ("process" half)     | -                   | -              | -                   | -              | -               |
-| InfraFunction [FaaS]  | ✓ ("actuator" half)    | -                   | -              | -                   | -              | -               |
+| Process [Composed Function] | ✓ ("process" half) | -                   | -              | -                   | -              | -               |
+| InfraFunction [Actuator] | ✓ ("actuator" half) | -                   | -              | -                   | -              | -               |
 | Structure [PaaS]      | -                      | -                   | -              | **✓**               | -              | -               |
 | Plant [SaaS]          | -                      | -                   | -              | ✓ (generation half) | -              | -               |
 | InfraStructure [IaaS] | -                      | -                   | **✓**          | ✓ (Transmission & Distribution (T&D) half) | -              | -               |

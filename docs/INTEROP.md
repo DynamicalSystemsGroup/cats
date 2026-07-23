@@ -25,7 +25,7 @@ flowchart TB
   end
   subgraph aq [Architectural_Quantum]
     subgraph function [Function_FaaS]
-      Process[Process_REPL]
+      Process[Process_FaaS_Composer]
       InfraFn[InfraFunction]
     end
     subgraph structure [Structure_PaaS]
@@ -70,8 +70,8 @@ Process public surface is locked by `process.__all__` and
 
 | Sub-component | Contract | Status | Prove plan |
 |---------------|----------|--------|------------|
-| **Process [REPL(aC)]** | `TransportPort` + `ComputePort`; no Ray; public `__all__` | Contract + demo (Ray adapter behind ComputePort) | Unchanged Process modules against second ComputePort adapter (**2f**); keep `TYPE_CHECKING`-only `data.*` imports |
-| **InfraFunction [FaaS]** | `PlantPort` + `JobHandle`; no Job Submission client | Contract + demo (RayPlantPort) | Unchanged `infrafunction_subproc` against second PlantPort + scratch landing (**2f**) |
+| **Process [Composed Function]** | `TransportPort` + `ComputePort`; no Ray; public `__all__` | Contract + demo (Ray adapter behind ComputePort) | Unchanged Process modules against second ComputePort adapter (**2f**); keep `TYPE_CHECKING`-only `data.*` imports |
+| **InfraFunction [Actuator]** | `PlantPort` + `JobHandle`; no Job Submission client | Contract + demo (RayPlantPort) | Unchanged `infrafunction_subproc` against second PlantPort + scratch landing (**2f**) |
 
 ### Structure [PaaS]
 
