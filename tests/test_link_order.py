@@ -1,11 +1,11 @@
-"""MeshClient.linkOrder — combined Function/Structure lineage helper."""
+"""ContentMesh.linkOrder — combined Function/Structure lineage helper."""
 import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
-from cats.network import MeshClient
+from cats.network import ContentMesh
 
 
 def _cat_response_fixture(
@@ -38,7 +38,6 @@ def _cat_response_fixture(
         'bom': {
             'invoice_cid': 'QmInv',
             'log_cid': 'QmLog',
-            'plant_snapshot_cid': 'QmPlantSnap',
         }
     }
 
@@ -65,8 +64,6 @@ def _cat_response_fixture(
             return json.dumps(prev_infrafunction)
         if cid == 'QmLog':
             return json.dumps({})
-        if cid == 'QmPlantSnap':
-            return json.dumps({'rebuilt': False})
         return '{}'
 
     return cat_response, _cat, structure, function_cid, structure_cid, data_cid
@@ -111,7 +108,7 @@ def test_link_order_function_only(monkeypatch, tmp_path):
     cat_response, _cat, _, function_cid, structure_cid, data_cid = (
         _cat_response_fixture()
     )
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     monkeypatch.setattr(client, 'cat', _cat)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
@@ -137,7 +134,7 @@ def test_link_order_structure_only(monkeypatch, tmp_path):
     cat_response, _cat, prev_structure, function_cid, structure_cid, data_cid = (
         _cat_response_fixture()
     )
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     monkeypatch.setattr(client, 'cat', _cat)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
@@ -176,7 +173,7 @@ def test_link_order_both_sides_single_invoice(monkeypatch, tmp_path):
     cat_response, _cat, _, function_cid, structure_cid, data_cid = (
         _cat_response_fixture()
     )
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     monkeypatch.setattr(client, 'cat', _cat)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
@@ -207,7 +204,7 @@ def test_link_order_fails_when_neither_side(monkeypatch, tmp_path):
     """linkOrder requires at least one Function or Structure mutation."""
     fake = MagicMock()
     cat_response, _cat, _, _, _, _ = _cat_response_fixture()
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     monkeypatch.setattr(client, 'cat', _cat)
 
@@ -220,7 +217,7 @@ def test_link_order_fails_when_structure_pairing_unchanged(monkeypatch, tmp_path
     fake = MagicMock()
     fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
     cat_response, _cat, prev_structure, _, _, _ = _cat_response_fixture()
-    client = MeshClient(ipfsClient=fake, CATS_HOME=str(tmp_path))
+    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     monkeypatch.setattr(client, 'cat', _cat)
 

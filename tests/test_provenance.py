@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from cats import DATA_HOME, MESH_CLIENT as meshClient
+from cats import DATA_HOME, CONTENT_MESH as contentMesh
 from cats import INPUT_STRUCTURE_HOME, INPUT_DATA_HOME
 
 from data.input.function.process import (
@@ -73,7 +73,7 @@ def files_to_pandasDF(output, format):
 
 def cid_to_pandasDF(cid, download_dir, format='*.csv'):
     os.makedirs(download_dir)
-    meshClient.testGet(cid, download_dir)
+    contentMesh.testGet(cid, download_dir)
     return files_to_pandasDF(output=download_dir, format=format)
 
 
@@ -102,7 +102,7 @@ def _assert_job_handle_uri(object_store_result_uri):
 
 def _assert_named_bind_leaf(leaf_cid, *, expected_source_cid):
     """Stock leaf CID is named-bind JSON pinned to the package source_cid."""
-    leaf = json.loads(meshClient.cat(leaf_cid))
+    leaf = json.loads(contentMesh.cat(leaf_cid))
     assert set(leaf) == {'source_cid', 'module', 'qualname'}, (
         f'named-bind leaf keys unexpected: {leaf!r}'
     )
@@ -112,7 +112,7 @@ def _assert_named_bind_leaf(leaf_cid, *, expected_source_cid):
 
 
 def assert_provenance_record(bom_response, order_request):
-    """Assert full Order / Invoice / BOM / log / snapshot provenance coverage."""
+    """Assert full Order / Invoice / BOM / log / as-executed provenance coverage."""
     assert 'error' not in bom_response, bom_response.get('error')
     assert 'bom' in bom_response
     assert 'bom_cid' in bom_response and bom_response['bom_cid']
@@ -120,13 +120,10 @@ def assert_provenance_record(bom_response, order_request):
     bom = bom_response['bom']
     assert 'bom_cid' not in bom
 
-    for key in (
-        'invoice_cid',
-        'log_cid',
-        'plant_snapshot_cid',
-        'infrastructure_snapshot_cid',
-    ):
+    for key in ('invoice_cid', 'log_cid', 'node_uri'):
         assert bom.get(key), f'bom.{key} should be set'
+    assert 'plant_snapshot_cid' not in bom
+    assert 'infrastructure_snapshot_cid' not in bom
 
     flat = bom_response['flat_bom']
     invoice = flat['invoice']
@@ -136,6 +133,7 @@ def assert_provenance_record(bom_response, order_request):
     input_invoice = order['flat']['invoice']
     log = flat['log']
     plant = flat['plant']
+    object_store_as_executed = flat['object_store_as_executed']
 
     # --- Order (submitted) vs Invoice backfill ---
     assert order_request.get('order_cid'), 'order_request.order_cid missing'
@@ -154,7 +152,7 @@ def assert_provenance_record(bom_response, order_request):
     for key in FUNCTION_PAIRING_KEYS:
         assert function[key], f'function.{key} should be set'
 
-    process_bind = json.loads(meshClient.cat(function['process_cid']))
+    process_bind = json.loads(contentMesh.cat(function['process_cid']))
     for key in PROCESS_BIND_KEYS:
         assert process_bind.get(key), f'process bind missing {key}'
         _assert_named_bind_leaf(
@@ -162,7 +160,7 @@ def assert_provenance_record(bom_response, order_request):
             expected_source_cid=function['process_source_cid'],
         )
 
-    ifr_bind = json.loads(meshClient.cat(function['infrafunction_cid']))
+    ifr_bind = json.loads(contentMesh.cat(function['infrafunction_cid']))
     for key in INFRAFUNCTION_BIND_KEYS:
         assert ifr_bind.get(key), f'infrafunction bind missing {key}'
         _assert_named_bind_leaf(
@@ -187,9 +185,20 @@ def assert_provenance_record(bom_response, order_request):
     assert invoice['seed_cid'] is None, (
         'invoice.seed_cid is still deferred (#187); expected null'
     )
+    assert invoice.get('structure_as_executed_cid'), (
+        'invoice.structure_as_executed_cid should be set'
+    )
     assert input_invoice.get('data_cid'), (
         'order.flat.invoice.data_cid (input) should be set'
     )
+
+    structure_as_executed = flat['structure_as_executed']
+    assert structure_as_executed is not None
+    assert structure_as_executed.get('plant_as_executed_cid')
+    assert structure_as_executed.get('infrastructure_as_executed_cid')
+    infrastructure_as_executed = flat['infrastructure_as_executed']
+    assert infrastructure_as_executed is not None
+    assert infrastructure_as_executed.get('object_store_as_executed_cid')
 
     # --- Log mirrors stage CIDs + JobHandle correlator ---
     assert log.get('ingress_data_cid') == invoice['ingress_data_cid']
@@ -199,22 +208,23 @@ def assert_provenance_record(bom_response, order_request):
     assert isinstance(log['plant_rebuilt'], bool)
     _assert_job_handle_uri(log.get('object_store_result_uri'))
 
-    # --- Plant snapshot (observed; flattened) ---
+    # --- Plant as-executed (observed; flattened) ---
+    assert plant is not None
     for key in PLANT_SNAPSHOT_KEYS:
-        assert key in plant, f'plant snapshot missing {key}'
+        assert key in plant, f'plant as-executed missing {key}'
     assert plant['applied_structure_cid'] == order['structure_cid'], (
         'plant.applied_structure_cid must equal order.structure_cid'
     )
     assert isinstance(plant['rebuilt'], bool)
 
-    # --- Infrastructure snapshot (observed; not yet flatten_bom'd) ---
-    infra_snap = json.loads(
-        meshClient.cat(bom['infrastructure_snapshot_cid'])
-    )
+    # --- ObjectStore as-executed (observed; nested under infrastructure) ---
+    assert object_store_as_executed is not None
     for key in INFRASTRUCTURE_SNAPSHOT_KEYS:
-        assert infra_snap.get(key), f'infrastructure snapshot missing {key}'
-    assert 'access_key' not in infra_snap
-    assert 'secret_key' not in infra_snap
+        assert object_store_as_executed.get(key), (
+            f'object_store as-executed missing {key}'
+        )
+    assert 'access_key' not in object_store_as_executed
+    assert 'secret_key' not in object_store_as_executed
 
     return {
         'input_data_cid': input_invoice['data_cid'],
@@ -224,12 +234,12 @@ def assert_provenance_record(bom_response, order_request):
         'function': function,
         'structure': structure,
         'plant': plant,
-        'infrastructure': infra_snap,
+        'infrastructure': object_store_as_executed,
     }
 
 
 def _create_order_request(*, integrated_subproc):
-    order_request = meshClient.create_order_request(
+    order_request = contentMesh.create_order_request(
         ingress_subproc=ingress,
         integrated_subproc=integrated_subproc,
         egress_subproc=egress,
@@ -246,14 +256,14 @@ def _create_order_request(*, integrated_subproc):
 
 def _submit_and_load(order_request):
     """Submit once: provenance assert + input/output DataFrames."""
-    response = meshClient.catSubmit(order_request)
+    response = contentMesh.catSubmit(order_request)
     pprint(response)
     print()
     if 'error' in response:
         raise RuntimeError(
             f"CAT node returned an error: {response['error']}"
         )
-    flat = meshClient.flatten_bom(response)
+    flat = contentMesh.flatten_bom(response)
     pprint(flat)
     print()
 
