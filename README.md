@@ -11,14 +11,14 @@
 ### Control-Feedback Loop:
 ![CATs Chaordic Kernel](images/CATs_chaordic_kernel.jpeg)
 - **Detailed** *Loop* [here](./docs/ControlFeedbackLoop.md)
-  - **Summarized** *Loop* below:
-    1. the *Node's* **Factory** 
-      a. *consumes* & *processes* a content-addressed **Order**
-      b. *composes* an *ephemeral* **Executor** of data processing using *AQ components* within **Order**
-    2. the *Node's* **Executor** 
-      a. *executes* the *AQ components* as **Function [FaaS]** on **Structure [PaaS]**
-      b. **Invoices** the *execution of data prcessing* as staged output **Content-Addresses**
-    3. the **Node** *emits* a **BOM** as the *Mesh-transportable Data Provenance record* to be *shared* & *re-executed* between Nodes
+- **Summarized** *Loop* below:
+  - 1. the *Node's* **Factory** 
+    - a. *consumes* & *processes* a content-addressed **Order**
+    - b. *composes* an *ephemeral* **Executor** of data processing using *AQ components* within **Order**
+  - 2. the *Node's* **Executor** 
+    - a. *executes* the *AQ components* as **Function [FaaS]** on **Structure [PaaS]**
+    - b. **Invoices** the *execution of data prcessing* as staged output **Content-Addresses**
+  - 3. the **Node** *emits* a **BOM** as the *Mesh-transportable Data Provenance record* to be *shared* & *re-executed* between Nodes
 
 ### Demonstration's Techncal Use-Case Specification:
 This CAT Node's data processing **Order** (Input) utilizes [Ray](https://www.ray.io/) as an execution middleware framework deployed on **[Kubernetes](https://kubernetes.io/)** for interoperable & parallelized distributed computing applications / Big Data processing with Scientific Computing enabled [ecosystem integrations](https://docs.ray.io/en/latest/ray-overview/ray-libraries.html) such as [Apache Spark](https://spark.apache.org/), and [PyTorch](https://pytorch.org/).
