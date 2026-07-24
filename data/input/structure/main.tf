@@ -56,14 +56,14 @@ provider "helm" {
 # infrastructure for maintaining a Plant - the IPFS/Docker transport layer
 # used to move content-addressed data in and out of the Plant.
 module "infrastructure" {
-  source = "./modules/infrastructure"
+  source = "./infrastructure"
 }
 
 # Plant (SaaS): the dynamically scaled execution environment of Function
 # (FaaS) - the kind cluster plus the Helm releases (KubeRay + Ray cluster)
 # that actually run CAT Processes.
 module "plant" {
-  source = "./modules/plant"
+  source = "./plant"
 
   kubeconfig_path = local.k8s_config_path
 

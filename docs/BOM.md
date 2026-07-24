@@ -2,33 +2,113 @@
 
 Each of the Architectural Quantum's four components (Function, InfraFunction, Structure, InfraStructure) is content-addressed independently, then paired back together as a small JSON object so the Order records both halves under a single CID:
 
-- `order.function_cid` resolves to `{process_cid, infrafunction_cid}` — `process_cid` is Process (FaaS): the Functional Data Processors themselves (`ingress_subproc_cid`, `integrated_subproc_cid`, `egress_subproc_cid`, `integration_cache_subproc_cid`); `infrafunction_cid` is InfraFunction (FaaS): the orchestrator that dispatches Process onto the Plant (`infrafunction_subproc_cid`).
-- `order.structure_cid` resolves to `{plant_cid, infrastructure_cid}` — `plant_cid` is the CID of the whole `modules/plant` Terraform directory (kind cluster + Helm releases that constitute Plant, SaaS); `infrastructure_cid` is the CID of the whole `modules/infrastructure` Terraform directory (the IPFS/Docker transport layer and MinIO deployment that constitute InfraStructure, IaaS).
+- `order.function_cid` resolves to `{process_cid, infrafunction_cid, process_source_cid, infrafunction_source_cid}` — hybrid Function pairing. `process_cid` / `infrafunction_cid` are bind JSON maps of `*_subproc_cid` → **leaf CID** (still a single string per slot). Process [Composed Function] holds (`ingress_subproc_cid`, `integration_cache_subproc_cid`, `integrated_subproc_cid`, `egress_subproc_cid`); only `integrated_subproc_cid` is the Transfer Higher-Order Function (tHOF) — Plant-agnostic `ComputePort.run_transfer` (see [transfer function](https://en.wikipedia.org/wiki/Transfer_function)); ingress / integration_cache / egress are transport **port** callables that require Executor-wired `TransportPort`. `infrafunction_cid` bind JSON holds InfraFunction [Actuator] (`infrafunction_subproc_cid`). Each leaf CID is either **named-bind JSON** `{"source_cid","module","qualname"}` (stock public callables from `create_order_request` / `linkProcess`) or **pickle bytes** (REPL escape hatch for non-stock callables). `process_source_cid` / `infrafunction_source_cid` are whole-directory CIDs of `function/process/` and `function/infrafunction/`; named binds must pin those package CIDs. `getEnhancedBom()` materializes the source trees; Executor `resolve_subproc` imports named binds or unpickles. Recreate Orders created before source keys existed — `getEnhancedBom()` / `linkProcess()` / Executor fail loud if they are missing. Compose Orders with **named imports** of the Process public surface only (`ingress`, `egress`, `integration_cache`, `function_*`, `process_*` — see `process.__all__`); never `from data.input.function.process import *`.
+- `order.structure_cid` resolves to `{root_cid, plant_cid, infrastructure_cid}` — apply-complete Structure pairing. `root_cid` is the directory CID of compose glue only (`main.tf`, `outputs.tf`, `.terraform.lock.hcl` — providers + `module "plant"` / `module "infrastructure"` wiring). `plant_cid` is the CID of the whole `plant/` Terraform directory (kind cluster + Helm releases, `plant_utils.py` / `RayPlantPort`, and Ray landing `ray_job_result_entrypoint.py` + `ray_compute_utils.py` / `RayComputePort` that constitute Plant, SaaS); `infrastructure_cid` is the CID of the whole `infrastructure/` Terraform directory (Docker Kubo transport + `transport_utils.py` / `TransportContext`, MinIO + `obj_store_utils.py` / `JobHandle`, host ContentStore helpers that constitute InfraStructure, IaaS). Recreate Orders created before `root_cid` existed — `getEnhancedBom()` fails loud if it is missing.
 
-Both are built in `create_order_request()` (`cats/network/__init__.py:193-248`) and unpacked back into modules on disk by `getEnhancedBom()` (`cats/network/__init__.py:379-410`) so the fetched Structure stays directly `terraform apply`-able. `plant_cid`/`infrastructure_cid` are each a whole-directory CID (added recursively via `cidDir()`, `cats/network/__init__.py:172-185`) — `ipfs ls`-ing one lists that Terraform module's actual files (e.g. `main.tf`, `outputs.tf`, `variables.tf` for `plant_cid`; `main.tf`, `outputs.tf`, `minio_compose.yaml`, `ipfs_transport_compose.yaml`, `ipfs_connect_peers.sh` for `infrastructure_cid`) — whereas `process_cid`/`infrafunction_cid` are each a CID of a small JSON object of `*_subproc_cid`s, not a directory. A real `structure_cid` fetched via `ipfs cat` looks like:
+Both are built in `create_order_request()` and unpacked back onto disk by `getEnhancedBom()` so the fetched Structure stays directly `terraform apply`-able from the Order alone (root files + `plant/` + `infrastructure/`) and Function source packages land under `function/process/` + `function/infrafunction/`. `root_cid`/`plant_cid`/`infrastructure_cid` and `process_source_cid`/`infrafunction_source_cid` are each whole-directory CIDs (via `cidDir()`) — `ipfs ls`-ing plant/infra lists that Terraform module's actual files (e.g. `main.tf`, `outputs.tf`, `variables.tf`, `plant_utils.py`, `ray_job_result_entrypoint.py`, `ray_compute_utils.py` for `plant_cid`; `main.tf`, `outputs.tf`, `minio_compose.yaml`, `ipfs_transport_compose.yaml`, `transport_utils.py`, `content_store_utils.py`, `obj_store_utils.py` for `infrastructure_cid`); `ipfs ls`-ing a Function source CID lists that package's Python modules. `process_cid`/`infrafunction_cid` remain CIDs of small JSON objects mapping slots to leaf CIDs. A real `function_cid` fetched via `ipfs cat` looks like:
 
 ```json
 {
+  "process_cid": "QmProcessBindJson…",
+  "infrafunction_cid": "QmInfraFunctionBindJson…",
+  "process_source_cid": "QmProcessPackageDir…",
+  "infrafunction_source_cid": "QmInfraFunctionPackageDir…"
+}
+```
+
+A stock named-bind leaf (`ipfs cat` of e.g. `integrated_subproc_cid`) looks like:
+
+```json
+{
+  "source_cid": "QmProcessPackageDir…",
+  "module": "data.input.function.process.callables",
+  "qualname": "process_0"
+}
+```
+
+A real `structure_cid` fetched via `ipfs cat` looks like:
+
+```json
+{
+  "root_cid": "QmRootComposeGlueAllowlistDir…",
   "plant_cid": "QmaxYkAmJogHAmHMgYLLuxETjeUxQMqu1NkowmM12EEqMM",
   "infrastructure_cid": "Qmf1SZni9CyMhTQCCCp2qVYxwGSPGojdPS7DDGgTR1xwkt"
 }
 ```
 
-The sibling `order.structure_filepath` field just records the directory name (e.g. `structure`) so `getEnhancedBom()` knows where to materialize each fetched module locally (`structure_filepath/modules/plant`, `structure_filepath/modules/infrastructure`); `flatten_bom()` (`cats/network/__init__.py:250-271`) surfaces the parsed `{plant_cid, infrastructure_cid}` object under `invoice.order.flat.structure` for inspection.
+The sibling `order.structure_filepath` field just records the directory name (e.g. `structure`) so `getEnhancedBom()` knows where to materialize root glue and each fetched module locally (`structure_filepath/` for root files, `structure_filepath/plant`, `structure_filepath/infrastructure`); `flatten_bom()` surfaces the parsed `{root_cid, plant_cid, infrastructure_cid}` object under `invoice.order.flat.structure` for inspection.
 
-The resulting BOM then pairs each of those *specified-as-code* CIDs with an *observed-at-execution-time* snapshot CID, recorded by `Service.execute()` (`cats/service/__init__.py:132-160`) from `enhanced_bom['plant']`/`enhanced_bom['infrastructure']`, which `Executor.execute()` sets right after `Structure.reconcile()` runs (`cats/factory/__init__.py`):
+### CAT Node HTTP BOM response
 
-- `bom.plant_snapshot_cid` — what `Plant.snapshot()` actually found after `Structure.reconcile()` ran: the live kind cluster name, kubeconfig context, Ray release name, the Ray dashboard address InfraFunction dispatches jobs to, the `structure_cid` currently applied, and whether this reconcile reused the existing Plant or destroyed/rebuilt it (`rebuilt`) (`cats/executor/structure/__init__.py:324-335`). Example content:
-  ```json
-  {"applied_structure_cid":"QmXe7n5auVw94fv3Xu6rZQqQWfGpXZnMq5u6ubKCM6yYK1","kind_cluster_name":"cats","kubeconfig_context":"kind-cats","ray_dashboard_address":"http://127.0.0.1:8265","ray_release_name":"raycluster","rebuilt":false}
-  ```
-- `bom.infrastructure_snapshot_cid` — what `InfraStructure.minio_snapshot()` actually found: the shared MinIO bucket and its host- and pod-reachable S3 endpoints (credentials deliberately excluded, so they never get CID'ed into the BOM/Invoice graph). Example content:
-  ```json
-  {"minio_bucket":"cats-scratch","minio_endpoint_host":"http://127.0.0.1:9000","minio_endpoint_pod":"http://172.19.0.1:9000"}
-  ```
+`Service.execute()` returns `{ bom_cid, bom }`. The HTTP envelope's `bom` holds only `invoice_cid`, `log_cid`, and `node_uri`. Observed Plant / InfraStructure state is nested under the Invoice as `structure_as_executed_cid` — parallel to as-Code `order.structure_cid`, but a different CID/bytes (observation, not IaC). Executor mints that nest bottom-up **before** `invoice_cid`. `infrastructure_as_executed` currently carries only `object_store_as_executed_cid` (`InfraStructure.snapshot`); transport / ContentStore facets may widen later. `bom_cid` is response-only (never written into the CID'd `bom` object).
 
-Concretely, `InfraFunction` dispatches `integrated_subproc` as a real Ray Job (via the Ray Job Submission API) onto the Plant's live Ray cluster rather than running it in-process, and that job writes its output blocks directly to the shared MinIO bucket from whichever node executes each write task — genuinely distributed, rather than gathering the whole result set onto one node first (`data/input/process.py`'s `infrafunction_subproc`/`_run_ray_batches`). `bom.infrastructure_snapshot_cid` is what lets a downstream verifier confirm which shared store that distributed write actually landed in.
+```text
+HTTP JSON response  (Service.execute → jsonify)
+├── bom_cid  →  content-address of the `bom` object below
+│
+└── bom  →  bom JSON
+    │
+    ├── invoice_cid  →  output Invoice JSON
+    │   │   Minted by Executor after as-executed CIDs are written.
+    │   │
+    │   ├── order_cid  →  Order JSON  (as-Code Quantum input)
+    │   │   ├── invoice_cid          input Invoice
+    │   │   ├── function_cid
+    │   │   │   ├── process_cid / infrafunction_cid
+    │   │   │   └── process_source_cid / infrafunction_source_cid
+    │   │   └── structure_cid        as-Code Structure pairing
+    │   │       ├── root_cid
+    │   │       ├── plant_cid
+    │   │       └── infrastructure_cid
+    │   │
+    │   ├── data_cid
+    │   ├── ingress_data_cid
+    │   ├── integration_data_cid
+    │   ├── seed_cid                 null until Seed (#187)
+    │   │
+    │   └── structure_as_executed_cid  →  observed Structure pairing JSON
+    │       ├── plant_as_executed_cid  →  Plant.snapshot() dict
+    │       │       kind/Ray/applied_structure_cid/rebuilt, …
+    │       └── infrastructure_as_executed_cid  →  InfraStructure.snapshot() dict
+    │           └── object_store_as_executed_cid  →  ObjectStore.snapshot() dict
+    │                   minio endpoints/bucket (no secrets)
+    │                   # later: transport_*, content_store_*, …
+    │
+    ├── log_cid  →  log JSON
+    │       stage CID mirrors, plant_rebuilt, object_store_result_uri
+    │
+    └── node_uri  (string, not a CID)
+            http://CAT_NODE_HOST:CAT_NODE_PORT
+```
 
-Neither snapshot CID is re-consumed downstream to drive further behavior — their purpose is purely to make the executed Plant/InfraStructure state part of the CAT's permanent, content-addressed record. `flatten_bom()` currently only fetches `plant_snapshot_cid` back out into `flat_bom['plant']` for human-readable inspection; `infrastructure_snapshot_cid` isn't flattened the same way yet, so it's only reachable by `ipfs cat`-ing it directly out of the raw `bom` dict.
+Example `plant_as_executed` content (`Plant.snapshot()` after `Structure.reconcile()`):
+
+```json
+{"applied_structure_cid":"QmXe7n5auVw94fv3Xu6rZQqQWfGpXZnMq5u6ubKCM6yYK1","kind_cluster_name":"cats","kubeconfig_context":"kind-cats","ray_dashboard_address":"http://127.0.0.1:8265","ray_release_name":"raycluster","rebuilt":false}
+```
+
+Example `object_store_as_executed` content (`ObjectStore.snapshot()` after `InfraStructure.obj_store_context()` — credentials excluded):
+
+```json
+{"minio_bucket":"cats-scratch","minio_endpoint_host":"http://127.0.0.1:9000","minio_endpoint_pod":"http://172.19.0.1:9000"}
+```
+
+Concretely, `InfraFunction` (`infrafunction_subproc`) dispatches `integrated_subproc` (Process `process_0` / `process_1` via **`ComputePort`** — no Ray in Process) onto Plant through **`PlantPort`** (this demo: `RayPlantPort` / Ray Job Submission). `ObjectStore.write_job_scratch` writes MinIO config only; `RayPlantPort.submit_job` stages the Plant-owned entrypoint + **`RayComputePort`**. Demo batch ABI is `Dict[str, np.ndarray]` column batches. Workers land CSV shards under a **`JobHandle`** prefix in MinIO; host-side retrieval uses `ObjectStore.download_job_result`. `object_store_as_executed_cid` records which shared store that write landed in.
+
+Neither as-executed CID is re-consumed downstream to drive further behavior — their purpose is the permanent content-addressed record. `flatten_bom()` expands `invoice.structure_as_executed_cid` into `flat_bom['structure_as_executed']`, `flat_bom['plant']`, `flat_bom['infrastructure_as_executed']`, and `flat_bom['object_store_as_executed']` for inspection.
+
+Lineage helpers (all chain Invoice `data_cid` from a prior BOM response): `linkProcess()` rebuilds `function_cid` and carries `structure_cid`; `linkStructure()` rebuilds apply-complete `structure_cid` and carries `function_cid`; `linkOrder()` mutates Function and/or Structure in one lineage step (single Invoice chain).
+
+### Invoice stage CIDs (interim feedback; Seed deferred)
+
+After `Executor.execute()` (`cats/executor/executor.py`), the Invoice records stage products for Control-Feedback Loop feedback until Seed is implemented ([#187](https://github.com/DynamicalSystemsGroup/cats/issues/187)):
+
+- `invoice.data_cid` — egress / output data CID (existing)
+- `invoice.ingress_data_cid` — CID produced by ingress transport
+- `invoice.integration_data_cid` — CID of Plant integration outputs after the tHOF runs (durable IPFS copy of data downloaded from MinIO scratch)
+- `invoice.seed_cid` — still `null` until Seed is populated
+- `invoice.structure_as_executed_cid` — observed Structure pairing (see Nest tree above)
+
+The BOM `log` mirrors those stage CIDs as `ingress_data_cid` / `integration_data_cid` / `egress_data_cid` (plus `plant_rebuilt`), and records `object_store_result_uri` (`s3://cats-scratch/jobs/<uuid>/result`) as a non-secret correlator for Structure-lifetime MinIO scratch — not a substitute for `integration_data_cid`. MinIO objects are retained until Structure destroy. Scratch access is InfraStructure-as-Code (Console / S3 / `infrastructure/obj_store_utils.py` / `ObjectStore` / `JobHandle`); there is no CAT Node jobs API (see [`MinIO.md`](./MinIO.md) / [`STORAGE.md`](./STORAGE.md)). Plant, object-store, and transport config are not Service fields — Executor threads `Plant.plant_port()`, `obj_store_context()`, and `as_transport_port(transport_context())` into Function stages. Plant input for the tHOF is the host path returned by `integration_cache` under `INTEGRATION_INPUT_DATA_CACHE`, not an Ingress side-channel path.
 
 See also: [Design: How the Architectural Quantum is realized as content-addressed CIDs](DESIGN.md#how-the-architectural-quantum-is-realized-as-content-addressed-cids) and [Lineage of Provenance: How are CATs composed as a Lineage of Data Provenance on a Data Mesh?](LineageOfProvenance.md#how-are-cats-composed-as-a-lineage-of-data-provenance-on-a-data-mesh).

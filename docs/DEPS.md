@@ -4,8 +4,8 @@
 > [`Makefile`](../Makefile) at the repo root). It always installs the latest release of each tool (not a pin),
 > warns if an already-installed tool is older than the floor documented here, and falls back to that floor only
 > if it can't detect the latest release (e.g. no network). Run `make help` for all targets — `make deps-all` also
-> installs the optional `helm` CLI, and `make print-versions` audits what's currently installed. The steps below
-> document what each target does and remain the reference for manual installs or troubleshooting.
+> installs optional `helm` and Graphviz (`dot`), and `make print-versions` audits what's currently installed. The
+> steps below document what each target does and remain the reference for manual installs or troubleshooting.
 
 0. [**Docker:**](https://docs.docker.com/desktop/install/mac-install/) (`make deps-docker`)
 1. [**uv**](https://docs.astral.sh/uv/) (>= 0.7.0) — manages the pinned Python interpreter, virtual environment
@@ -45,3 +45,7 @@
   out to a `helm` binary. Only install this CLI if you want to manually inspect releases with commands like
   `helm list` / `helm get` against the `kind-cats` cluster. (`make deps-helm`, or `make deps-all` to include it
   alongside everything else.)
+* [**Graphviz**](https://graphviz.org/download/) — optional; required for PNG output from
+  [Diagramming](../README.md#diagramming) (`make diagrams`, `code2flow` / `pyreverse`). Provides `dot`
+  on `PATH`. (`make deps-graphviz`, or `make deps-all` to include it with helm.) Not installed by `uv`
+  or core `make deps`.

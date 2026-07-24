@@ -4,13 +4,16 @@
 
 ## How are CATs composed as a Lineage of Data Provenance on a Data Mesh?
 
-Because every BOM is Content-Addressed using **[Content Identifiers (CIDs)](https://docs.ipfs.io/concepts/content-addressing/)**, a BOM's inputs and outputs can reference the CIDs of upstream and downstream BOMs. As CATs execute across a **CAT Mesh**, this chains individual BOMs together into a verifiable, traceable record of how data moved and was transformed from one CAT to the next—composing the Mesh's **[data and process lineage & provenance](https://bi-insider.com/posts/data-lineage-and-data-provenance/)**.
+Because every BOM is Content-Addressed using **[Content Identifiers (CIDs)](https://docs.ipfs.io/concepts/content-addressing/)**, each CAT's output `data_cid` is the exact same content the next CAT's input Invoice references (\*). As CATs execute across a **CAT Mesh**, this chains individual CATs' data together into a verifiable, traceable record of how data moved and was transformed from one CAT to the next—composing the Mesh's **[data and process lineage & provenance](https://bi-insider.com/posts/data-lineage-and-data-provenance/)**.
 
 This composition gives the Mesh three properties:
 
 - **Verifiability** — CIDs can be used to verify the means of processing data (input, transformation/process, output, and infrastructure-as-code (IaC)) at every link in the chain, enabling [Data Verification](https://en.wikipedia.org/wiki/Data_verification).
 - **Resilience** — because each link is retrievable by its CID, any CAT in the lineage can be re-executed from its recorded BOM, making the Mesh resilient to node loss or replay needs.
 - **Auditability** — the resulting chain of evidence lets CAT Mesh participants prove [Data Lineage](https://bi-insider.com/posts/data-lineage-and-data-provenance/) end-to-end, from a Data Product's source inputs to its final outputs, across organizational boundaries.
+
+Notes (\*):
+* This chains by carrying forward each CAT's output `data_cid` content - not a stored `bom_cid`/`order_cid` backward-pointer from the new BOM to the one before it. A BOM's own `bom_cid` is never written into any IPFS-addressed content it produces (it's only ever returned transiently in the Node's HTTP response), so recovering *which* BOM produced a given `data_cid` - the "upstream" link - currently depends on whoever calls `linkProcess()` / `linkStructure()` / `linkOrder()` already holding that prior response themselves, standing in for the not-yet-built registry (see [`NodeProductFlow.md`](NodeProductFlow.md)'s note on the same gap). A "downstream" pointer is deferred further still: no BOM can know at creation time who will later consume its output, so that link is only ever discoverable from the consuming CAT's side, going forward. **Function-only mutation** uses `linkProcess()` (new `function_cid`, prior `structure_cid`). **Structure-only mutation** uses `linkStructure()` (new apply-complete `structure_cid` = `{root_cid, plant_cid, infrastructure_cid}`, prior `function_cid`). **Combined mutation** uses `linkOrder()` (Function and/or Structure in one new Order with a single Invoice `data_cid` chain). A-la-carte helpers remain first-class. Second-Plant interop still needs Plant adapters ([`INTEROP.md` §2f](INTEROP.md#2f-second-plant-interop-incomplete-as-product)); `linkStructure` / `linkOrder` are the Order ops for that prove path.
 
 ## Where this fits in CATs:
 
@@ -22,4 +25,4 @@ See also: [README: How are CATs workloads processed as Data Provenance Records?]
 
 ## What's inside a BOM's CIDs
 
-See **[`BOM.md`](BOM.md)** for exactly what each of an Order's and BOM's CIDs resolves to: how `order.function_cid`/`order.structure_cid` nest their Process/InfraFunction and Plant/InfraStructure pairs (with concrete example payloads pulled live from IPFS), and how the output-side `bom.plant_snapshot_cid`/`bom.infrastructure_snapshot_cid` differ from those input-side, specified-as-code CIDs.
+See **[`BOM.md`](BOM.md)** (especially [CAT Node HTTP BOM response](BOM.md#cat-node-http-bom-response)) for exactly what each of an Order's and BOM's CIDs resolves to: how `order.function_cid`/`order.structure_cid` nest their Process/InfraFunction and Plant/InfraStructure pairs (with concrete example payloads), and how Invoice `structure_as_executed_cid` (observed Plant / ObjectStore nest) differs from those input-side, specified-as-code CIDs.

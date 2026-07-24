@@ -1,37 +1,49 @@
 # Dashboards
 
-Once a CAT Node's Structure is deployed — `terraform apply` runs automatically from `cats/node.py` and the
-[Demo](./DEMO.md)/[Test](./TEST.md) workflows, so this normally requires no manual step — the following web
-dashboards are reachable on `localhost`. All three stay at fixed addresses across reconciles/rebuilds, so
-these links keep working for the lifetime of the Structure.
+Once a CAT Node's Structure is deployed — Terraform runs from `Structure.reconcile()` /
+`deploy()` / `redeploy()` during CAT execution (`cats/node.py` hosts the HTTP API; see
+[Demo](./DEMO.md) / [Test](./TEST.md)) — these UIs stay at fixed `localhost` addresses for
+the Structure's lifetime.
 
 ### [Ray Dashboard](http://127.0.0.1:8265)
 
 - **URL:** http://127.0.0.1:8265
-- Ray's own dashboard for the Plant's (`module.plant`) KubeRay cluster — job status, actors, cluster/node
-  resource usage, and logs for every Ray Job InfraFunction dispatches via the Ray Job Submission API
-  (`Processor.Integration()`, `cats/executor/function/__init__.py`).
-- Exposed via a static Kubernetes NodePort (`30265`), mapped to this fixed host port by `kind`'s
-  `extraPortMappings` (`data/input/structure/modules/plant/main.tf`) — the address never changes across
-  reconciles or rebuilds.
+- Plant [SaaS] (`module.plant`) KubeRay UI — jobs, actors, resources, logs for Ray Jobs that
+  InfraFunction dispatches (`Processor.Integration()` → Job Submission API).
+- Live address is `Plant.snapshot()['ray_dashboard_address']`, threaded into
+  `Function.execute(…, dashboard_address=…)`. It is **not** a Service field.
+- Static NodePort `30265` → host `8265` via kind `extraPortMappings`
+  (`data/input/structure/plant/main.tf`).
 
 ### [MinIO Console](http://127.0.0.1:9001)
 
-- **URL:** http://127.0.0.1:9001
-- **Credentials:** `cats-minio` / `cats-minio-secret` (`local.minio_root_user`/`local.minio_root_password` in
-  `data/input/structure/modules/infrastructure/main.tf`) — change these before deploying this Structure
-  anywhere the console would be reachable by anyone else.
-- Web console for the shared MinIO bucket (`cats-scratch`) that Ray Data's distributed write tasks and
-  `infrafunction_subproc`'s result retrieval use instead of a local filesystem — browse objects, buckets,
-  and access policies (`data/input/structure/modules/infrastructure/minio_compose.yaml`).
-- See [`LineageOfProvenance.md`](./LineageOfProvenance.md#whats-inside-a-boms-cids) for how this bucket's
-  observed state is recorded as `bom.infrastructure_snapshot_cid`.
+- **URL:** http://127.0.0.1:9001 (S3 API: http://127.0.0.1:9000)
+- **Credentials:** `cats-minio` / `cats-minio-secret`
+  (`local.minio_root_user` / `local.minio_root_password` in
+  `data/input/structure/infrastructure/main.tf`) — change these before deploying a
+  Structure whose console would be reachable by anyone else.
+- Console for InfraStructure [IaaS] shared object store / scratch (`cats-scratch`) used for
+  Plant parallel Ray writes (`jobs/<uuid>/result`). Named volume `structure_minio_data` retains
+  objects for the Structure's lifetime; durable integration outputs are IPFS
+  (`invoice.integration_data_cid`), not MinIO. Compose:
+  `data/input/structure/infrastructure/minio_compose.yaml`.
+- Runtime config is `ObjectStore` from `InfraStructure.obj_store_context()` (Order-submitted
+  `infrastructure/obj_store_utils.py`) — **not** Service fields. BOM `log` may record
+  `object_store_result_uri` for Structure-lifetime correlation; credential-free endpoints land in
+  Invoice `object_store_as_executed_cid` via `ObjectStore.snapshot()` (see
+  [`BOM.md` Nest tree](./BOM.md#cat-node-http-bom-response)).
+- There is **no CAT Node HTTP API** for scratch — use this Console, the S3 API, or:
+
+  ```bash
+  uv run python data/input/structure/infrastructure/obj_store_utils.py list-jobs
+  ```
+
+  Details: [`MinIO.md`](./MinIO.md), roles: [`STORAGE.md`](./STORAGE.md).
 
 ### [IPFS WebUI](http://127.0.0.1:5001/webui)
 
 - **URL:** http://127.0.0.1:5001/webui
-- The host [IPFS (Kubo)](https://docs.ipfs.tech/install/command-line/#system-requirements) daemon's own web
-  UI — browse pinned content, peers, and repo stats for everything CID'ed into a BOM/Invoice/Order. See
-  [`IPFS.md`](./IPFS.md) for how and when this daemon starts.
-- The daemon's Gateway (`http://127.0.0.1:8080/ipfs/<cid>`) is also available for fetching any CID's raw
-  content directly in a browser, without needing the WebUI.
+- Host Kubo daemon UI — pinned content, peers, repo stats for BOM / Invoice / Order CIDs.
+  Python talks to the same daemon via `cats/network/clients/ipfs_client.py` (Kubo HTTP RPC). See
+  [`IPFS.md`](./IPFS.md) for how/when the daemon starts.
+- Gateway: `http://127.0.0.1:8080/ipfs/<cid>` for raw CID bytes without the WebUI.
