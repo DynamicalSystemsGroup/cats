@@ -2,6 +2,9 @@
 
 ## Control-Feedback Loop Specification:
 
+The Control-Feedback Loop is how a CAT Node operationalizes its Architectural Quantum as a **[Minimal Federated Operating Model](https://github.com/DynamicalSystemsGroup/cats#quantum-architecture-description-as-a-minimal-federated-operating-model)**.
+The **Ordering** of **Execution** that is **Invoiced** into a **Bill-Of-Materials** loop is the Node's runtime realization of the Quantum Architecture Description in the README Function / Process / InfraFunction and Structure / Plant / InfraStructure are independently content-addressed halves of one deployable Data Product unit.
+
 ![CAT Node's Control-Feedback Loop: WIP Mermaid Activity Diagram](../images/NodeProductFlow.png)
 
 1. The "Architectural Quantum" is a Minimal Federated Operating Model that adheres to Domain-Driven Design principles
