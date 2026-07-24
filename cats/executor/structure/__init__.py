@@ -1,317 +1,77 @@
-import os
-import re
-
-from cats.utils import subproc_run
-from cats.network.ipfs_docker import MIGRATION_CONTAINER, INTEGRATION_CONTAINER
-
-KIND_CLUSTER_NAME = "cats"
-KIND_CLUSTER_RESOURCE = "kind_cluster.default"
-# Resources in main.tf that depend on kind_cluster.default and thus can't
-# be reconciled (or even refreshed) once its cluster is gone from the host.
-KIND_DEPENDENT_RESOURCES = (
-    "helm_release.ray-cluster",
-    "helm_release.kuberay-operator",
+"""Structure half of the Architectural Quantum (PaaS + Plant/InfraStructure)."""
+from cats.executor.structure._tf import (
+    modules_installed,
+    read_applied_structure_cid,
+    write_applied_structure_cid,
 )
-DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE = "shell_script.docker_compose_ipfs_transport"
-APPLIED_STRUCTURE_MARKER = '.applied-structure.cid'
+from cats.executor.structure.infrastructure import InfraStructure
+from cats.executor.structure.plant import Plant
 
 
-def _applied_structure_marker_path(structure_home):
-    return os.path.join(structure_home, APPLIED_STRUCTURE_MARKER)
-
-
-def read_applied_structure_cid(structure_home):
-    """Return the structure_cid this Structure's Terraform state currently
-    reflects, or None if nothing has been successfully applied yet."""
-    marker_path = _applied_structure_marker_path(structure_home)
-    if not os.path.isfile(marker_path):
-        return None
-    with open(marker_path, encoding='utf-8') as marker_file:
-        return marker_file.read().strip() or None
-
-
-def write_applied_structure_cid(structure_home, structure_cid):
-    """Record the structure_cid Terraform state now reflects, so a later
-    CAT execution with an unchanged (content-addressed) Structure can
-    reconcile in place instead of destroying and rebuilding the Plant."""
-    with open(_applied_structure_marker_path(structure_home), 'w', encoding='utf-8') as marker_file:
-        marker_file.write(structure_cid or '')
-
-
-def terraform_bin(service):
-    # `.venv` is uv's managed venv (see docs/DEPS.md).
-    path = os.path.join(service.CATS_HOME, '.venv', 'bin', 'terraform')
-    return path if os.path.isfile(path) else 'terraform'
-
-
-def configure_terraform_data_dir(structure_home):
-    # TF_DATA_DIR must not equal the module root; that breaks backend state loading.
-    tf_data_dir = os.path.join(structure_home, '.terraform-data')
-    os.makedirs(tf_data_dir, exist_ok=True)
-    os.environ['TF_DATA_DIR'] = tf_data_dir
-    return tf_data_dir
-
-
-def ensure_integration_cache_env(service):
-    # Docker Compose bind mounts require an absolute host path; relative paths
-    # are treated as named volumes and fail with "undefined volume".
-    cache = os.path.abspath(service.INTEGRATION_INPUT_DATA_CACHE)
-    os.makedirs(cache, exist_ok=True)
-    os.environ['INTEGRATION_INPUT_DATA_CACHE'] = cache
-    return cache
-
-
-def _parse_lock_providers(lock_path):
-    providers = []
-    current = None
-    with open(lock_path, encoding='utf-8') as lock_file:
-        for line in lock_file:
-            provider_match = re.match(
-                r'\s*provider\s+"registry\.terraform\.io/([^"]+)"',
-                line,
-            )
-            if provider_match:
-                current = provider_match.group(1)
-                continue
-            if current:
-                version_match = re.match(r'\s*version\s*=\s*"([^"]+)"', line)
-                if version_match:
-                    providers.append((current, version_match.group(1)))
-                    current = None
-    return providers
-
-
-def _provider_binary_present(platform_path):
-    for name in os.listdir(platform_path):
-        path = os.path.join(platform_path, name)
-        if os.path.isfile(path) and os.access(path, os.X_OK) and 'terraform-provider' in name:
-            return True
-    return False
-
-
-def providers_cached(structure_home):
-    lock_path = os.path.join(structure_home, '.terraform.lock.hcl')
-    tf_data_dir = os.path.join(structure_home, '.terraform-data')
-    if not os.path.isfile(lock_path) or not os.path.isdir(tf_data_dir):
-        return False
-
-    required = _parse_lock_providers(lock_path)
-    if not required:
-        return False
-
-    for provider, version in required:
-        version_dir = os.path.join(
-            tf_data_dir,
-            'providers',
-            'registry.terraform.io',
-            provider,
-            version,
-        )
-        if not os.path.isdir(version_dir):
-            return False
-        if not any(
-            _provider_binary_present(os.path.join(version_dir, platform))
-            for platform in os.listdir(version_dir)
-            if os.path.isdir(os.path.join(version_dir, platform))
-        ):
-            return False
-    return True
-
-
-def _terraform_state_resources(service, structure_home):
-    configure_terraform_data_dir(structure_home)
-    proc = subproc_run(
-        f'{terraform_bin(service)} state list',
-        cwd=structure_home,
-    )
-    if proc.returncode != 0:
-        return set()
-    return {line.strip() for line in proc.stdout.splitlines() if line.strip()}
-
-
-def _kind_cluster_names():
-    proc = subproc_run('kind get clusters')
-    if proc.returncode != 0:
-        return set()
-    return {line.strip() for line in proc.stdout.splitlines() if line.strip()}
-
-
-def _docker_container_running(container):
-    proc = subproc_run(
-        f"docker ps --format '{{{{.Names}}}}' | grep -qx '{container}'"
-    )
-    return proc.returncode == 0
-
-
-def cleanup_orphan_kind_cluster(service, structure_home):
-    """Remove a leftover kind cluster when it exists on the host but not in state."""
-    clusters = _kind_cluster_names()
-    if KIND_CLUSTER_NAME not in clusters:
-        return
-
-    state = _terraform_state_resources(service, structure_home)
-    if KIND_CLUSTER_RESOURCE in state:
-        return
-
-    print(
-        f'Removing orphan kind cluster "{KIND_CLUSTER_NAME}" '
-        f'({KIND_CLUSTER_RESOURCE} is not in Terraform state)'
-    )
-    proc = subproc_run(f'kind delete cluster --name {KIND_CLUSTER_NAME}')
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f'Failed to delete orphan kind cluster "{KIND_CLUSTER_NAME}": {proc.stderr.strip()}'
-        )
-    if proc.stdout.strip():
-        print(proc.stdout.strip())
-
-
-def cleanup_stale_kind_cluster_state(service, structure_home):
-    """Remove state entries for the kind cluster (and Helm releases that
-    depend on it) when Terraform state believes the cluster still exists
-    but the host does not have it - e.g. after a Docker Desktop restart or
-    reset wiped its containers out from under Terraform. Left alone, the
-    next `apply` fails during its automatic refresh with something like
-    "could not locate any control plane nodes for cluster named 'cats'"
-    before it ever gets a chance to recreate anything."""
-    state = _terraform_state_resources(service, structure_home)
-    if KIND_CLUSTER_RESOURCE not in state:
-        return
-
-    clusters = _kind_cluster_names()
-    if KIND_CLUSTER_NAME in clusters:
-        return
-
-    stale_resources = [
-        resource for resource in (*KIND_DEPENDENT_RESOURCES, KIND_CLUSTER_RESOURCE)
-        if resource in state
-    ]
-    print(
-        f'Terraform state has "{KIND_CLUSTER_RESOURCE}" but no kind cluster named '
-        f'"{KIND_CLUSTER_NAME}" exists on the host; removing stale state for: '
-        f'{", ".join(stale_resources)}'
-    )
-    proc = subproc_run(
-        f'{terraform_bin(service)} state rm {" ".join(stale_resources)}',
-        cwd=structure_home,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f'Failed to remove stale Terraform state for "{KIND_CLUSTER_NAME}": '
-            f'{proc.stderr.strip()}'
-        )
-    if proc.stdout.strip():
-        print(proc.stdout.strip())
-
-
-def cleanup_stale_docker_compose_ipfs_transport_state(service, structure_home):
-    """Remove the state entry for the IPFS transport Docker Compose stack
-    when Terraform state believes it's already up but its containers are
-    gone from the host - e.g. after a Docker Desktop restart or reset.
-
-    Unlike `shell_script.host_ipfs_daemon`, this resource's `create` script
-    isn't idempotent/self-probing, and the `scottwinkler/shell` provider
-    has no `read` command to detect this drift on its own - so once this
-    resource is in state, plain `apply` never notices the containers are
-    missing and never re-runs `create`. Left alone, `ingress`/`egress`
-    then fail against a nonexistent container (e.g. "No such container:
-    structure-ipfs_migration-1") the next time a CAT executes."""
-    state = _terraform_state_resources(service, structure_home)
-    if DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE not in state:
-        return
-
-    if _docker_container_running(MIGRATION_CONTAINER) and _docker_container_running(INTEGRATION_CONTAINER):
-        return
-
-    print(
-        f'Terraform state has "{DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE}" but its '
-        f'containers ("{MIGRATION_CONTAINER}", "{INTEGRATION_CONTAINER}") are not '
-        f'running on the host; removing stale state so apply recreates them'
-    )
-    proc = subproc_run(
-        f'{terraform_bin(service)} state rm {DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE}',
-        cwd=structure_home,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f'Failed to remove stale Terraform state for '
-            f'"{DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE}": {proc.stderr.strip()}'
-        )
-    if proc.stdout.strip():
-        print(proc.stdout.strip())
-
-
-class Plant:
-    def __init__(self, service):
+class Structure:
+    def __init__(self, service, structure_cid):
         self.service = service
-        self.INPUT_STRUCTURE_HOME = self.service.INPUT_STRUCTURE_HOME
-        tf_data_dir = configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
-        cache_dir = ensure_integration_cache_env(self.service)
-        print(f"export TF_DATA_DIR={tf_data_dir}")
-        print(f"export INTEGRATION_INPUT_DATA_CACHE={cache_dir}")
-
-
-class InfraStructure:
-    def __init__(self, service):
-        self.service = service
-        self.INPUT_STRUCTURE_HOME = self.service.INPUT_STRUCTURE_HOME
-        configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
-        ensure_integration_cache_env(self.service)
-        print(
-            f"Environment variable INTEGRATION_INPUT_DATA_CACHE is set to:",
-            os.environ["INTEGRATION_INPUT_DATA_CACHE"]
+        self.bom_json_cid = self.service.bom_json_cid
+        self.infraStructure: InfraStructure = InfraStructure(
+            service=self.service, structure_cid=structure_cid
         )
+        self.plant: Plant = self.infraStructure.compose()
 
-    def destroy(self):
-        print('Destroy Structure!')
-        self.service.executeCMD(
-            f'{terraform_bin(self.service)} destroy --auto-approve',
-            cwd=self.INPUT_STRUCTURE_HOME
-        )
+    def redeploy(self):
         print()
         print()
+        print('Re-Deploy Structure!')
+        # `destroy` needs providers already installed to even load their
+        # schemas, same as `apply`/`plan` - so `initialize` must run first,
+        # not just before `apply` below.
+        self.infraStructure.initialize()
+        self.infraStructure.destroy()
+        self.infraStructure.apply()
+        self.plant.rebuilt = True
 
-    def plan(self):
-        print('Plan Structure!')
-        self.service.executeCMD(
-            f'{terraform_bin(self.service)} plan',
-            cwd=self.INPUT_STRUCTURE_HOME
-        )
+    def deploy(self):
         print()
         print()
+        print('Deploy Structure!')
+        self.infraStructure.initialize()
+        self.infraStructure.apply()
+        self.plant.rebuilt = False
 
-    def initialize(self):
-        print('Initialize Structure!')
-        configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
-        if providers_cached(self.INPUT_STRUCTURE_HOME):
-            print('Terraform providers already cached; skipping init.')
-            print()
-            return
-        self.service.executeCMD(
-            f'{terraform_bin(self.service)} init -input=false',
-            cwd=self.INPUT_STRUCTURE_HOME
-        )
-        print()
-        print()
+    def reconcile(self):
+        """Materialize this CAT's Structure, skipping the destructive
+        rebuild when the incoming (content-addressed) structure_cid
+        matches what's already applied.
 
-    def apply(self):
-        print('Apply Structure!')
-        configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
-        ensure_integration_cache_env(self.service)
-        cleanup_orphan_kind_cluster(self.service, self.INPUT_STRUCTURE_HOME)
-        cleanup_stale_kind_cluster_state(self.service, self.INPUT_STRUCTURE_HOME)
-        cleanup_stale_docker_compose_ipfs_transport_state(self.service, self.INPUT_STRUCTURE_HOME)
-        self.service.executeCMD(
-            f'{terraform_bin(self.service)} apply --auto-approve',
-            cwd=self.INPUT_STRUCTURE_HOME
-        )
-        peer_script = os.path.join(self.INPUT_STRUCTURE_HOME, 'ipfs_connect_peers.sh')
-        if os.path.isfile(peer_script):
-            print('Connect IPFS transport peers...')
-            proc = subproc_run(f'bash {peer_script}', cwd=self.INPUT_STRUCTURE_HOME)
-            if proc.stdout.strip():
-                print(proc.stdout.strip())
-            if proc.returncode != 0 and proc.stderr.strip():
-                print(proc.stderr.strip())
-        print()
-        print()
+        Structure is content-addressed like everything else in CATs.
+        Destroying and rebuilding the Plant (kind cluster + Helm
+        releases) for a Structure whose content hasn't changed is the
+        same redundant recomputation content-addressing is meant to
+        avoid elsewhere in CATs; `apply()` alone is Terraform's own
+        declarative reconciliation, and it's a fast no-op when nothing
+        changed.
+
+        Returns a snapshot of the resulting Plant (see `Plant.snapshot()`),
+        so callers can record what this Structure actually produced
+        alongside Function's output in the CAT's BOM.
+        """
+        structure_cid = self.infraStructure.structure_cid
+        structure_home = self.infraStructure.INPUT_STRUCTURE_HOME
+        applied_cid = read_applied_structure_cid(structure_home)
+        if structure_cid and applied_cid == structure_cid:
+            print(f'Structure {structure_cid} already applied; reconciling in place.')
+            self.deploy()
+        else:
+            self.redeploy()
+        if structure_cid:
+            write_applied_structure_cid(structure_home, structure_cid)
+        return self.plant.snapshot()
+
+
+__all__ = [
+    'Structure',
+    'InfraStructure',
+    'Plant',
+    'modules_installed',
+    'read_applied_structure_cid',
+    'write_applied_structure_cid',
+]
