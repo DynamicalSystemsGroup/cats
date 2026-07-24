@@ -76,11 +76,11 @@ This CAT Node's data processing **Order** (Input) utilizes [Ray](https://www.ray
   ```bash
   make diagrams
   ```
-    * Optional Commands / Utilities: 
-      * `code2flow` used to generate *Functional Component Activity Diagram*: 
-        * `uv run python utils/code2flow/diagram_c2f.py`
-      * `pyreverse` used to generates *Class & Dependency Diagrams*: 
-        * `uv run pyreverse -o png -p CATs -d images/pyreverse cats`
+  * Optional Commands / Utilities: 
+    * `code2flow` used to generate *Functional Component Activity Diagram*: 
+      * `uv run python utils/code2flow/diagram_c2f.py`
+    * `pyreverse` used to generates *Class & Dependency Diagrams*: 
+      * `uv run pyreverse -o png -p CATs -d images/pyreverse cats`
   
 
 ### [Contribute!](docs/CONTRIBUTING.md)
