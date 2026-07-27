@@ -17,12 +17,12 @@ from cats.executor.structure.plant import Plant
 
 
 class InfraStructure:
-    def __init__(self, service, structure_cid):
-        self.service = service
+    def __init__(self, runtime, structure_cid):
+        self.runtime = runtime
         self.structure_cid = structure_cid
-        self.INPUT_STRUCTURE_HOME = self.service.INPUT_STRUCTURE_HOME
+        self.INPUT_STRUCTURE_HOME = self.runtime.INPUT_STRUCTURE_HOME
         configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
-        ensure_integration_cache_env(self.service)
+        ensure_integration_cache_env(self.runtime)
         print(
             f"Environment variable INTEGRATION_INPUT_DATA_CACHE is set to:",
             os.environ["INTEGRATION_INPUT_DATA_CACHE"]
@@ -86,10 +86,10 @@ class InfraStructure:
         Order-submitted infrastructure utils module (directory model)."""
         utils = self._load_obj_store_module()
         structure_home = self.INPUT_STRUCTURE_HOME
-        service = self.service
+        runtime = self.runtime
 
         def get_output(name):
-            return _terraform_output(service, structure_home, name)
+            return _terraform_output(runtime, structure_home, name)
 
         return utils.ObjectStore.from_terraform_outputs(get_output)
 
@@ -151,8 +151,8 @@ class InfraStructure:
     def destroy(self):
         print('Destroy Structure!')
         configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
-        self.service.executeCMD(
-            f'{terraform_bin(self.service)} destroy --auto-approve',
+        self.runtime.executeCMD(
+            f'{terraform_bin(self.runtime)} destroy --auto-approve',
             cwd=self.INPUT_STRUCTURE_HOME
         )
         print()
@@ -161,8 +161,8 @@ class InfraStructure:
     def plan(self):
         print('Plan Structure!')
         configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
-        self.service.executeCMD(
-            f'{terraform_bin(self.service)} plan',
+        self.runtime.executeCMD(
+            f'{terraform_bin(self.runtime)} plan',
             cwd=self.INPUT_STRUCTURE_HOME
         )
         print()
@@ -178,8 +178,8 @@ class InfraStructure:
             print('Terraform providers and modules already cached; skipping init.')
             print()
             return
-        self.service.executeCMD(
-            f'{terraform_bin(self.service)} init -input=false',
+        self.runtime.executeCMD(
+            f'{terraform_bin(self.runtime)} init -input=false',
             cwd=self.INPUT_STRUCTURE_HOME
         )
         # `init` just (re)extracted provider binaries; make sure they're
@@ -191,22 +191,22 @@ class InfraStructure:
     def apply(self):
         print('Apply Structure!')
         configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
-        ensure_integration_cache_env(self.service)
+        ensure_integration_cache_env(self.runtime)
         # ContentStore.ensure is à la carte TF (host_ipfs_daemon create), not
         # Python apply — Executor only asserts readiness after terraform apply.
         self.compose()._load_plant_utils().cleanup_stale_plant_state(
             self.INPUT_STRUCTURE_HOME,
-            terraform_bin(self.service),
+            terraform_bin(self.runtime),
             configure_tf_data_dir=configure_terraform_data_dir,
         )
-        cleanup_stale_docker_compose_ipfs_transport_state(self.service, self.INPUT_STRUCTURE_HOME)
+        cleanup_stale_docker_compose_ipfs_transport_state(self.runtime, self.INPUT_STRUCTURE_HOME)
         self._load_obj_store_module().cleanup_stale_obj_store_state(
             self.INPUT_STRUCTURE_HOME,
-            terraform_bin(self.service),
+            terraform_bin(self.runtime),
             configure_tf_data_dir=configure_terraform_data_dir,
         )
-        self.service.executeCMD(
-            f'{terraform_bin(self.service)} apply --auto-approve',
+        self.runtime.executeCMD(
+            f'{terraform_bin(self.runtime)} apply --auto-approve',
             cwd=self.INPUT_STRUCTURE_HOME
         )
         print('Assert InfraStructure content store ready (Order-submitted)...')

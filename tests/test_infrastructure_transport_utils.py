@@ -243,7 +243,7 @@ def test_transport_assert_wraps_assert_ready(tmp_path, monkeypatch):
 
     infra = InfraStructure.__new__(InfraStructure)
     infra.INPUT_STRUCTURE_HOME = str(tmp_path)
-    infra.service = SimpleNamespace()
+    infra.runtime = SimpleNamespace()
 
     monkeypatch.setattr(
         infra,

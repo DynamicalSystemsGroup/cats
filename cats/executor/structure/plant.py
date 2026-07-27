@@ -47,10 +47,10 @@ class Plant:
         dispatch uses ``plant_port()`` → PlantPort."""
         utils = self._load_plant_utils()
         structure_home = self.infraStructure.INPUT_STRUCTURE_HOME
-        service = self.infraStructure.service
+        runtime = self.infraStructure.runtime
 
         def get_output(name):
-            return _terraform_output(service, structure_home, name)
+            return _terraform_output(runtime, structure_home, name)
 
         return utils.PlantContext.from_terraform_outputs(get_output)
 

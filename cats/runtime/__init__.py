@@ -8,7 +8,14 @@ from cats.network.identity import node_uri as resolve_node_uri
 from cats.utils import subproc_run, executeCMD
 
 
-class Service:
+class Runtime:
+    """Data Product process-lifetime ambient: layout, ContentMesh, Order entry.
+
+    Long-lived Node substrate under the peer edge (`node.py`). Owns host paths
+    and ContentMesh; delegates manufacturing to Factory and wraps the BOM
+    envelope. Not the peer, not Factory, not the per-Order Executor.
+    """
+
     def __init__(self,
         contentMesh: ContentMesh,
         CATS_HOME: str
@@ -58,7 +65,7 @@ class Service:
         Path(self.INPUT_DATA_HOME).mkdir(parents=True, exist_ok=True)
 
     def initFactory(self, order_request, ipfs_uri):
-        """Platform entry: delegate Order intake to Factory manufacturing cell."""
+        """Runtime entry: delegate Order intake to Factory manufacturing cell."""
         factory = Factory(self).accept(order_request, ipfs_uri)
         return factory, order_request
 
@@ -90,7 +97,7 @@ class Service:
     def execute(self, catFactory, order_request):
         executor = catFactory.produce()
         # invoice_cid (and structure_as_executed nesting / order_cid
-        # backfill) is produced by Executor.execute() — Service.execute()
+        # backfill) is produced by Executor.execute() — Runtime.execute()
         # only wraps invoice_cid + log_cid + node_uri into bom/bom_cid.
         enhanced_bom, invoice_cid = executor.execute(order_request)
 

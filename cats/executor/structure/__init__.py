@@ -9,11 +9,11 @@ from cats.executor.structure.plant import Plant
 
 
 class Structure:
-    def __init__(self, service, structure_cid):
-        self.service = service
-        self.bom_json_cid = self.service.bom_json_cid
+    def __init__(self, runtime, structure_cid):
+        self.runtime = runtime
+        self.bom_json_cid = self.runtime.bom_json_cid
         self.infraStructure: InfraStructure = InfraStructure(
-            service=self.service, structure_cid=structure_cid
+            runtime=self.runtime, structure_cid=structure_cid
         )
         self.plant: Plant = self.infraStructure.compose()
 

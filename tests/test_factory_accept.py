@@ -5,13 +5,13 @@ from cats.factory import Factory
 
 
 def test_factory_accept_stages_bom_then_assembles(monkeypatch):
-    service = SimpleNamespace(OUTPUT_HOME='/tmp/cats-out')
+    runtime = SimpleNamespace(OUTPUT_HOME='/tmp/cats-out')
     init_calls = []
 
     def _init_bom_car(**kwargs):
         init_calls.append(kwargs)
 
-    service.initBOMcar = _init_bom_car
+    runtime.initBOMcar = _init_bom_car
 
     fake_structure = object()
     fake_function = object()
@@ -39,7 +39,7 @@ def test_factory_accept_stages_bom_then_assembles(monkeypatch):
         },
     }
 
-    factory = Factory(service).accept(order_request, 'QmInitData')
+    factory = Factory(runtime).accept(order_request, 'QmInitData')
 
     assert len(init_calls) == 1
     assert init_calls[0]['structure_cid'] == 'QmStruct'

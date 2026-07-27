@@ -8,16 +8,16 @@ from cats.executor.structure import Structure
 
 class Executor:
     def __init__(self,
-        service, structure, function
+        runtime, structure, function
     ):
-        self.service = service
+        self.runtime = runtime
         self.CAT_HOME = None
 
         self.structure: Structure = structure
         self.function: Function = function
-        self.bom_json_cid: str = self.service.bom_json_cid
-        self.enhanced_bom, self.bom = self.service.contentMesh.getEnhancedBom(
-            self.bom_json_cid, self.service.INPUT_HOME, self.service.OUTPUT_HOME
+        self.bom_json_cid: str = self.runtime.bom_json_cid
+        self.enhanced_bom, self.bom = self.runtime.contentMesh.getEnhancedBom(
+            self.bom_json_cid, self.runtime.INPUT_HOME, self.runtime.OUTPUT_HOME
         )
         self.orderCID = None
         self.invoiceCID = None
@@ -27,19 +27,19 @@ class Executor:
         self.egress_data_cid = None
 
     def catStore(self):
-        self.CAT_HOME = self.service.CAT_HOME = self.service.contentMesh.CAT_HOME = \
-            f"""{self.service.JOB_HOME}/cat={datetime.utcnow().isoformat()}"""
-        self.service.INGRESS_HOME = self.service.contentMesh.INGRESS_HOME = f"{self.CAT_HOME}/ingress"
-        self.service.INTEGRATION_HOME = self.service.contentMesh.INTEGRATION_HOME = f"{self.CAT_HOME}/integration"
-        self.service.EGRESS_HOME = self.service.contentMesh.EGRESS_HOME = f"{self.CAT_HOME}/egress"
-        self.service.EGRESS_INPUT_DATA = self.service.contentMesh.EGRESS_INPUT_DATA = f"{self.service.EGRESS_HOME}/outputs"
-        self.service.PROCESS_HOME = self.service.contentMesh.PROCESS_HOME = f"{self.CAT_HOME}/process"
+        self.CAT_HOME = self.runtime.CAT_HOME = self.runtime.contentMesh.CAT_HOME = \
+            f"""{self.runtime.JOB_HOME}/cat={datetime.utcnow().isoformat()}"""
+        self.runtime.INGRESS_HOME = self.runtime.contentMesh.INGRESS_HOME = f"{self.CAT_HOME}/ingress"
+        self.runtime.INTEGRATION_HOME = self.runtime.contentMesh.INTEGRATION_HOME = f"{self.CAT_HOME}/integration"
+        self.runtime.EGRESS_HOME = self.runtime.contentMesh.EGRESS_HOME = f"{self.CAT_HOME}/egress"
+        self.runtime.EGRESS_INPUT_DATA = self.runtime.contentMesh.EGRESS_INPUT_DATA = f"{self.runtime.EGRESS_HOME}/outputs"
+        self.runtime.PROCESS_HOME = self.runtime.contentMesh.PROCESS_HOME = f"{self.CAT_HOME}/process"
 
-        Path(self.service.INGRESS_HOME).mkdir(parents=True, exist_ok=True)
-        Path(self.service.INTEGRATION_HOME).mkdir(parents=True, exist_ok=True)
-        Path(self.service.EGRESS_HOME).mkdir(parents=True, exist_ok=True)
-        Path(self.service.EGRESS_INPUT_DATA).mkdir(parents=True, exist_ok=True)
-        Path(self.service.PROCESS_HOME).mkdir(parents=True, exist_ok=True)
+        Path(self.runtime.INGRESS_HOME).mkdir(parents=True, exist_ok=True)
+        Path(self.runtime.INTEGRATION_HOME).mkdir(parents=True, exist_ok=True)
+        Path(self.runtime.EGRESS_HOME).mkdir(parents=True, exist_ok=True)
+        Path(self.runtime.EGRESS_INPUT_DATA).mkdir(parents=True, exist_ok=True)
+        Path(self.runtime.PROCESS_HOME).mkdir(parents=True, exist_ok=True)
 
     def execute(self, order_request):
         self.catStore()
@@ -59,9 +59,9 @@ class Executor:
 
         # function_cid / structure_cid: as-Code; structure_as_executed_cid on
         # the Invoice records what Plant / InfraStructure actually ran.
-        self.enhanced_bom['function'] = json.loads(self.service.contentMesh.cat(self.enhanced_bom['order']['function_cid']))
-        self.enhanced_bom['structure'] = json.loads(self.service.contentMesh.cat(self.enhanced_bom['order']['structure_cid']))
-        ipfs = self.service.contentMesh.ipfsClient
+        self.enhanced_bom['function'] = json.loads(self.runtime.contentMesh.cat(self.enhanced_bom['order']['function_cid']))
+        self.enhanced_bom['structure'] = json.loads(self.runtime.contentMesh.cat(self.enhanced_bom['order']['structure_cid']))
+        ipfs = self.runtime.contentMesh.ipfsClient
         object_store_as_executed_cid = ipfs.add_json(object_store.snapshot())
         infrastructure_as_executed_cid = ipfs.add_json(
             self.structure.infraStructure.snapshot(
@@ -93,14 +93,14 @@ class Executor:
         self.enhanced_bom['log_cid'] = ipfs.add_json(self.enhanced_bom['log'])
 
         # Invoice CID: produced here (by the Executor), not by
-        # Service.execute() - so "Invoice CIDs are produced by the
+        # Runtime.execute() - so "Invoice CIDs are produced by the
         # Executor" holds at the class level. Backfilling order_cid with
         # the real, already-submitted order_request['order_cid'] directly
         # (as opposed to the placeholder order_cid getEnhancedBom() may
         # have fetched into self.enhanced_bom['order']) is what makes the
         # Invoice point at "the original CID-ed Order" (see
         # docs/NodeProductFlow.md#2b). Factory.accept threads this same
-        # order_cid into the bootstrap Invoice via Service.initBOMcar /
+        # order_cid into the bootstrap Invoice via Runtime.initBOMcar /
         # ContentMesh.initBOMjson, so the locally materialized order.json
         # and this final Invoice's order_cid are the exact same CID for
         # every execution, not just a re-hash that happens to match it.

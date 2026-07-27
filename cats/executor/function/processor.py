@@ -45,16 +45,16 @@ class Processor:
         return self.ingress_data_cid
 
     def Integration(self, object_store, plant, transport):
-        self.infraFunction.service.INTEGRATION_HOME = \
-            self.infraFunction.service.contentMesh.INTEGRATION_HOME + "/outputs"
+        self.infraFunction.runtime.INTEGRATION_HOME = \
+            self.infraFunction.runtime.contentMesh.INTEGRATION_HOME + "/outputs"
         # Structure staging: process_input is the host path returned by
         # integration_cache (Plant-facing mount).
         process_input = _call_transport_port(
             self.infraFunction.integration_cache_subproc,
             label='integration_cache',
             input_dir_cid=self.ingress_data_cid,
-            cwd=self.infraFunction.service.INTEGRATION_INPUT_CACHE,
-            data_cache=self.infraFunction.service.INTEGRATION_INPUT_DATA_CACHE,
+            cwd=self.infraFunction.runtime.INTEGRATION_INPUT_CACHE,
+            data_cache=self.infraFunction.runtime.INTEGRATION_INPUT_DATA_CACHE,
             transport=transport,
         )
         if not process_input or not isinstance(process_input, str):
@@ -67,20 +67,20 @@ class Processor:
         # [Composed Function] (integrated_subproc only) onto the deployed
         # Plant, rather than running it in this (ephemeral executor) process.
         # Plant dispatch surface and object-store come from Plant.context() /
-        # InfraStructure.obj_store_context(), not Service fields.
+        # InfraStructure.obj_store_context(), not Runtime fields.
         _output, job_handle = self.infraFunction.infrafunction_subproc(
             self.infraFunction.integrated_subproc,
             process_input,
-            self.infraFunction.service.INTEGRATION_HOME,
+            self.infraFunction.runtime.INTEGRATION_HOME,
             object_store=object_store,
             plant=plant,
         )
         self.object_store_result_uri = (
             object_store.result_uri(job_handle) if job_handle else None
         )
-        wait_for_directory(self.infraFunction.service.INTEGRATION_HOME, check_interval=1)
+        wait_for_directory(self.infraFunction.runtime.INTEGRATION_HOME, check_interval=1)
         self.integration_data_cid, _ = \
-            self.infraFunction.service.contentMesh.cidDir(self.infraFunction.service.INTEGRATION_HOME)
+            self.infraFunction.runtime.contentMesh.cidDir(self.infraFunction.runtime.INTEGRATION_HOME)
         return self.integration_data_cid
 
     def Egress(self, transport):
@@ -92,7 +92,7 @@ class Processor:
         )
         if not isinstance(egress_result, str) or not egress_result:
             raise RuntimeError(f"Egress failed: {egress_result}")
-        self.infraFunction.service.contentMesh.EGRESS_HOME = \
+        self.infraFunction.runtime.contentMesh.EGRESS_HOME = \
             self.egress_data_cid = self.invoice_data_cid = egress_result
         return self.egress_data_cid
 

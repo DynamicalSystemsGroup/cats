@@ -56,13 +56,13 @@ def _write_fake_content_store_utils(path: Path, marker_name: str, *, ready=True)
 
 
 def _infra_with_structure_home(structure_home: Path, cats_home: Path):
-    service = SimpleNamespace(
+    runtime = SimpleNamespace(
         INPUT_STRUCTURE_HOME=str(structure_home),
         CATS_HOME=str(cats_home),
         executeCMD=MagicMock(),
     )
     infra = InfraStructure.__new__(InfraStructure)
-    infra.service = service
+    infra.runtime = runtime
     infra.structure_cid = 'bafy-test'
     infra.INPUT_STRUCTURE_HOME = str(structure_home)
     return infra
@@ -152,11 +152,11 @@ def test_infrastructure_content_store_ensure_loads_order_tree(tmp_path):
     _write_fake_content_store_utils(utils_path, 'order-submitted')
 
     infra = _infra_with_structure_home(structure_home, tmp_path / 'cats_home')
-    infra.content_store_ensure(cwd=infra.service.CATS_HOME)
+    infra.content_store_ensure(cwd=infra.runtime.CATS_HOME)
 
     mod = importlib.import_module('infrastructure_content_store_utils_order')
     assert mod.ContentStore.ensured == [
-        {'cwd': infra.service.CATS_HOME, 'marker': 'order-submitted'}
+        {'cwd': infra.runtime.CATS_HOME, 'marker': 'order-submitted'}
     ]
 
 
@@ -264,7 +264,7 @@ def test_apply_does_not_call_content_store_ensure(tmp_path, monkeypatch):
     assert content_assert_calls == ['assert']
     assert transport_assert_calls == ['assert']
     assert ensure_peered_calls == []
-    infra.service.executeCMD.assert_called()
+    infra.runtime.executeCMD.assert_called()
 
 
 def test_meshclient_init_does_not_call_bootstrap_ensure(tmp_path, monkeypatch):

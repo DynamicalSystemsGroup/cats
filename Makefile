@@ -349,7 +349,7 @@ node-status:
 content-store-ensure:
 	uv run python $(CONTENT_STORE_UTILS) ensure
 
-# In-process Service.execute (same path as POST /cat/node/init, no Flask).
+# In-process Runtime.execute (same path as POST /cat/node/init, no Flask).
 # Example order_cid: QmNU5EAmWNDc7U3bjZ8X2rzjD3iN83KXcarsvnyk8AXA9o
 # Usage: make execute-order ORDER_CID=<cid>
 execute-order:

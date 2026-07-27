@@ -4,11 +4,11 @@ from cats.executor.function.processor import Processor
 
 
 class Function:
-    def __init__(self, service, function_cid):
-        self.service = service
+    def __init__(self, runtime, function_cid):
+        self.runtime = runtime
         self.CAT_HOME = None
         self.infraFunction: InfraFunction = InfraFunction(
-            service=self.service, function_cid=function_cid
+            runtime=self.runtime, function_cid=function_cid
         )
         self.processor: Processor = self.infraFunction.compose()
         self.ingress_data_cid = None

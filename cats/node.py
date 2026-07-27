@@ -33,7 +33,7 @@ import time
 import traceback
 
 from flask import Flask, request, jsonify
-from cats import CATS_HOME, SERVICE
+from cats import CATS_HOME, RUNTIME
 from cats.network import _load_bootstrap_content_store_module
 
 catNode = Flask(__name__)
@@ -135,7 +135,7 @@ def _bootstrap_content_store_ensure():
     """
     module = _load_bootstrap_content_store_module(CATS_HOME)
     module.ContentStore.ensure(cwd=CATS_HOME)
-    SERVICE.contentMesh._bootstrap_content_store_ensured = True
+    RUNTIME.contentMesh._bootstrap_content_store_ensured = True
 
 
 def _bootstrap_content_store_assert_ready():
@@ -146,7 +146,7 @@ def _bootstrap_content_store_assert_ready():
     """
     module = _load_bootstrap_content_store_module(CATS_HOME)
     if module.ContentStore.is_ready():
-        SERVICE.contentMesh._bootstrap_content_store_ensured = True
+        RUNTIME.contentMesh._bootstrap_content_store_ensured = True
         return
     raise RuntimeError(
         'Host Kubo ContentStore API not ready. Run '
@@ -160,17 +160,17 @@ def _bootstrap_content_store_assert_ready():
 def execute_init_cat():
     try:
         order_request = request.get_json()
-        order_request["order"] = json.loads(SERVICE.contentMesh.cat(order_request["order_cid"]))
-        order_request['invoice'] = json.loads(SERVICE.contentMesh.cat(order_request['order']['invoice_cid']))
+        order_request["order"] = json.loads(RUNTIME.contentMesh.cat(order_request["order_cid"]))
+        order_request['invoice'] = json.loads(RUNTIME.contentMesh.cat(order_request['order']['invoice_cid']))
 
         # IPFS checks
         # if 'bom_cid' not in bom:
         #     return jsonify({'error': 'CID not provided'}), 400
 
-        catFactory, updated_order_request = SERVICE.initFactory(
+        catFactory, updated_order_request = RUNTIME.initFactory(
             order_request, order_request["invoice"]["data_cid"]
         )
-        bom_response = SERVICE.execute(catFactory, updated_order_request)
+        bom_response = RUNTIME.execute(catFactory, updated_order_request)
 
         # Return BOM
         response = jsonify(bom_response)

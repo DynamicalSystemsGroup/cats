@@ -50,9 +50,9 @@ def write_applied_structure_cid(structure_home, structure_cid):
         marker_file.write(structure_cid or '')
 
 
-def terraform_bin(service):
+def terraform_bin(runtime):
     # `.venv` is uv's managed venv (see docs/DEPS.md).
-    path = os.path.join(service.CATS_HOME, '.venv', 'bin', 'terraform')
+    path = os.path.join(runtime.CATS_HOME, '.venv', 'bin', 'terraform')
     return path if os.path.isfile(path) else 'terraform'
 
 
@@ -95,10 +95,10 @@ def configure_terraform_data_dir(structure_home):
     return tf_data_dir
 
 
-def ensure_integration_cache_env(service):
+def ensure_integration_cache_env(runtime):
     # Docker Compose bind mounts require an absolute host path; relative paths
     # are treated as named volumes and fail with "undefined volume".
-    cache = os.path.abspath(service.INTEGRATION_INPUT_DATA_CACHE)
+    cache = os.path.abspath(runtime.INTEGRATION_INPUT_DATA_CACHE)
     os.makedirs(cache, exist_ok=True)
     os.environ['INTEGRATION_INPUT_DATA_CACHE'] = cache
     return cache
@@ -191,10 +191,10 @@ def modules_installed(structure_home):
     return True
 
 
-def _terraform_state_resources(service, structure_home):
+def _terraform_state_resources(runtime, structure_home):
     configure_terraform_data_dir(structure_home)
     proc = subproc_run(
-        f'{terraform_bin(service)} state list',
+        f'{terraform_bin(runtime)} state list',
         cwd=structure_home,
     )
     if proc.returncode != 0:
@@ -209,7 +209,7 @@ def _docker_container_running(container):
     return proc.returncode == 0
 
 
-def cleanup_stale_docker_compose_ipfs_transport_state(service, structure_home):
+def cleanup_stale_docker_compose_ipfs_transport_state(runtime, structure_home):
     """Remove the state entry for the IPFS transport Docker Compose stack
     when Terraform state believes it's already up but its containers are
     gone from the host - e.g. after a Docker Desktop restart or reset.
@@ -222,7 +222,7 @@ def cleanup_stale_docker_compose_ipfs_transport_state(service, structure_home):
     alone, `ingress`/`egress` then fail against a nonexistent container
     (e.g. "No such container: structure-ipfs_migration-1") the next time a
     CAT executes."""
-    state = _terraform_state_resources(service, structure_home)
+    state = _terraform_state_resources(runtime, structure_home)
     if DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE not in state:
         return
 
@@ -238,7 +238,7 @@ def cleanup_stale_docker_compose_ipfs_transport_state(service, structure_home):
         f'running on the host; removing stale state so apply recreates them'
     )
     proc = subproc_run(
-        f'{terraform_bin(service)} state rm {DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE}',
+        f'{terraform_bin(runtime)} state rm {DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE}',
         cwd=structure_home,
     )
     if proc.returncode != 0:
@@ -250,9 +250,9 @@ def cleanup_stale_docker_compose_ipfs_transport_state(service, structure_home):
         print(proc.stdout.strip())
 
 
-def _terraform_output(service, structure_home, name):
+def _terraform_output(runtime, structure_home, name):
     proc = subproc_run(
-        f'{terraform_bin(service)} output -raw {name}',
+        f'{terraform_bin(runtime)} output -raw {name}',
         cwd=structure_home,
     )
     if proc.returncode != 0:
