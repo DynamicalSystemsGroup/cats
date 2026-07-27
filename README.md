@@ -2,13 +2,19 @@
 
 ## Description:
 
-**Content-Addressable Transformers** (**CATs**) is an edge-computing Node framework that establishs a self-serviced [Data Mesh](https://www.datamesh-architecture.com/#what-is-data-mesh) for Data Service Collaboration between orginizations with *verifiable* **Data Provenance**. *CAT Nodes* execute horizontal, vertical, and heterogenious scallable *data processing workloads* inputed & outputted as *Data Provenance records* used to establishe a Data Mesh as a Platform. The [Content-Addressed Storage (CAS)](https://en.wikipedia.org/wiki/Content-addressable_storage) of CAT workloads as **[Bills-Of-Materials (BOMs)](https://en.wikipedia.org/wiki/Bill_of_materials)** is used for Data Transport — turning workloads into Data Provenance that builds the Mesh.
+### Introduction: *What is a CAT Node & Why are they valuable?*
+**CAT Node** is an edge-computing framework that establishs a *self-serviced* **[Data Mesh](https://www.datamesh-architecture.com/#what-is-data-mesh)** for inter and intra-orginizational Data Service Collaboration with *verifiable* **Data Provenance**. *CAT Nodes* are intended to be system *integration points* that enable **[Data Product](https://www.datamesh-architecture.com/#data-product)** collaborators to verify, retrieve, and re-execute **interoperable** data processing workload components intra and inter-orginizationally with Data Provenance via **BOMs**. *CAT Nodes* hetoerogeneously scale processing workload portability between client-server cloud platforms and mesh (p2p) networks with minimal rework or modification.
 
-**CAT Node** connects collaborators on [Data Products](https://www.datamesh-architecture.com/#data-product) between organizations on a Data Mesh by enabling them to verify, retrieve, and re-execute the full means of processing via **BOMs** that enable the Data Provenance of **interoperable** workload components. *CATs themeselves are data processing **workloads*** deployable as parallelized and distributed processes to support scalable (big) data processing microservices (with Scientific Computing capabilities). CAT Nodes are also integration points which enable scaled workload portability between client-server cloud platforms and mesh (p2p) networks with minimal rework or modification.
+### Means: *How are CATs processed into Data Provenance Records that espablish a Mesh Network?*
+*CAT Nodes* execute horizontal, vertical, and heterogenious scallable **Content-Addressable Transformers (CATs)**. **CATs** are ***content-addressed data processing (/ transformation)* workloads** inputed & outputted as *Data Provenance records* used to establishe a Data Mesh as a Platform. CATs reify a Data Mesh as Data Provenance records because the edge protocol mechanism used for the [Content-Addressed Storage (CAS)](https://en.wikipedia.org/wiki/Content-addressable_storage) of CATs as **[Bills-Of-Materials (BOMs)](https://en.wikipedia.org/wiki/Bill_of_materials)** is also the means of Data Transport that networks CAT Nodes as verifiable lineages of Data Provenance (* **[Details](docs/LineageOfProvenance.md)**). 
+* *BOMs* are CAT Node's input & output surface that contain the means of data processing between Nodes. CAT Node produces **content-addressed** BOMS that certify the accuracy of data processing for services offered by *Data Products* by enabling maintenance and reporting of [data and process lineage & provenance](https://bi-insider.com/posts/data-lineage-and-data-provenance/) as *supply chains of evidence.*
+  * [**Content-Addressing**](docs/CAS.md) reffers **Content-Addressed Storage (CAS)**, which is a method of uniquely identifying and retrieving information based on its content rather than its location or address. 
+* CATs (*CAT workloads*) are **Ordered** and **Invoiced** for verification and registered as **[BOMs](docs/BOM.md)** to serve as **Data Provenance records** that uniquely identify CATs and their content for **verifiable data processing** using content-addresses. CATs are deployable as parallelized and distributed processes to support scalable data processing microservices.
 
-*CATs’* **Architectural Quantum (AQ)** is [*Minimal* **Federated Operating Model (FOM)**](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/) as the re-executable and exchangable *atomic unit* representating the architectural domain of a Data Product. The AQ is content-addressed as a BOM containing the AQ's components such that organizations can collaborate on a Data Mesh with verifiable provenance of *interoperable AQ compoents*. CAT Node's runtime realization of the *minimal FOM / Quantum Architecture* is the **Ordering** of **Execution** is **Invoiced** into a **Bill-Of-Materials** as a **Control-Feedback Loop**.
+### Operations: *What is the Operating Model of CATs?*
+*CATs’* **Architectural Quantum (AQ)** is a [*Minimal* **Federated Operating Model (FOM)**](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/) as the re-executable and exchangable *atomic unit* representating the architectural domain of a Data Product. The AQ is content-addressed as a BOM containing the AQ's components such that organizations can collaborate on a Data Mesh with verifiable provenance of *interoperable AQ compoents*. CAT Node's runtime realization of the *minimal FOM / Quantum Architecture* is the **Ordering** of **Execution** is **Invoiced** into a **Bill-Of-Materials** as a **Control-Feedback Loop**.
 
-### Control-Feedback Loop:
+#### Control-Feedback Loop:
 ![CATs Chaordic Kernel](images/CATs_chaordic_kernel.jpeg)
 - **Detailed** *Loop* [here](./docs/ControlFeedbackLoop.md)
 - **Summarized** *Loop* below:
@@ -20,8 +26,8 @@
     - b. **Invoices** the *execution of data prcessing* as staged output **Content-Addresses**
   - 3. the **Node** *emits* a **BOM** as the *Mesh-transportable Data Provenance record* to be *shared* & *re-executed* between Nodes
 
-### Demonstration's Techncal Use-Case Specification:
-This CAT Node's data processing **Order** (Input) utilizes [Ray](https://www.ray.io/) as an execution middleware framework deployed on **[Kubernetes](https://kubernetes.io/)** for interoperable & parallelized distributed computing applications / Big Data processing with Scientific Computing enabled [ecosystem integrations](https://docs.ray.io/en/latest/ray-overview/ray-libraries.html) such as [Apache Spark](https://spark.apache.org/), and [PyTorch](https://pytorch.org/).
+## Demonstration: *CAT Workload Specification*
+CAT Node is shipped with *Techncal Use-Case Processing Templates (/ "Recipies")* specified as *CAT **Orders*** for which proccess will be executed and **Invoiced**. This repository will feature a Scalable Scientific Computing application **Ordered** as a CATs. This **Order** is specified to utilize [Ray](https://www.ray.io/) as an execution middleware framework **Plant (SaaS)** deployed on **[Kubernetes](https://kubernetes.io/)** for interoperable & parallelized distributed computing applications / Big Data processing with Scientific Computing enabled [ecosystem integrations](https://docs.ray.io/en/latest/ray-overview/ray-libraries.html) such as [Apache Spark](https://spark.apache.org/), and [PyTorch](https://pytorch.org/).
 
 ## Get Started!:
 
@@ -87,30 +93,11 @@ This CAT Node's data processing **Order** (Input) utilizes [Ray](https://www.ray
 
 ## Concepts:
 
-### How are CATs workloads processed as Data Provenance Records?
-
-CAT's (Data) Mesh is specified / reified by CATs executing **[Bills-Of-Materials (BOMs)](https://en.wikipedia.org/wiki/Bill_of_materials)** as specifications used to chain CAT Nodes' content-addressed records into a verifiable lineage of Data Provenance. (* **[Details](docs/LineageOfProvenance.md)**)
-
-CATs are submitted as content-addressed **Orders** of data processes (transformers) which are **Invoiced** for verification and logged as **BOMs** that serve as **Data Provenance records** that are unique identifiers of CAT workloads and their content. **BOMs** are CATs' Content-Addressed **Data Provenance records** for **verifiable data processing** with URIs for transport over a Mesh network of CATs. BOMs are also used as CAT’ input & output that contain CATs’ means of data processing between CAT Nodes. Node HTTP BOM nesting (Invoice `structure_as_executed_cid` vs Order as-Code `structure_cid`): [`docs/BOM.md`](docs/BOM.md#cat-node-http-bom-response).
-
-**BOMs** employ **Content Identifiers (CIDs)** for CAS to provide a means of location-agnostic data transportation / retrieval of based on its content / CAT processes for [Data Verification](https://en.wikipedia.org/wiki/Data_verification). Therefore, the implementation of CATs' as content-addressed data processes establishes and self-services a scalable Data Platform as a Data Mesh network of interoperable distributed computing workloads deployable on [Kubernetes](https://kubernetes.io/) as CATs execution paradigm.
-![CATs BOM Activity](images/CATs_bom_activity.jpeg)
-
-- BOM CIDs can be used to verify the means of processing data (input, transformation / process, output, infrastructure-as-code (IaC)) they can also make CATs resilient by enabling re-execution via retrieval. CATs certifies the accuracy of data processing on data products and pipelines by enabling maintenance and reporting of [data and process lineage & provenance](https://bi-insider.com/posts/data-lineage-and-data-provenance/) as chains of 
-evidence using CIDs.
-
-### How do CATs enable colaborative Data Processing for Data Initiatives?
-
-CATs enables the **[continuous reification of Data Initiatives](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative-reification)** by cataloging discoverable, accessible, and re-executable workloads as **[Data Service Collaboration](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative-reification)** composable records between organizations. These records provide a reliable and efficient way to manage, share, and reference data processes via **[Content-Addressing](https://en.wikipedia.org/wiki/Content-addressable_storage)** Data Provenance records. **Data Initiatives** will be naturally reified as a result of **Data Service Collaboration** on CATs. CATs will be compiled and executed as interconnecting services on a Data Mesh that grows naturally when organizations communicate CATs provenance records within feedback loops of Data Initiatives.
-![CATs Initiative Aligmment](images/CATs_bom_ag.jpeg)
-
-### What is Content-Addressing & How do CATs use it?
-
-**Content-Addressing** is a method of uniquely identifying and retrieving data based on its content rather than its location or address. CATs provides verifiable data processing and transport on a Mesh network of CATs interconnected by 
-Content-Addressing Data Provenance records with [IPFS](https://ipfs.io/) **[CIDs](https://docs.ipfs.io/concepts/content-addressing/)** (Content-Identifiers) as content addresses issued by IPFS **[client](https://docs.ipfs.io/install/command-line/#official-distributions)** to identify and retrieve inputs, transformations, outputs, and infrastructure (as code [IaC]) for verifying transformation accuracy given CIDs.
-![CID Example](images/cid_example.jpeg)
-
-- IPFS serves as CATs' Data Mesh's network layer to provide parallelized data ingress and egress for IPFS data. This network portability closes the gap between data analysis and operations by connecting the network planes of the cloud service model (SaaS, PaaS, IaaS) with IPFS. CATs connect these network planes by enabling the instantiation of FaaS with cloud services in AWS, GCP, Azure, etc. on a **Data Mesh** network of CATs. IPFS enables this connection as p2p distributed-computing job submission in addition to the client-server job submission provided by Ray.
+### How are Content-Addressed BOMs used to establish and sustain Data Initiatives?
+![CATs BOM Activity](images/CATs_bom_activity_ag.jpeg)
+- **Collaboration:** The registration and cataloging of **BOMs** as *Data Provenance records* establishes and sustains **Data Initiatives** because CATs are *discoverable, accessible, composable, re-executable, and iteroperable* such that they support *Inter & Intra-Orginizational Collaboration* on **Data Products**. BOMs provide a reliable and efficient way to manage, share, and reference data processes because they are **[Content-Addressed](https://en.wikipedia.org/wiki/Content-addressable_storage)**. **Data Initiatives** will be naturally established as a result of collaboration on a CAT Node's *Data Product*. CATs will be compiled and executed as interconnecting *Data Products* on a Data Mesh that grow naturally / heterogeneously scales when organizations communicate CATs provenance records within feedback loops of their Data Initiatives.
+- **Data Provenance:** The content-address of *BOMs* and their components can be used to verify the means of processing data (input, transformation / process, output, infrastructure-as-code (IaC)) they can also make CATs resilient by enabling re-execution via retrieval. They certify the accuracy of data processing on data products and pipelines by enabling maintenance and reporting of [data and process lineage & provenance](https://bi-insider.com/posts/data-lineage-and-data-provenance/) as *supply chains of evidence*.
+- **Data Transport:** *BOMs* employ **Content Identifiers (CIDs)** for Content-Addesable Storage to provide a means of location-agnostic data transportation / retrieval based on its content / CAT processes for [Data Verification](https://en.wikipedia.org/wiki/Data_verification). Therefore, the implementation of CATs' as content-addressed data processes establishes and self-services a scalable Data Platform as a Data Mesh network of interoperable and scalable computing workloads deployable on [Kubernetes](https://kubernetes.io/) as CATs execution paradigm.
 
 ### CATs' Architectural Quantum:
 
