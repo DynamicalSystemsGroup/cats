@@ -40,10 +40,10 @@ The sibling `order.structure_filepath` field just records the directory name (e.
 
 ### CAT Node HTTP BOM response
 
-`Service.execute()` returns `{ bom_cid, bom }`. The HTTP envelope's `bom` holds only `invoice_cid`, `log_cid`, and `node_uri`. Observed Plant / InfraStructure state is nested under the Invoice as `structure_as_executed_cid` — parallel to as-Code `order.structure_cid`, but a different CID/bytes (observation, not IaC). Executor mints that nest bottom-up **before** `invoice_cid`. `infrastructure_as_executed` currently carries only `object_store_as_executed_cid` (`InfraStructure.snapshot`); transport / ContentStore facets may widen later. `bom_cid` is response-only (never written into the CID'd `bom` object).
+`Runtime.execute()` returns `{ bom_cid, bom }`. The HTTP envelope's `bom` holds only `invoice_cid`, `log_cid`, and `node_uri`. Observed Plant / InfraStructure state is nested under the Invoice as `structure_as_executed_cid` — parallel to as-Code `order.structure_cid`, but a different CID/bytes (observation, not IaC). Executor mints that nest bottom-up **before** `invoice_cid`. `infrastructure_as_executed` currently carries only `object_store_as_executed_cid` (`InfraStructure.snapshot`); transport / ContentStore facets may widen later. `bom_cid` is response-only (never written into the CID'd `bom` object).
 
 ```text
-HTTP JSON response  (Service.execute → jsonify)
+HTTP JSON response  (Runtime.execute → jsonify)
 ├── bom_cid  →  content-address of the `bom` object below
 │
 └── bom  →  bom JSON
@@ -109,6 +109,6 @@ After `Executor.execute()` (`cats/executor/executor.py`), the Invoice records st
 - `invoice.seed_cid` — still `null` until Seed is populated
 - `invoice.structure_as_executed_cid` — observed Structure pairing (see Nest tree above)
 
-The BOM `log` mirrors those stage CIDs as `ingress_data_cid` / `integration_data_cid` / `egress_data_cid` (plus `plant_rebuilt`), and records `object_store_result_uri` (`s3://cats-scratch/jobs/<uuid>/result`) as a non-secret correlator for Structure-lifetime MinIO scratch — not a substitute for `integration_data_cid`. MinIO objects are retained until Structure destroy. Scratch access is InfraStructure-as-Code (Console / S3 / `infrastructure/obj_store_utils.py` / `ObjectStore` / `JobHandle`); there is no CAT Node jobs API (see [`MinIO.md`](./MinIO.md) / [`STORAGE.md`](./STORAGE.md)). Plant, object-store, and transport config are not Service fields — Executor threads `Plant.plant_port()`, `obj_store_context()`, and `as_transport_port(transport_context())` into Function stages. Plant input for the tHOF is the host path returned by `integration_cache` under `INTEGRATION_INPUT_DATA_CACHE`, not an Ingress side-channel path.
+The BOM `log` mirrors those stage CIDs as `ingress_data_cid` / `integration_data_cid` / `egress_data_cid` (plus `plant_rebuilt`), and records `object_store_result_uri` (`s3://cats-scratch/jobs/<uuid>/result`) as a non-secret correlator for Structure-lifetime MinIO scratch — not a substitute for `integration_data_cid`. MinIO objects are retained until Structure destroy. Scratch access is InfraStructure-as-Code (Console / S3 / `infrastructure/obj_store_utils.py` / `ObjectStore` / `JobHandle`); there is no CAT Node jobs API (see [`MinIO.md`](./MinIO.md) / [`STORAGE.md`](./STORAGE.md)). Plant, object-store, and transport config are not Runtime fields — Executor threads `Plant.plant_port()`, `obj_store_context()`, and `as_transport_port(transport_context())` into Function stages. Plant input for the tHOF is the host path returned by `integration_cache` under `INTEGRATION_INPUT_DATA_CACHE`, not an Ingress side-channel path.
 
 See also: [Design: How the Architectural Quantum is realized as content-addressed CIDs](DESIGN.md#how-the-architectural-quantum-is-realized-as-content-addressed-cids) and [Lineage of Provenance: How are CATs composed as a Lineage of Data Provenance on a Data Mesh?](LineageOfProvenance.md#how-are-cats-composed-as-a-lineage-of-data-provenance-on-a-data-mesh).

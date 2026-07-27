@@ -8,7 +8,7 @@ They are not separate Architectural Quantum components — they are two operatio
 **MinIO is [S3-compatible](https://min.io/product/s3-compatibility):** Plant scratch uses the S3 API
 (`s3://…` URIs, bucket/key layout) via InfraStructure’s `ObjectStore` / `JobHandle`. That compatibility is
 why Ray (and other S3 clients) can write job results to MinIO without a proprietary store API. Object-store
-config is **not** a Service field — see [`MinIO.md`](./MinIO.md) and [`INTEROP.md`](./INTEROP.md).
+config is **not** a Runtime field — see [`MinIO.md`](./MinIO.md) and [`INTEROP.md`](./INTEROP.md).
 
 ## Facets inside InfraStructure (still one Quantum component)
 
@@ -112,7 +112,7 @@ content-addressed record you use after the run (`integration_data_cid` and relat
 3. The host downloads that **JobHandle** prefix into `…/integration/outputs/`.
 4. `cidDir` adds that directory to IPFS → `invoice.integration_data_cid` (and the BOM `log` mirror).
 
-Post-run retrieval of integration outputs is via **IPFS** and that CID — not by reading MinIO. MinIO’s observed endpoints (without credentials) come from `ObjectStore.snapshot()` after `InfraStructure.obj_store_context()` and are recorded as `object_store_as_executed_cid` under Invoice `structure_as_executed_cid` (see [`BOM.md` Nest tree](BOM.md#cat-node-http-bom-response)) so verifiers can see which shared store the distributed write landed in. Object-store, Plant, and transport config are **not** Service fields — Executor passes `object_store`, **`PlantPort`** (`Plant.plant_port()`), and a narrowed **`TransportPort`** into Function stages. Structure-lifetime scratch inspection uses the MinIO Console / S3 API or InfraStructure’s directory-model CLI (`obj_store_utils.py`) — not a CAT Node HTTP API:
+Post-run retrieval of integration outputs is via **IPFS** and that CID — not by reading MinIO. MinIO’s observed endpoints (without credentials) come from `ObjectStore.snapshot()` after `InfraStructure.obj_store_context()` and are recorded as `object_store_as_executed_cid` under Invoice `structure_as_executed_cid` (see [`BOM.md` Nest tree](BOM.md#cat-node-http-bom-response)) so verifiers can see which shared store the distributed write landed in. Object-store, Plant, and transport config are **not** Runtime fields — Executor passes `object_store`, **`PlantPort`** (`Plant.plant_port()`), and a narrowed **`TransportPort`** into Function stages. Structure-lifetime scratch inspection uses the MinIO Console / S3 API or InfraStructure’s directory-model CLI (`obj_store_utils.py`) — not a CAT Node HTTP API:
 
 ```bash
 # from repo root, with Structure MinIO up

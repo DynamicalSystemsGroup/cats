@@ -109,7 +109,7 @@ adapter modules).
    (see [`LineageOfProvenance.md`](./LineageOfProvenance.md)). Available as Order ops for proving
    2f; second Plant adapters still required for a full interop prove.
 7. **Executor / Factory adapter-blind CI:** Function modules are grep-guarded against Ray /
-   Job Submission; extend CI so `cats/factory`, `cats/executor`, and `cats/service` never import
+   Job Submission; extend CI so `cats/factory`, `cats/executor`, and `cats/runtime` never import
    `JobSubmissionClient` / `import ray` / hard-coded `structure-ipfs_*`. Executor may only pass
    ports/handles (`plant_port()`, `obj_store_context()`, `as_transport_port(...)`).
 
@@ -164,7 +164,7 @@ Treat remaining soft edges (`job_endpoint` shape) as cleanup with the first non-
 
 - [ ] Implements the relevant port(s) without Function importing adapter modules
 - [ ] Same Process `__all__` callables / InfraFunction `infrafunction_subproc` reused
-- [ ] Executor wiring unchanged (ports/handles only); CI guards Factory / Executor / Service against adapter imports
+- [ ] Executor wiring unchanged (ports/handles only); CI guards Factory / Executor / Runtime against adapter imports
 - [ ] BOM still records tool-specific snapshots without feeding them back as dispatch inputs
 - [ ] Demo or CI path documents how to select the Structure CID (incl. Structure-mutation / `linkStructure` path when swapping Plant)
 - [ ] Republish lag understood: new adapters ship in new `infrastructure_cid` / `plant_cid` (Ray landing under `plant_cid`)

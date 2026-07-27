@@ -12,7 +12,7 @@ MinIO access is **InfraStructure-as-Code** (directory model): the module under
 `data/input/structure/infrastructure/` is what `create_order_request()` CIDs as
 `infrastructure_cid`. Object-store config is resolved at runtime as `ObjectStore` via
 `InfraStructure.obj_store_context()` (importlib seam into `obj_store_utils.py`) — it is **not** a
-Service field. Job scratch write/download (`ObjectStore.begin_job` / `write_job_scratch` /
+Runtime field. Job scratch write/download (`ObjectStore.begin_job` / `write_job_scratch` /
 `download_job_result`) and `JobHandle` live in that module tree: `write_job_scratch`
 stages pod-reachable MinIO config only. Ray landing (`ray_job_result_entrypoint.py`,
 `ray_compute_utils.py` / `RayComputePort`) ships under `plant/` (`plant_cid`) and is
