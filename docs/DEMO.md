@@ -15,7 +15,7 @@ the API is down and does **not** auto-ensure. Order-submitted TF `host_ipfs_daem
 # from repo root — heal/start host Kubo (required before node-start if :5001 is down)
 make content-store-ensure
 # or: uv run python data/input/structure/infrastructure/content_store_utils.py ensure
-# or: uv run python cats/node.py ensure
+# or: uv run python -m cats.node ensure
 ```
 
 Or run `ipfs daemon` yourself only if you want its logs in their own terminal. `make node-stop` / Node exit

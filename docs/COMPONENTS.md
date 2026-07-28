@@ -1,7 +1,7 @@
 # CAT Node Archtectural Components:
 
 * the Runtime:
-    * Process-lifetime Node ambient (`cats/runtime`, singleton `RUNTIME`): host layout, ContentMesh, Order entry (`initFactory` / `initBOMcar`) and BOM envelope wrap (`execute`). Not the peer edge (`node.py`), not Factory, not the per-Order Executor.
+    * Process-lifetime Node ambient (`cats/runtime`, singleton `RUNTIME`): host layout, ContentMesh, Order entry (`initFactory` / `initBOMcar`) and BOM envelope wrap (`execute`). Not the peer edge (`cats.node`), not Factory, not the per-Order Executor.
 * the Factory:
     * Software Diambiguation: https://en.wikipedia.org/wiki/Software_factory 
     * Manafacturing Diambiguation: https://en.wikipedia.org/wiki/Factory 

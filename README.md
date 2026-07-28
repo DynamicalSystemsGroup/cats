@@ -20,7 +20,7 @@
 - **Summarized** *Loop* below:
   - 1. the *Node's* **Factory** 
     - a. *consumes* & *processes* a content-addressed **Order**
-    - b. *composes* an *ephemeral* **Executor** of data processing using *AQ components* within **Order**
+    - b. *composes* and *produces* an *ephemeral* **Executor** of data processing using *AQ components* within **Order**
   - 2. the *Node's* **Executor** 
     - a. *executes* the *AQ components* as **Function [FaaS]** on **Structure [PaaS]**
     - b. **Invoices** the *execution of data prcessing* as staged output **Content-Addresses**
@@ -58,14 +58,14 @@ CAT Node is shipped with *Techncal Use-Case Processing Templates (/ "Recipies")*
 4. **Check Node status** (Flask listen + ContentStore ready):
   ```bash
   make node-status
-  # or: uv run python cats/node.py status
+  # or: uv run python -m cats.node status
   ```
 5. **Demo: [Establish a CAT Mesh](./docs/DEMO.md)**
 6. **Test: [CAT Mesh Verification](./docs/TEST.md)**
 7. **Stop the CAT Node** (Flask only — host Kubo stays up):
   ```bash
   make node-stop
-  # or: uv run python cats/node.py stop
+  # or: uv run python -m cats.node stop
 
   # host IPFS (Kubo) daemon is left running on purpose
   # stop IPFS (Kubo) daemon via the following command:

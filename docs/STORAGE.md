@@ -44,12 +44,12 @@ Content-store is **two-phase** across **two on-disk copies** of the same helper 
 
 Get Started uses [`make node-up`](../Makefile) as a **convenience wrapper** that runs
 `content-store-ensure` then `node-start`. That does **not** mean the Node owns Kubo lifecycle —
-the wrapper is Make-only; `cats/node.py start` remains assert-only.
+the wrapper is Make-only; `python -m cats.node start` remains assert-only.
 
 | Target / CLI | Role |
 |--------------|------|
-| `make content-store-ensure` / `uv run python cats/node.py ensure` | Operator **mutate**: repo-tree `ContentStore.ensure` (heal/start host Kubo) |
-| `make node-start` / `uv run python cats/node.py start` | Client **assert**: bind Flask only if ContentStore API is already ready; does **not** heal Kubo |
+| `make content-store-ensure` / `uv run python -m cats.node ensure` | Operator **mutate**: repo-tree `ContentStore.ensure` (heal/start host Kubo) |
+| `make node-start` / `uv run python -m cats.node start` | Client **assert**: bind Flask only if ContentStore API is already ready; does **not** heal Kubo |
 | `make node-up` | Convenience: ensure, then start |
 
 **Why keep them separate under the hood**

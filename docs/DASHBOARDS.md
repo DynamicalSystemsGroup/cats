@@ -1,7 +1,7 @@
 # Dashboards
 
 Once a CAT Node's Structure is deployed — Terraform runs from `Structure.reconcile()` /
-`deploy()` / `redeploy()` during CAT execution (`cats/node.py` hosts the HTTP API; see
+`deploy()` / `redeploy()` during CAT execution (`cats.node` hosts the HTTP API; see
 [Demo](./DEMO.md) / [Test](./TEST.md)) — these UIs stay at fixed `localhost` addresses for
 the Structure's lifetime.
 
