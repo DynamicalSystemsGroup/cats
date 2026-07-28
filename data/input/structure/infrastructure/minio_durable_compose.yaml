@@ -1,0 +1,25 @@
+services:
+  minio_durable:
+    image: minio/minio:latest
+    command: server /data --console-address ":9101"
+    environment:
+      MINIO_ROOT_USER: cats-durable
+      MINIO_ROOT_PASSWORD: cats-durable-secret
+    ports:
+      - "9100:9000"
+      - "9101:9101"
+    volumes:
+      # Node-lifetime Entity Relationship corpus; Structure destroy must
+      # not use down -v on this compose (volume survives redeploy).
+      - node_minio_durable_data:/data
+    networks:
+      - kind
+
+networks:
+  kind:
+    external: true
+
+volumes:
+  node_minio_durable_data:
+    # Named volume shared across Structure apply cycles on this Node.
+    name: node_minio_durable_data
