@@ -15,15 +15,3 @@
   ```
   - Runs on macOS or Linux (see the `[Makefile](./Makefile)` and `make help`), or follow
   `[DEPS.md](./docs/DEPS.md)` to install each dependency manually.
-3. **Start a CAT Node** (convenience: ensure host ContentStore, then bind Flask):
-  ```bash
-  make node-up
-  # chains: make content-store-ensure && make node-start
-  ```
-  See `[STORAGE.md](./docs/STORAGE.md#node-up-vs-content-store-ensure-and-node-start)`
-  for why ensure and start are separate Make targets.
-4. **Check Node status** (Flask listen + ContentStore ready):
-  ```bash
-  make node-status
-  # or: uv run python -m cats.node status
-  ```

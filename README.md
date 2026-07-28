@@ -18,7 +18,7 @@
     * **2.** the *Node's* **Executor** 
       * **a.** *executes* the *AQ components* as **Function [FaaS]** on **Structure [PaaS]**
       * **b.** **Invoices** the *execution of data prcessing* as staged output **Content-Addresses**
-  * **B: Content-Addressed Bills-of-Materials (BOMs)** - [**Content-Addressing**](docs/CAS.md) reffers to **Content-Addressed Storage (CAS)**, which is a method of uniquely identifying and retrieving information based on its content rather than its location or address.
+  * **B: Content-Addressed Bills-of-Materials (BOMs)** -
     * **3.** the *Node's* **Runtime** *emits* a **BOM** as the *Mesh-transportable Data Provenance record* to be *shared* & *re-executed* between Node
 
 ### Content-Addressed BOMs used for Data Transport establishes and sustains Data Initiatives
@@ -27,42 +27,42 @@
 - **Data Transport:** *BOMs* employ **Content Identifiers (CIDs)** for Content-Addesable Storage to provide a means of location-agnostic data transportation / retrieval based on its content / CAT processes for [Data Verification](https://en.wikipedia.org/wiki/Data_verification). Therefore, the implementation of CATs' as content-addressed data processes establishes and self-services a scalable Data Platform as a Data Mesh network of interoperable and scalable computing workloads deployable on [Kubernetes](https://kubernetes.io/) as CATs execution paradigm. 
 
 ## Get Started!:
-#### 1. [Installation](docs/INSTALL.md)
-#### 2. [Demonstration](./docs/DEMO.md): Establish a CAT Mesh for a Scalable Scientific Computing CAT
-  * CAT Node is shipped with *Techncal Use-Case CAT Workload Specifications ( Templates / "Recipies")* as *CAT **Orders*** for which proccess will be executed and **Invoiced**. This repository will feature a Scalable Scientific Computing application **Ordered** as a CATs. This **Order** is specified to utilize [Ray](https://www.ray.io/) as an execution middleware framework **Plant (SaaS)** deployed on **[Kubernetes](https://kubernetes.io/)** for interoperable & parallelized distributed computing applications / Big Data processing with Scientific Computing enabled [ecosystem integrations](https://docs.ray.io/en/latest/ray-overview/ray-libraries.html) such as [Apache Spark](https://spark.apache.org/), and [PyTorch](https://pytorch.org/).
-#### 3. [Testing:](./docs/TEST.md) - CAT Mesh Integration & CAT Node Unit Tests**
-#### 4. Node Operations: 
-
-  A. **Stop the CAT Node** (Flask only — host Kubo stays up):
+#### 0. [Installation](docs/INSTALL.md)
+#### 1. Start a CAT Node:
+  ```bash
+  make node-up
+  # chains: make content-store-ensure && make node-start
+  # convenience: ensure host ContentStore, then bind Flask
+  ```
+  See `[STORAGE.md](./docs/STORAGE.md#node-up-vs-content-store-ensure-and-node-start)`
+  for why ensure and start are separate Make targets.
+#### 2. Check Node status:
+  ```bash
+  make node-status
+  # or: uv run python -m cats.node status
+  # Flask listen + ContentStore ready
+  ```
+#### 3. [Demonstration](./docs/DEMO.md):
+  * CAT Node is shipped with *Techncal Use-Case CAT Workload Specifications ( Templates / "Recipies")* as *CAT **Orders*** for which proccess will be executed and **Invoiced**. This repository will feature a Scalable Scientific Computing application **Ordered** as a 2 CATs. This **Order** is specified to utilize [Ray](https://www.ray.io/) as an execution middleware framework **Plant (SaaS)** deployed on **[Kubernetes](https://kubernetes.io/)** for interoperable & parallelized distributed computing applications / Big Data processing with Scientific Computing enabled [ecosystem integrations](https://docs.ray.io/en/latest/ray-overview/ray-libraries.html) such as [Apache Spark](https://spark.apache.org/), and [PyTorch](https://pytorch.org/).
+#### 4. [Testing:](./docs/TEST.md) - CAT Node Integration & Unit Tests**
+#### 5. [Dashboards](./docs/DASHBOARDS.md)
+#### 6. Stop the CAT Node:
     ```bash
     make node-stop
     # or: uv run python -m cats.node stop
-
-    # host IPFS (Kubo) daemon is left running on purpose
-    # stop IPFS (Kubo) daemon via the following command:
+    # Flask only — host IPFS (Kubo) daemon is left running on purpose
+    # To stop IPFS (Kubo) daemon via the following command:
     # ipfs shutdown
     ```
-
-  B. **Dashboards:**
-    Once a Structure is deployed, three web dashboards are reachable at fixed `localhost` addresses: See [DASHBOARDS.md](docs/DASHBOARDS.md) for URLs, credentials, and each one's purpose.
-    * [Ray Dashboard](http://127.0.0.1:8265) for the Plant's KubeRay cluster (job status, actors, logs)
-    * [MinIO Console](http://127.0.0.1:9001) for the [S3-compatible](https://min.io/product/s3-compatibility) shared object store Ray Data's distributed writes land in (see `[STORAGE.md](docs/STORAGE.md)` / `[MinIO.md](docs/MinIO.md)`)
-    * [IPFS WebUI](http://127.0.0.1:5001/webui) for browsing everything CID'ed into a BOM/Invoice/Order 
-      * CID Nested BOM layout: [`docs/BOM.md`](docs/BOM.md#cat-node-http-bom-response).
-
-  C. **Auto-Diagramming Software Archtecture:**
+#### 7. Auto-Diagramming Software Archtecture:
     * Command(s): requires `Graphviz` for PNG output — `make deps-graphviz` (or `make deps-all`)
-    ```bash
-    make diagrams
-    ```
+    `make diagrams`
     * Optional Commands / Utilities: 
       * `code2flow` used to generate *Functional Component Activity Diagram*: 
         * `uv run python utils/code2flow/diagram_c2f.py`
       * `pyreverse` used to generates *Class & Dependency Diagrams*: 
         * `uv run pyreverse -o png -p CATs -d images/pyreverse cats`
-  
-
-### [Contribute!](docs/CONTRIBUTING.md)
+#### 8. [Contribute!](docs/CONTRIBUTING.md)
 
 ## Concepts:
 
@@ -119,10 +119,11 @@ lineage using historical records that provide the means
 of pipeline re-execution and **[data validation](https://en.wikipedia.org/wiki/Data_validation)**
 - **[Data Lineage](https://bi-insider.com/posts/data-lineage-and-data-provenance/)** - reporting of data lifecyle from 
 source to destination
-- **[Distributed Computing](https://en.wikipedia.org/wiki/Distributed_computing)** - typically the concurrent and/or 
-parallel execution of job tasks distributed to networked computers processing data
 - **[Bill of Materials (BOM)](https://en.wikipedia.org/wiki/Bill_of_materials)** - an extensive list of raw materials,
 components, and instructions required to construct, manufacture, or repair a product or service
+- **[Content-Addressing](docs/CAS.md)** - reffers to **Content-Addressed Storage (CAS)**, which is a method of uniquely identifying and retrieving information based on its content rather than its location or address.
+- **[Distributed Computing](https://en.wikipedia.org/wiki/Distributed_computing)** - typically the concurrent and/or 
+parallel execution of job tasks distributed to networked computers processing data
 
 ### [Experiments](./experiments/EXP.md)
 
