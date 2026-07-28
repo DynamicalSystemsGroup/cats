@@ -2,16 +2,13 @@
 
 ## Description:
 
-### Introduction: *What is a CAT Node & Why are they valuable?*
 **CAT Node** is an edge-computing framework that establishs a *self-serviced* **[Data Mesh](https://www.datamesh-architecture.com/#what-is-data-mesh)** for inter and intra-orginizational Data Service Collaboration with *verifiable* **Data Provenance**. *CAT Nodes* are intended to be system *integration points* that enable **[Data Product](https://www.datamesh-architecture.com/#data-product)** collaborators to verify, retrieve, and re-execute **interoperable** data processing workload components intra and inter-orginizationally with Data Provenance via **BOMs**. *CAT Nodes* hetoerogeneously scale processing workload portability between client-server cloud platforms and mesh (p2p) networks with minimal rework or modification.
 
-### Means: *How are CATs processed into Data Provenance Records that espablish a Mesh Network?*
 *CAT Node's* execute horizontal, vertical, and heterogenious scallable **Content-Addressable Transformers (CATs)**. **CATs** are ***content-addressed data processing (/ transformation)* workloads** inputed & outputted as *Data Provenance records* used to establishe a Data Mesh as a Platform. CATs reify a Data Mesh as Data Provenance records because the edge protocol mechanism used for the [Content-Addressed Storage (CAS)](https://en.wikipedia.org/wiki/Content-addressable_storage) of CATs as **[Bills-Of-Materials (BOMs)](https://en.wikipedia.org/wiki/Bill_of_materials)** is also the means of Data Transport that networks CAT Nodes as verifiable lineages of Data Provenance (* **[Details](docs/LineageOfProvenance.md)**).
 
-### Domain-Driven Architecture: *What is the Operating Model of CATs?*
 *CAT Node's* **Architectural Quantum (AQ)** is a [*Minimal* **Federated Operating Model (FOM)**](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/) as the re-executable and exchangable *atomic unit* representating the architectural domain of a Data Product. The AQ is content-addressed as a BOM containing the AQ's components such that organizations can collaborate on a Data Mesh with verifiable provenance of *interoperable AQ compoents*. CAT Node's runtime realization of the *minimal FOM / Quantum Architecture* is the **Ordering** of **Execution** is **Invoiced** into a **Bill-Of-Materials** as a **Control-Feedback Loop**.
 
-#### CAT Node's *Control-Feedback Loop*:
+### CAT Node's *Control-Feedback Loop*:
 ![CATs Chaordic Kernel](images/CATs_chaordic_kernel.jpeg)
 * **Detailed** *Loop* [here](./docs/ControlFeedbackLoop.md)
 * **Summarized** *Loop* below:
