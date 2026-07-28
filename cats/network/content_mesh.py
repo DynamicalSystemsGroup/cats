@@ -91,7 +91,7 @@ class ContentMesh(OrderOps):
             if not module.ContentStore.is_ready():
                 print(
                     'WARNING: host IPFS ContentStore API not ready; '
-                    'run make content-store-ensure or cats/node.py ensure '
+                    'run make content-store-ensure or python -m cats.node ensure '
                     '(ContentMesh does not auto-ensure).',
                     flush=True,
                 )

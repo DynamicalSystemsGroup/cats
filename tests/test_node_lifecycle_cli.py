@@ -5,14 +5,17 @@ from types import SimpleNamespace
 import pytest
 
 import cats.node as node
+from cats.node import app, cli
 
 
-NODE_PY = Path(__file__).resolve().parents[1] / 'cats' / 'node.py'
+NODE_PKG = Path(__file__).resolve().parents[1] / 'cats' / 'node'
 
 
-def test_node_py_has_no_ipfs_daemon_or_shutdown_strings():
-    """Node CLI source must not start or shut down the host Kubo daemon."""
-    text = NODE_PY.read_text(encoding='utf-8')
+def test_node_pkg_has_no_ipfs_daemon_or_shutdown_strings():
+    """Node CLI/edge source must not start or shut down the host Kubo daemon."""
+    text = '\n'.join(
+        path.read_text(encoding='utf-8') for path in NODE_PKG.rglob('*.py')
+    )
     assert 'ipfs shutdown' not in text
     assert 'ipfs daemon' not in text
 
@@ -29,11 +32,11 @@ def test_start_asserts_ready_before_run(monkeypatch):
         return None
 
     monkeypatch.setattr(
-        node, '_bootstrap_content_store_assert_ready', fake_assert
+        cli, '_bootstrap_content_store_assert_ready', fake_assert
     )
-    monkeypatch.setattr(node, '_free_stale_port', lambda *a, **k: None)
-    monkeypatch.setattr(node.catNode, 'run', fake_run)
-    monkeypatch.setattr(node.signal, 'signal', lambda *a, **k: None)
+    monkeypatch.setattr(cli, '_free_stale_port', lambda *a, **k: None)
+    monkeypatch.setattr(app.catNode, 'run', fake_run)
+    monkeypatch.setattr(cli.signal, 'signal', lambda *a, **k: None)
 
     assert node.main(['start']) == 0
     assert calls == ['assert', 'run']
@@ -43,7 +46,7 @@ def test_bare_main_defaults_to_start(monkeypatch):
     """Bare `python -m cats.node` with no args defaults to start."""
     calls = []
     monkeypatch.setattr(
-        node, '_cmd_start', lambda: calls.append('start') or 0
+        cli, '_cmd_start', lambda: calls.append('start') or 0
     )
     assert node.main([]) == 0
     assert calls == ['start']
@@ -56,9 +59,9 @@ def test_start_assert_failure_skips_run(monkeypatch):
     def boom():
         raise RuntimeError('kubo down')
 
-    monkeypatch.setattr(node, '_bootstrap_content_store_assert_ready', boom)
+    monkeypatch.setattr(cli, '_bootstrap_content_store_assert_ready', boom)
     monkeypatch.setattr(
-        node.catNode, 'run', lambda **k: run_called.append(True)
+        app.catNode, 'run', lambda **k: run_called.append(True)
     )
 
     assert node.main(['start']) == 1
@@ -70,14 +73,14 @@ def test_stop_uses_port_helper_only(monkeypatch):
     stopped = []
 
     monkeypatch.setattr(
-        node,
+        cli,
         '_stop_node_process',
         lambda host, port: stopped.append((host, port)),
     )
-    monkeypatch.setattr(node, '_flask_listening', lambda *a, **k: False)
+    monkeypatch.setattr(cli, '_flask_listening', lambda *a, **k: False)
 
     assert node.main(['stop']) == 0
-    assert stopped == [(node.HOST, node.PORT)]
+    assert stopped == [(app.HOST, app.PORT)]
 
 
 def test_status_exit_codes(monkeypatch):
@@ -90,19 +93,19 @@ def test_status_exit_codes(monkeypatch):
             return cls.ready
 
     monkeypatch.setattr(
-        node,
+        cli,
         '_load_bootstrap_content_store_module',
         lambda cats_home: SimpleNamespace(ContentStore=FakeCS),
     )
 
-    monkeypatch.setattr(node, '_flask_listening', lambda *a, **k: True)
+    monkeypatch.setattr(cli, '_flask_listening', lambda *a, **k: True)
     FakeCS.ready = True
     assert node.main(['status']) == 0
 
     FakeCS.ready = False
     assert node.main(['status']) == 1
 
-    monkeypatch.setattr(node, '_flask_listening', lambda *a, **k: False)
+    monkeypatch.setattr(cli, '_flask_listening', lambda *a, **k: False)
     FakeCS.ready = True
     assert node.main(['status']) == 1
 
@@ -112,7 +115,7 @@ def test_ensure_still_heals_via_bootstrap_ensure(monkeypatch):
     calls = []
 
     monkeypatch.setattr(
-        node,
+        cli,
         '_bootstrap_content_store_ensure',
         lambda: calls.append('ensure'),
     )
@@ -122,7 +125,7 @@ def test_ensure_still_heals_via_bootstrap_ensure(monkeypatch):
     def boom():
         raise OSError('missing utils')
 
-    monkeypatch.setattr(node, '_bootstrap_content_store_ensure', boom)
+    monkeypatch.setattr(cli, '_bootstrap_content_store_ensure', boom)
     assert node.main(['ensure']) == 1
 
 
@@ -134,9 +137,9 @@ def test_assert_ready_raises_when_not_ready(monkeypatch):
             return False
 
     monkeypatch.setattr(
-        node,
+        cli,
         '_load_bootstrap_content_store_module',
         lambda cats_home: SimpleNamespace(ContentStore=FakeCS),
     )
     with pytest.raises(RuntimeError, match='not ready'):
-        node._bootstrap_content_store_assert_ready()
+        cli._bootstrap_content_store_assert_ready()

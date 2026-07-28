@@ -11,7 +11,7 @@ from cats.utils import subproc_run, executeCMD
 class Runtime:
     """Data Product process-lifetime ambient: layout, ContentMesh, Order entry.
 
-    Long-lived Node substrate under the peer edge (`node.py`). Owns host paths
+    Long-lived Node substrate under the peer edge (`cats.node`). Owns host paths
     and ContentMesh; delegates manufacturing to Factory and wraps the BOM
     envelope. Not the peer, not Factory, not the per-Order Executor.
     """

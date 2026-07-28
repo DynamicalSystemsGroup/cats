@@ -338,13 +338,13 @@ print-versions:
 node-up: content-store-ensure node-start
 
 node-start:
-	uv run python cats/node.py start
+	uv run python -m cats.node start
 
 node-stop:
-	uv run python cats/node.py stop
+	uv run python -m cats.node stop
 
 node-status:
-	uv run python cats/node.py status
+	uv run python -m cats.node status
 
 content-store-ensure:
 	uv run python $(CONTENT_STORE_UTILS) ensure
