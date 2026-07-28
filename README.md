@@ -6,7 +6,7 @@
 
 *CAT Node's* execute horizontal, vertical, and heterogenious scallable **Content-Addressable Transformers (CATs)**. **CATs** are ***content-addressed data processing (/ transformation)* workloads** inputed & outputted as *Data Provenance records* used to establishe a Data Mesh as a Platform. CATs reify a Data Mesh as Data Provenance records because the edge protocol mechanism used for the [Content-Addressed Storage (CAS)](https://en.wikipedia.org/wiki/Content-addressable_storage) of CATs as **[Bills-Of-Materials (BOMs)](https://en.wikipedia.org/wiki/Bill_of_materials)** is also the means of Data Transport that networks CAT Nodes as verifiable lineages of Data Provenance (* **[Details](docs/LineageOfProvenance.md)**).
 
-### CAT's Domain-Driven Architecture & *Control-Feedback Loop*:
+### CAT's Domain-Driven Architecture as *Control-Feedback Loop*:
 ![CATs Chaordic Kernel](images/CATs_chaordic_kernel.jpeg)
 *CAT Node's* **Architectural Quantum (AQ)** is a [*Minimal* **Federated Operating Model (FOM)**](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/) as the re-executable and exchangable *atomic unit* representating the architectural domain of a Data Product. The AQ is content-addressed as a BOM containing the AQ's components such that organizations can collaborate on a Data Mesh with verifiable provenance of *interoperable AQ compoents*. CAT Node's runtime realization of the *minimal FOM / Quantum Architecture* is the **Ordering** of **Execution** is **Invoiced** into a **Bill-Of-Materials** as a **Control-Feedback Loop**.
 * **Detailed** *Loop* [here](./docs/ControlFeedbackLoop.md)
