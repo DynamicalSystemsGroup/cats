@@ -5,17 +5,19 @@ execution and provenance. That substrate includes both **IPFS** and **MinIO** (p
 They are not separate Architectural Quantum components — they are two operational stores inside
 **InfraStructure [IaaS]**. See [`PLANTs.md`](./PLANTs.md) and [`BOM.md`](./BOM.md).
 
-**MinIO is [S3-compatible](https://min.io/product/s3-compatibility):** Plant scratch uses the S3 API
-(`s3://…` URIs, bucket/key layout) via InfraStructure’s `ObjectStore` / `JobHandle`. That compatibility is
-why Ray (and other S3 clients) can write job results to MinIO without a proprietary store API. Object-store
-config is **not** a Runtime field — see [`MinIO.md`](./MinIO.md) and [`INTEROP.md`](./INTEROP.md).
+**MinIO is [S3-compatible](https://min.io/product/s3-compatibility):** Plant scratch and durable
+Entity Relationship use the S3 API (`s3://…` URIs, bucket/key layout) via InfraStructure’s
+`ObjectStore` / `JobHandle`. Two hard-isolated MinIO daemons (scratch + durable) share that
+contract; object-store config is **not** a Runtime field — see [`MinIO.md`](./MinIO.md) and
+[`INTEROP.md`](./INTEROP.md).
 
 ## Facets inside InfraStructure (still one Quantum component)
 
 | Facet | What | Lifetime |
 |-------|------|----------|
 | **Content store** | Host Kubo (`ContentStore` in `content_store_utils.py`) | Long-lived; repo file is SoT (ships in `infrastructure_cid`); **Node start** asserts bootstrap readiness; operator/`node ensure`/TF `host_ipfs_daemon` create mutate; Executor `apply` only **asserts** Order tree; **not** killed on Structure destroy or `node stop` |
-| **T&D** | Docker Kubo transport peers (`TransportContext` in `transport_utils.py`) + MinIO scratch (`ObjectStore`) | Structure lifetime (until destroy), with Plant |
+| **T&D** | Docker Kubo transport peers (`TransportContext`) + MinIO **scratch** (`cats-scratch`) | Structure lifetime (ILM 7d + destroy `down -v`) |
+| **Durable Entity Relationship** | Second MinIO (`cats-durable`) via same `ObjectStore` façade | Node lifetime; no ILM; Structure destroy leaves volume; GC via `gc-er` only |
 
 ### One daemon, two traffic classes
 
@@ -74,34 +76,37 @@ Ray job entrypoint (staged by **`RayPlantPort.submit_job`**) wires **`RayCompute
 batches onto that shape (see [`INTEROP.md`](./INTEROP.md) §2g). InfraFunction dispatches
 via Function-owned **`PlantPort`** (`submit_job` / `wait`); Executor passes
 `Plant.plant_port()` → Structure **`RayPlantPort`**. `ObjectStore.write_job_scratch`
-stages MinIO config only. Scratch correlator is
+stages scratch MinIO config only. Scratch correlator is
 **`ObjectStore.begin_job()` → `JobHandle`** (BOM `object_store_result_uri`;
-`result_uri` / `download_job_result` are JobHandle-only).
+`result_uri` / `download_job_result` are JobHandle-only). Durable Entity Relationship
+uses structure namespaces (`structures/<applied_structure_cid>/er/<name>/`) plus
+`er/current/<name>` pointers (`promote_er` / `resolve_er`); GC is `gc-er` (pointer roots).
 
-There is no separate Quantum label such as “ScratchStore” vs “ProvenanceStore.” Content-store vs T&D is an
-operational lifetime split inside InfraStructure; the host daemon’s two traffic classes (above) sit on that
-same soft plane.
+There is no separate Quantum label such as “ScratchStore” vs “ProvenanceStore.” Content-store,
+T&D scratch, and durable Entity Relationship are lifetime facets inside InfraStructure.
 
 ## Canonical names
 
 | Store | Component (Architectural Quantum) | Role name in CATs docs |
 |-------|-----------------------------------|------------------------|
 | **IPFS** | InfraStructure [IaaS] | **Content-addressed storage** (CID / Data Provenance Records) — content-store facet (host Kubo); transport peers are T&D |
-| **MinIO** | InfraStructure [IaaS] | **S3-compatible shared object store** / **shared store** (bucket `cats-scratch`) — T&D facet |
+| **MinIO scratch** | InfraStructure [IaaS] | **S3-compatible scratch** (`cats-scratch`) — T&D / job landing → IPFS |
+| **MinIO durable** | InfraStructure [IaaS] | **S3-compatible Entity Relationship store** (`cats-durable`) — structure NS + `er/current` index |
 
 ## What each store is for
 
-| | **MinIO** (S3-compatible shared object store / scratch) | **IPFS** (content-addressed storage) |
-|---|-------------------------------------------|--------------------------------------|
-| **Type** | [S3-compatible](https://min.io/product/s3-compatibility) object store (MinIO implements the S3 API) | Content-addressed store (CID graph) |
-| **Role** | Plant parallel-write landing zone during a job | Durable provenance / retrieval of CAT products |
-| **What lands there** | Ray result CSV shards under `cats-scratch/jobs/<uuid>/result/` | Order, Invoice, BOM, stage data (`integration_data_cid`, `data_cid`, …), Function/Structure as Code |
-| **Addressing** | Bucket + key (`s3://…`) | Content hash (CID) |
-| **Lifetime** | Structure lifetime (until destroy) | Host Kubo content-store outlives Structure destroy; CIDs survive as long as the node still has them |
-| **Who writes** | Ray workers (distributed) | Host after stages (`cidDir` / `add_json` / etc.) |
+| | **Scratch MinIO** | **Durable Entity Relationship MinIO** | **IPFS** |
+|---|-------------------------------------------|--------------------------------------|----------|
+| **Type** | S3-compatible (Structure-lifetime) | S3-compatible (Node-lifetime) | Content-addressed store (CID graph) |
+| **Role** | Plant parallel-write landing → IPFS | Ray Entity Relationship lookups across Structures | Durable provenance / CAT products |
+| **What lands there** | `cats-scratch/jobs/<uuid>/result/` | `cats-durable/structures/<cid>/er/<name>/` + `er/current/<name>` | Order, Invoice, BOM, stage CIDs |
+| **Addressing** | Bucket + key (`s3://…`) | Bucket + key (`s3://…`) | Content hash (CID) |
+| **Lifetime** | ILM 7d + Structure destroy `down -v` | No ILM; survives destroy; `gc-er` only | Host Kubo outlives Structure destroy |
+| **Who writes** | Ray workers (distributed) | Host/`ObjectStore` (promote explicit) | Host after stages (`cidDir` / `add_json`) |
 
-**One line:** MinIO is temporary **S3-compatible** shared disk for parallel Ray writes; IPFS is the
-content-addressed record you use after the run (`integration_data_cid` and related Invoice/BOM CIDs).
+**One line:** scratch MinIO is temporary S3 disk for parallel Ray writes before IPFS; durable
+MinIO is the Node Entity Relationship corpus (structure-scoped + pointer index); IPFS is the
+content-addressed record after the run.
 
 ## How they connect in one CAT execution
 
@@ -112,14 +117,20 @@ content-addressed record you use after the run (`integration_data_cid` and relat
 3. The host downloads that **JobHandle** prefix into `…/integration/outputs/`.
 4. `cidDir` adds that directory to IPFS → `invoice.integration_data_cid` (and the BOM `log` mirror).
 
-Post-run retrieval of integration outputs is via **IPFS** and that CID — not by reading MinIO. MinIO’s observed endpoints (without credentials) come from `ObjectStore.snapshot()` after `InfraStructure.obj_store_context()` and are recorded as `object_store_as_executed_cid` under Invoice `structure_as_executed_cid` (see [`BOM.md` Nest tree](BOM.md#cat-node-http-bom-response)) so verifiers can see which shared store the distributed write landed in. Object-store, Plant, and transport config are **not** Runtime fields — Executor passes `object_store`, **`PlantPort`** (`Plant.plant_port()`), and a narrowed **`TransportPort`** into Function stages. Structure-lifetime scratch inspection uses the MinIO Console / S3 API or InfraStructure’s directory-model CLI (`obj_store_utils.py`) — not a CAT Node HTTP API:
+Post-run retrieval of integration outputs is via **IPFS** and that CID — not by reading scratch
+MinIO. `ObjectStore.snapshot()` records credential-free scratch **and** durable endpoints/buckets
+as `object_store_as_executed_cid` under Invoice `structure_as_executed_cid` (see
+[`BOM.md` Nest tree](BOM.md#cat-node-http-bom-response)). Object-store, Plant, and transport
+config are **not** Runtime fields. Inspection uses MinIO Consoles / S3 / `obj_store_utils.py`
+CLI — not a CAT Node HTTP API:
 
 ```bash
-# from repo root, with Structure MinIO up
 uv run python data/input/structure/infrastructure/obj_store_utils.py list-jobs
+uv run python data/input/structure/infrastructure/obj_store_utils.py resolve-er <name>
+uv run python data/input/structure/infrastructure/obj_store_utils.py gc-er --dry-run
 ```
 
-See [`MinIO.md`](./MinIO.md) for `list-files` / `get-file`, and [`BOM.md`](./BOM.md) for Invoice stage CIDs.
+See [`MinIO.md`](./MinIO.md) and [`BOM.md`](./BOM.md) for Invoice stage CIDs.
 
 ## Related docs
 

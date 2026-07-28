@@ -50,7 +50,7 @@ These seams are how interoperability is supposed to work without rewriting Funct
 | **TransportPort** | Process ingress / egress / integration_cache | `TransportContext` | Docker Kubo peers + host Bitswap |
 | **ComputePort** | Process `process_*` tHOF | `RayComputePort` (job working_dir) | Ray Data `map_batches` |
 | **PlantPort** | InfraFunction actuator | `RayPlantPort` | Ray Job Submission |
-| **JobHandle** / ObjectStore | InfraFunction scratch correlator | `ObjectStore.begin_job` / `write_job_scratch` | MinIO `cats-scratch` |
+| **JobHandle** / ObjectStore | InfraFunction scratch correlator; durable Entity Relationship façade | `begin_job` / `write_job_scratch`; `er_uri` / `promote_er` / `resolve_er` / `gc_er` | Scratch MinIO `cats-scratch` + durable MinIO `cats-durable` |
 
 Process public surface is locked by `process.__all__` and
 [`tests/test_process_public_surface.py`](../tests/test_process_public_surface.py)
@@ -80,7 +80,7 @@ Process public surface is locked by `process.__all__` and
 | **Plant [SaaS]** | Implements `PlantPort`; BOM snapshot may stay tool-specific | Demo-proved (KubeRay only) | **2f**: second Plant module (non-Ray) with `plant_port_from_context` equivalent |
 | **InfraStructure [IaaS] — content-store** | Host Kubo facet; ContentMesh client; TF ensure / apply assert | Demo-proved; soft dual-job documented | Interop = mesh CIDs remain valid across Structure swaps; destroy must not kill host Kubo (already). Optional hard dual-daemon isolation is **not** required for Function interop |
 | **InfraStructure [IaaS] — T&D transport** | `TransportContext` / `TransportPort` | Demo-proved (Compose peers) | Optional second transport adapter only if a Plant cannot use Docker Kubo peers; Function stays on `TransportPort` |
-| **InfraStructure [IaaS] — object store** | `ObjectStore` / `JobHandle` | Demo-proved (MinIO); **2g** JobHandle-only `result_uri` / `download_job_result` | **2f** may keep MinIO; alternate scratch backend needs `begin_job` / `download_job_result` / Plant-owned entrypoint landing |
+| **InfraStructure [IaaS] — object store** | `ObjectStore` / `JobHandle` + durable Entity Relationship | Demo-proved (dual MinIO: scratch + durable); **2g** JobHandle-only `result_uri` / `download_job_result` | **2f** may keep MinIO; alternate scratch backend needs `begin_job` / `download_job_result` / Plant-owned entrypoint landing; durable ER is structure-NS + `er/current` pointers |
 
 ## 2f. Second Plant (interop incomplete as product)
 
@@ -177,5 +177,5 @@ Treat remaining soft edges (`job_endpoint` shape) as cleanup with the first non-
 - [`BOM.md`](./BOM.md) — Order Function/Structure CIDs; named Process imports
 - [`LineageOfProvenance.md`](./LineageOfProvenance.md) — `linkProcess` / `linkStructure` / `linkOrder` Order lineage; **2f** still needs second Plant adapters
 - [`IPFS.md`](./IPFS.md) — host Kubo content-store; transport peering
-- [`MinIO.md`](./MinIO.md) — object-store scratch / JobHandle landing
+- [`MinIO.md`](./MinIO.md) — dual MinIO (scratch + durable Entity Relationship) / JobHandle / `gc-er`
 - [`DESIGN.md`](./DESIGN.md) — AQ as content-addressed CIDs
