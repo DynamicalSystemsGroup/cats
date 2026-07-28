@@ -2,97 +2,69 @@
 
 ## Description:
 
-**CATs** is an edge-computing framework that establishs a *self-serviced* **[Data Mesh](https://www.datamesh-architecture.com/#what-is-data-mesh)** for inter and intra-orginizational Data Service Collaboration with *verifiable* **Data Provenance**. **CAT Nodes** are intended to be system *integration points* that enable **[Data Product](https://www.datamesh-architecture.com/#data-product)** collaborators to verify, retrieve, and re-execute **interoperable** data processing workload components intra and inter-orginizationally with Data Provenance via **BOMs**. *CAT Nodes* hetoerogeneously scale processing workload portability between client-server cloud platforms and mesh (p2p) networks with minimal rework or modification.
+**Content-Addressable Transformers (CATs)** is an edge-computing framework that establishs a **[Data Mesh](https://www.datamesh-architecture.com/#what-is-data-mesh)** as a *self-service* Platform for *inter and intra-orginizational Data Service Collaboration* with *verifiable* **Data Provenance**. **CAT Nodes** are intended to be system *integration points* that enable **[Data Product](https://www.datamesh-architecture.com/#data-product)** collaboration involving the *verification, retrieval, and re-execution* of **interoperable** data processing workload components *intra and inter-orginizationally* with Data Provenance via *content-addressing* **[Bills-Of-Materials (BOMs)](https://en.wikipedia.org/wiki/Bill_of_materials)** and their contents. BOMs are used to **verify** the means of processing data as code (input, transformation / process, output, & infrastructure) beteen Nodes. The maintenance and reporting of [data and process lineage & provenance](https://bi-insider.com/posts/data-lineage-and-data-provenance/) using BOMs as *supply-chains of evidence* certifies the accuracy of services offered by *Data Products*. 
 
-*CAT Node's* execute horizontal, vertical, and heterogenious scallable **Content-Addressable Transformers (CATs)**. **CATs** are ***content-addressed data processing (/ transformation)* workloads** inputed & outputted as *Data Provenance records* used to establishe a Data Mesh as a Platform. CATs reify a Data Mesh as Data Provenance records because the edge protocol mechanism used for the [Content-Addressed Storage (CAS)](https://en.wikipedia.org/wiki/Content-addressable_storage) of CATs as **[Bills-Of-Materials (BOMs)](https://en.wikipedia.org/wiki/Bill_of_materials)** is also the means of Data Transport that networks CAT Nodes as verifiable lineages of Data Provenance (* **[Details](docs/LineageOfProvenance.md)**).
+*CAT Nodes* scale processing workload portability between client-server cloud platforms and mesh (p2p) networks with minimal rework or modification. *CAT Node's* enable this via their execution of horizontal, vertical, and heterogenious scallable **CATs** or *content-addressed data processing (/ transformation)* **workloads**. CATs are inputed & outputted as **BOMs** acting as *Data Provenance records* which are used to establishe a Data Mesh. The Data Mesh is established using BOMs because the edge protocol mechanism used for the [Content-Addressed Storage (CAS)](https://en.wikipedia.org/wiki/Content-addressable_storage) of CATs as BOMs is also the means of Data Transport that networks CAT Nodes as verifiable lineages of Data Provenance (* **[Details](docs/LineageOfProvenance.md)**). This enables the Mesh to grow naturally / heterogeneously scale when organizations communicate with BOMs as a means of cross-collaboration on *Data Products* within the feedback loops of their **Data Initiatives.**
 
 ### CAT's Domain-Driven Architecture as a *Control-Feedback Loop*:
 ![CATs Chaordic Kernel](images/CATs_chaordic_kernel.jpeg)
-*CAT Node's* **Architectural Quantum (AQ)** is a [*Minimal* **Federated Operating Model (FOM)**](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/) as the re-executable and exchangable *atomic unit* representating the architectural domain of a Data Product. The AQ is content-addressed as a BOM containing the AQ's components such that organizations can collaborate on a Data Mesh with verifiable provenance of *interoperable AQ compoents*. CAT Node's runtime realization of the *minimal FOM / Quantum Architecture* is the **Ordering** of **Execution** is **Invoiced** into a **Bill-Of-Materials** as the following **Control-Feedback Loop**:
+*CAT Node's* **Architectural Quantum (AQ)** is a [*Minimal* **Federated Operating Model (FOM)**](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/) as the re-executable and exchangable *atomic unit* representating the architectural domain of Data Product contriburion. The AQ is content-addressed within a BOM containing the AQ's components such that organizations can collaborate on a Data Mesh with verifiable provenance of *interoperable AQ compoents*. CAT Node's runtime realization of the *minimal FOM / Quantum Architecture* is the **Ordering** of **Execution** is **Invoiced** into a **Bill-Of-Materials** as the following **Control-Feedback Loop**:
 * **Detailed** *Loop* [here](./docs/ControlFeedbackLoop.md)
 * **Summarized** *Loop* below:
-  * **A: Production** - CATs (*CAT workloads*) are **Ordered** and **Invoiced** for verification and registered as **[BOMs](docs/BOM.md)** to serve as **Data Provenance records** that uniquely identify CATs and their content for **verifiable data processing** using content-addresses. CATs are deployable as parallelized and distributed processes to support scalable data processing microservices.
+  * **A: Manifactured Execution** - CATs (*CAT workloads*) are **Ordered** and **Invoiced** for verification and registered as **[BOMs](docs/BOM.md)** to serve as **Data Provenance records** that uniquely identify CATs and their content for **verifiable data processing** using content-addresses. CATs are deployable as parallelized and distributed processes to support scalable data processing microservices.
     * **1.** the *Node's* **Factory** 
       * **a.** *consumes* & *processes* a content-addressed **Order**
-      * **b.** *composes* and *produces* an *ephemeral* **Executor** of data processing using *AQ components* within **Order**
+      * **b.** *composes* and *produces* an *ephemeral* **Executor** of CATs using *AQ components* within **Order**
     * **2.** the *Node's* **Executor** 
       * **a.** *executes* the *AQ components* as **Function [FaaS]** on **Structure [PaaS]**
       * **b.** **Invoices** the *execution of data prcessing* as staged output **Content-Addresses**
-  * **B: BOMs** - CAT Node's input & output surface that contain the means of data processing between Nodes. CAT Node produces **content-addressed** BOMS that certify the accuracy of data processing for services offered by *Data Products* by enabling maintenance and reporting of [data and process lineage & provenance](https://bi-insider.com/posts/data-lineage-and-data-provenance/) as *supply chains of evidence*. [**Content-Addressing**](docs/CAS.md) reffers **Content-Addressed Storage (CAS)**, which is a method of uniquely identifying and retrieving information based on its content rather than its location or address.
-    * **3.** the **Node's Runtime** *emits* a **BOM** as the *Mesh-transportable Data Provenance record* to be *shared* & *re-executed* between Nodes 
+  * **B: Content-Addressed Bills-of-Materials (BOMs)** - [**Content-Addressing**](docs/CAS.md) reffers to **Content-Addressed Storage (CAS)**, which is a method of uniquely identifying and retrieving information based on its content rather than its location or address.
+    * **3.** the *Node's* **Runtime** *emits* a **BOM** as the *Mesh-transportable Data Provenance record* to be *shared* & *re-executed* between Node
 
-## Demonstration: *CAT Workload Specification*
-CAT Node is shipped with *Techncal Use-Case Processing Templates (/ "Recipies")* specified as *CAT **Orders*** for which proccess will be executed and **Invoiced**. This repository will feature a Scalable Scientific Computing application **Ordered** as a CATs. This **Order** is specified to utilize [Ray](https://www.ray.io/) as an execution middleware framework **Plant (SaaS)** deployed on **[Kubernetes](https://kubernetes.io/)** for interoperable & parallelized distributed computing applications / Big Data processing with Scientific Computing enabled [ecosystem integrations](https://docs.ray.io/en/latest/ray-overview/ray-libraries.html) such as [Apache Spark](https://spark.apache.org/), and [PyTorch](https://pytorch.org/).
+### Content-Addressed BOMs used for Data Transport establishes and sustains Data Initiatives
+![CATs BOM Activity](images/CATs_bom_activity_ag.jpeg)
+- **Collaboration:** The registration and cataloging of **BOMs** establishes and sustains **Data Initiatives** because content-addressing BOMs for **Data Provenance** makes CATs *reteivable, shareable, composable, re-executable, and iteroperable* such that they support *Inter & Intra-Orginizational Collaboration* on **Data Products**. *Data Initiatives* will be naturally established as a result of cross-collaboration on CAT Node's *Data Products* by communicating BOMs that produce CATs. Data Product teams with impliment CAT Nodes to produce interconnected *Data Services of CATs between Products* on a Data Mesh. 
+- **Data Transport:** *BOMs* employ **Content Identifiers (CIDs)** for Content-Addesable Storage to provide a means of location-agnostic data transportation / retrieval based on its content / CAT processes for [Data Verification](https://en.wikipedia.org/wiki/Data_verification). Therefore, the implementation of CATs' as content-addressed data processes establishes and self-services a scalable Data Platform as a Data Mesh network of interoperable and scalable computing workloads deployable on [Kubernetes](https://kubernetes.io/) as CATs execution paradigm. 
 
 ## Get Started!:
+#### 1. [Installation](docs/INSTALL.md)
+#### 2. [Demonstration](./docs/DEMO.md): Establish a CAT Mesh for a Scalable Scientific Computing CAT
+  * CAT Node is shipped with *Techncal Use-Case CAT Workload Specifications ( Templates / "Recipies")* as *CAT **Orders*** for which proccess will be executed and **Invoiced**. This repository will feature a Scalable Scientific Computing application **Ordered** as a CATs. This **Order** is specified to utilize [Ray](https://www.ray.io/) as an execution middleware framework **Plant (SaaS)** deployed on **[Kubernetes](https://kubernetes.io/)** for interoperable & parallelized distributed computing applications / Big Data processing with Scientific Computing enabled [ecosystem integrations](https://docs.ray.io/en/latest/ray-overview/ray-libraries.html) such as [Apache Spark](https://spark.apache.org/), and [PyTorch](https://pytorch.org/).
+#### 3. [Testing:](./docs/TEST.md) - CAT Mesh Integration & CAT Node Unit Tests**
+#### 4. Node Operations: 
 
-1. **Clone CATs:**
-  ```bash
-    git clone git@github.com:DynamicalSystemsGroup/cats.git
-    cd cats
-    uv python install   # installs the Python version pinned in .python-version
-    uv sync             # creates .venv and installs locked dependencies from uv.lock
-  ```
-  - See `[ENV.md](./docs/ENV.md)` for the full environment workflow, including the `ops` and `mac` extras.
-2. **Install [Dependencies](./docs/DEPS.md)** (including [uv](https://docs.astral.sh/uv/), which manages
-  CATs' Python interpreter, virtual environment, and locked dependencies)
-  ```bash
-  make deps-all
-  # core: make deps
-  # optional extras alone: make deps-helm / make deps-graphviz
-  ```
-  - Runs on macOS or Linux (see the `[Makefile](./Makefile)` and `make help`), or follow
-  `[DEPS.md](./docs/DEPS.md)` to install each dependency manually.
-3. **Start a CAT Node** (convenience: ensure host ContentStore, then bind Flask):
-  ```bash
-  make node-up
-  # chains: make content-store-ensure && make node-start
-  ```
-  See `[STORAGE.md](./docs/STORAGE.md#node-up-vs-content-store-ensure-and-node-start)`
-  for why ensure and start are separate Make targets.
-4. **Check Node status** (Flask listen + ContentStore ready):
-  ```bash
-  make node-status
-  # or: uv run python -m cats.node status
-  ```
-5. **Demo: [Establish a CAT Mesh](./docs/DEMO.md)**
-6. **Test: [CAT Mesh Verification](./docs/TEST.md)**
-7. **Stop the CAT Node** (Flask only — host Kubo stays up):
-  ```bash
-  make node-stop
-  # or: uv run python -m cats.node stop
+  A. **Stop the CAT Node** (Flask only — host Kubo stays up):
+    ```bash
+    make node-stop
+    # or: uv run python -m cats.node stop
 
-  # host IPFS (Kubo) daemon is left running on purpose
-  # stop IPFS (Kubo) daemon via the following command:
-  # ipfs shutdown
-  ```
-8. **Dashboards:**
-  Once a Structure is deployed, three web dashboards are reachable at fixed `localhost` addresses: See [DASHBOARDS.md](docs/DASHBOARDS.md) for URLs, credentials, and each one's purpose.
-  * [Ray Dashboard](http://127.0.0.1:8265) for the Plant's KubeRay cluster (job status, actors, logs)
-  * [MinIO Console](http://127.0.0.1:9001) for the [S3-compatible](https://min.io/product/s3-compatibility) shared object store Ray Data's distributed writes land in (see `[STORAGE.md](docs/STORAGE.md)` / `[MinIO.md](docs/MinIO.md)`)
-  * [IPFS WebUI](http://127.0.0.1:5001/webui) for browsing everything CID'ed into a BOM/Invoice/Order 
-    * CID Nested BOM layout: [`docs/BOM.md`](docs/BOM.md#cat-node-http-bom-response)). 
-9. **Auto-Diagramming Software Archtecture:**
-  * Command(s): requires `Graphviz` for PNG output — `make deps-graphviz` (or `make deps-all`)
-  ```bash
-  make diagrams
-  ```
-  * Optional Commands / Utilities: 
-    * `code2flow` used to generate *Functional Component Activity Diagram*: 
-      * `uv run python utils/code2flow/diagram_c2f.py`
-    * `pyreverse` used to generates *Class & Dependency Diagrams*: 
-      * `uv run pyreverse -o png -p CATs -d images/pyreverse cats`
+    # host IPFS (Kubo) daemon is left running on purpose
+    # stop IPFS (Kubo) daemon via the following command:
+    # ipfs shutdown
+    ```
+
+  B. **Dashboards:**
+    Once a Structure is deployed, three web dashboards are reachable at fixed `localhost` addresses: See [DASHBOARDS.md](docs/DASHBOARDS.md) for URLs, credentials, and each one's purpose.
+    * [Ray Dashboard](http://127.0.0.1:8265) for the Plant's KubeRay cluster (job status, actors, logs)
+    * [MinIO Console](http://127.0.0.1:9001) for the [S3-compatible](https://min.io/product/s3-compatibility) shared object store Ray Data's distributed writes land in (see `[STORAGE.md](docs/STORAGE.md)` / `[MinIO.md](docs/MinIO.md)`)
+    * [IPFS WebUI](http://127.0.0.1:5001/webui) for browsing everything CID'ed into a BOM/Invoice/Order 
+      * CID Nested BOM layout: [`docs/BOM.md`](docs/BOM.md#cat-node-http-bom-response).
+
+  C. **Auto-Diagramming Software Archtecture:**
+    * Command(s): requires `Graphviz` for PNG output — `make deps-graphviz` (or `make deps-all`)
+    ```bash
+    make diagrams
+    ```
+    * Optional Commands / Utilities: 
+      * `code2flow` used to generate *Functional Component Activity Diagram*: 
+        * `uv run python utils/code2flow/diagram_c2f.py`
+      * `pyreverse` used to generates *Class & Dependency Diagrams*: 
+        * `uv run pyreverse -o png -p CATs -d images/pyreverse cats`
   
 
 ### [Contribute!](docs/CONTRIBUTING.md)
 
 ## Concepts:
-
-### How are Content-Addressed BOMs used to establish and sustain Data Initiatives?
-![CATs BOM Activity](images/CATs_bom_activity_ag.jpeg)
-- **Collaboration:** The registration and cataloging of **BOMs** as *Data Provenance records* establishes and sustains **Data Initiatives** because CATs are *discoverable, accessible, composable, re-executable, and iteroperable* such that they support *Inter & Intra-Orginizational Collaboration* on **Data Products**. BOMs provide a reliable and efficient way to manage, share, and reference data processes because they are **[Content-Addressed](https://en.wikipedia.org/wiki/Content-addressable_storage)**. **Data Initiatives** will be naturally established as a result of collaboration on a CAT Node's *Data Product*. CATs will be compiled and executed as interconnecting *Data Products* on a Data Mesh that grow naturally / heterogeneously scales when organizations communicate CATs provenance records within feedback loops of their Data Initiatives.
-- **Data Provenance:** The content-address of *BOMs* and their components can be used to verify the means of processing data (input, transformation / process, output, infrastructure-as-code (IaC)) they can also make CATs resilient by enabling re-execution via retrieval. They certify the accuracy of data processing on data products and pipelines by enabling maintenance and reporting of [data and process lineage & provenance](https://bi-insider.com/posts/data-lineage-and-data-provenance/) as *supply chains of evidence*.
-- **Data Transport:** *BOMs* employ **Content Identifiers (CIDs)** for Content-Addesable Storage to provide a means of location-agnostic data transportation / retrieval based on its content / CAT processes for [Data Verification](https://en.wikipedia.org/wiki/Data_verification). Therefore, the implementation of CATs' as content-addressed data processes establishes and self-services a scalable Data Platform as a Data Mesh network of interoperable and scalable computing workloads deployable on [Kubernetes](https://kubernetes.io/) as CATs execution paradigm.
 
 ### CATs' Architectural Quantum:
 
