@@ -81,6 +81,9 @@ class Executor:
             # Non-secret object-store scratch URI for Structure-lifetime
             # correlation; durable retrieval remains integration_data_cid (IPFS).
             'object_store_result_uri': self.function.processor.object_store_result_uri,
+            # Durable Entity Relationship correlators (None until promote is used).
+            'durable_er_uri': self.function.processor.durable_er_uri,
+            'durable_er_pointer': self.function.processor.durable_er_pointer,
         }
         # Invoice feedback (Seed deferred / #187): stage CIDs on Invoice until
         # Seed holds the Process replay dictionary.

@@ -50,9 +50,12 @@ PLANT_SNAPSHOT_KEYS = (
     'rebuilt',
 )
 INFRASTRUCTURE_SNAPSHOT_KEYS = (
-    'minio_bucket',
-    'minio_endpoint_host',
-    'minio_endpoint_pod',
+    'minio_scratch_bucket',
+    'minio_scratch_endpoint_host',
+    'minio_scratch_endpoint_pod',
+    'minio_durable_bucket',
+    'minio_durable_endpoint_host',
+    'minio_durable_endpoint_pod',
 )
 
 CAT_INPUT_PATH = f'{DATA_HOME}/testing/cat_input'

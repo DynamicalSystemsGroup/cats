@@ -24,6 +24,9 @@ class Processor:
         self.infraFunction = infraFunction
         self.invoice_data_cid = None
         self.object_store_result_uri = None
+        # Durable Entity Relationship correlators (set when promote path is used).
+        self.durable_er_uri = None
+        self.durable_er_pointer = None
 
         self.ingress_input_data_cid = self.infraFunction.enhanced_bom['init_data_cid']
         self.ingress_data_cid = None

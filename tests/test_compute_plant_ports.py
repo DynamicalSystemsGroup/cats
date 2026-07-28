@@ -112,20 +112,22 @@ def test_job_handle_begin_and_scratch_writes_config_only(tmp_path):
     """begin_job + write_job_scratch write ObjectStore config, not Ray landing."""
     ou = _load(OBJ_STORE_UTILS, 'infrastructure_obj_store_utils_ports')
     store = ou.ObjectStore(
-        endpoint_host='http://127.0.0.1:9000',
-        endpoint_pod='http://172.19.0.1:9000',
-        bucket='cats-scratch',
-        access_key='cats-minio',
-        secret_key='cats-minio-secret',
+        scratch_endpoint_host='http://127.0.0.1:9000',
+        scratch_endpoint_pod='http://172.19.0.1:9000',
+        scratch_bucket='cats-scratch',
+        scratch_access_key='cats-scratch',
+        scratch_secret_key='cats-scratch-secret',
     )
     handle = store.begin_job()
     assert handle.prefix.startswith('jobs/')
-    assert store.result_uri(handle) == f's3://{store.bucket}/{handle.result_key()}'
+    assert store.result_uri(handle) == (
+        f's3://{store.scratch_bucket}/{handle.result_key()}'
+    )
 
     job_dir = tmp_path / 'job'
     job_dir.mkdir()
     store.write_job_scratch(str(job_dir), handle)
-    assert (job_dir / 'object_store_config.json').is_file()
+    assert (job_dir / 'object_store_scratch_config.json').is_file()
     assert not (job_dir / 'entrypoint.py').exists()
     assert not (job_dir / 'ray_compute_utils.py').exists()
 
@@ -197,7 +199,9 @@ def test_infrafunction_subproc_uses_plant_port_and_job_handle(tmp_path, monkeypa
             return h
 
         def write_job_scratch(self, job_dir, handle):
-            Path(job_dir).joinpath('object_store_config.json').write_text('{}')
+            Path(job_dir).joinpath('object_store_scratch_config.json').write_text(
+                '{}'
+            )
 
         def download_job_result(self, handle, output):
             self.downloads.append((handle.prefix, output))
