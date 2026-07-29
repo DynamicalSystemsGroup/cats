@@ -6,9 +6,9 @@
 
 *CAT Nodes* scale processing workload portability between client-server cloud platforms and mesh (p2p) networks with minimal rework or modification. *CAT Node's* enable this via their execution of horizontal, vertical, and heterogenious scallable **CATs** or *content-addressed data processing (/ transformation)* **workloads**. CATs are inputed & outputted as **BOMs** acting as *Data Provenance records* which are used to establishe a Data Mesh. The Data Mesh is established using BOMs because the edge protocol mechanism used for the [Content-Addressed Storage (CAS)](https://en.wikipedia.org/wiki/Content-addressable_storage) of CATs as BOMs is also the means of Data Transport that networks CAT Nodes as verifiable lineages of Data Provenance (* **[Details](docs/LineageOfProvenance.md)**). This enables the Mesh to grow naturally / heterogeneously scale when organizations communicate with BOMs as a means of cross-collaboration on *Data Products* within the feedback loops of their **Data Initiatives.**
 
-### CAT's Domain-Driven Architecture as a *Control-Feedback Loop*:
+### Compotational Governance: CATs *Architectural Quantum* & *Control-Feedback Loop*:
 ![CATs Chaordic Kernel](images/CATs_chaordic_kernel.jpeg)
-*CAT Node's* **Architectural Quantum (AQ)** is a [*Minimal* **Federated Operating Model (FOM)**](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/) as the re-executable and exchangable *atomic unit* representating the architectural domain of Data Product contriburion. The AQ is content-addressed within a BOM containing the AQ's components such that organizations can collaborate on a Data Mesh with verifiable provenance of *interoperable AQ compoents*. CAT Node's runtime realization of the *minimal FOM / Quantum Architecture* is the **Ordering** of **Execution** is **Invoiced** into a **Bill-Of-Materials** as the following **Control-Feedback Loop**:
+*CAT Node's* **[Architectural Quantum (AQ)](https://martinfowler.com/articles/data-mesh-principles.html#LogicalArchitecturedataProductTheArchitecturalQuantum)** is a [*Minimal* **Federated Operating Model (FOM)**](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/) as the re-executable and exchangable *atomic unit* representating the architectural domain of Data Product contriburion. The AQ is content-addressed within a BOM containing the AQ's components such that organizations can collaborate on a Data Mesh with verifiable provenance of *interoperable AQ compoents*. CAT Node's runtime realization of the *minimal FOM / Quantum Architecture* is the **Ordering** of **Execution** is **Invoiced** into a **Bill-Of-Materials** as the following **Control-Feedback Loop**:
 * **Detailed** *Loop* [here](./docs/ControlFeedbackLoop.md)
 * **Summarized** *Loop* below:
   * **A: Manifactured Execution** - CATs (*CAT workloads*) are **Ordered** and **Invoiced** for verification and registered as **[BOMs](docs/BOM.md)** to serve as **Data Provenance records** that uniquely identify CATs and their content for **verifiable data processing** using content-addresses. CATs are deployable as parallelized and distributed processes to support scalable data processing microservices.
@@ -23,55 +23,48 @@
 
 ### Content-Addressed BOMs used for Data Transport establishes and sustains Data Initiatives
 ![CATs BOM Activity](images/CATs_bom_activity_ag.jpeg)
-- **Collaboration:** The registration and cataloging of **BOMs** establishes and sustains **Data Initiatives** because content-addressing BOMs for **Data Provenance** makes CATs *reteivable, shareable, composable, re-executable, and iteroperable* such that they support *Inter & Intra-Orginizational Collaboration* on **Data Products**. *Data Initiatives* will be naturally established as a result of cross-collaboration on CAT Node's *Data Products* by communicating BOMs that produce CATs. Data Product teams with impliment CAT Nodes to produce interconnected *Data Services of CATs between Products* on a Data Mesh. 
+- **[Data Initiatives:](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative)** - Participating organizations and collaborators will employ CATs for rapid ratification of service agreements within collaborative feedback loops of **[Data Initiatives](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative)**. CATs' apply an **Architectural Quantum** *Domain-Driven Design* principle described in **[Data Mesh of Data Products](https://martinfowler.com/articles/data-mesh-principles.html)** to *reify* Data Initiatives.(* **[Design Description](docs/DESIGN.md)**)
+- **Collaboration:** The registration and cataloging of **BOMs** establishes and sustains *Data Initiatives* because content-addressing BOMs for **Data Provenance** makes CATs *reteivable, shareable, composable, re-executable, and iteroperable* such that they support *Inter & Intra-Orginizational Collaboration* on **Data Products**. *Data Initiatives* will be naturally established as a result of cross-collaboration on CAT Node's *Data Products* by communicating BOMs that produce CATs. Data Product teams with impliment CAT Nodes to produce interconnected *Data Services of CATs between Products* on a Data Mesh. 
 - **Data Transport:** *BOMs* employ **Content Identifiers (CIDs)** for Content-Addesable Storage to provide a means of location-agnostic data transportation / retrieval based on its content / CAT processes for [Data Verification](https://en.wikipedia.org/wiki/Data_verification). Therefore, the implementation of CATs' as content-addressed data processes establishes and self-services a scalable Data Platform as a Data Mesh network of interoperable and scalable computing workloads deployable on [Kubernetes](https://kubernetes.io/) as CATs execution paradigm. 
 
 ## Get Started!:
-#### 0. [Installation](docs/INSTALL.md)
-#### 1. Start a CAT Node:
-  ```bash
-  make node-up
-  # chains: make content-store-ensure && make node-start
-  # convenience: ensure host ContentStore, then bind Flask
-  ```
-  See `[STORAGE.md](./docs/STORAGE.md#node-up-vs-content-store-ensure-and-node-start)`
-  for why ensure and start are separate Make targets.
-#### 2. Check Node status:
-  ```bash
-  make node-status
-  # or: uv run python -m cats.node status
-  # Flask listen + ContentStore ready
-  ```
+#### 0. Clone CATs:
+```bash
+git clone git@github.com:DynamicalSystemsGroup/cats.git
+cd cats
+uv python install   # installs the Python version pinned in .python-version
+uv sync             # creates .venv and installs locked dependencies from uv.lock
+```
+  - See `[ENV.md](./docs/ENV.md)` for the full environment workflow, including the `ops` and `mac` extras.
+#### 1. Installation:
+`make deps-all` - Runs on macOS or Linux (see the `[Makefile](./Makefile)` and `make help`), or follow `[DEPS.md](./docs/DEPS.md)` to install each dependency manually.
+#### 2. [Node Lifecycle](./docs/NodeLifeCycle.md) — start / status / stop:
+```bash
+make node-up     # content-store-ensure && node-start
+make node-status # flask=up|down + content_store=ready|not_ready
+make node-stop   # Flask only — host Kubo left running
+```
+*Optional:* `make node-down` = `make node-stop` + `ipfs shutdown`
+Full command reference, exit codes, and why ensure ≠ start: [`NodeLifeCycle.md`](./docs/NodeLifeCycle.md).
 #### 3. [Demonstration](./docs/DEMO.md):
-  * CAT Node is shipped with *Techncal Use-Case CAT Workload Specifications ( Templates / "Recipies")* as *CAT **Orders*** for which proccess will be executed and **Invoiced**. This repository will feature a Scalable Scientific Computing application **Ordered** as a 2 CATs. This **Order** is specified to utilize [Ray](https://www.ray.io/) as an execution middleware framework **Plant (SaaS)** deployed on **[Kubernetes](https://kubernetes.io/)** for interoperable & parallelized distributed computing applications / Big Data processing with Scientific Computing enabled [ecosystem integrations](https://docs.ray.io/en/latest/ray-overview/ray-libraries.html) such as [Apache Spark](https://spark.apache.org/), and [PyTorch](https://pytorch.org/).
-#### 4. [Testing:](./docs/TEST.md) - CAT Node Integration & Unit Tests**
+CAT Node is shipped with *Techncal Use-Case CAT Workload Specifications ( Templates / "Recipies")* as *CAT **Orders*** for which proccess will be executed and **Invoiced**. This repository will feature a Scalable Scientific Computing application **Ordered** as a 2 CATs. This **Order** is specified to utilize [Ray](https://www.ray.io/) as an execution middleware framework **Plant (SaaS)** deployed on **[Kubernetes](https://kubernetes.io/)** for interoperable & parallelized distributed computing applications / Big Data processing with Scientific Computing enabled [ecosystem integrations](https://docs.ray.io/en/latest/ray-overview/ray-libraries.html) such as [Apache Spark](https://spark.apache.org/), and [PyTorch](https://pytorch.org/).
+#### 4. [Testing:](./docs/TEST.md) *CAT Node Integration & Unit Tests*
 #### 5. [Dashboards](./docs/DASHBOARDS.md)
-#### 6. Stop the CAT Node:
-    ```bash
-    make node-stop
-    # or: uv run python -m cats.node stop
-    # Flask only — host IPFS (Kubo) daemon is left running on purpose
-    # To stop IPFS (Kubo) daemon via the following command:
-    # ipfs shutdown
-    ```
-#### 7. Auto-Diagramming Software Archtecture:
-    * Command(s): requires `Graphviz` for PNG output — `make deps-graphviz` (or `make deps-all`)
-    `make diagrams`
-    * Optional Commands / Utilities: 
-      * `code2flow` used to generate *Functional Component Activity Diagram*: 
-        * `uv run python utils/code2flow/diagram_c2f.py`
-      * `pyreverse` used to generates *Class & Dependency Diagrams*: 
-        * `uv run pyreverse -o png -p CATs -d images/pyreverse cats`
-#### 8. [Contribute!](docs/CONTRIBUTING.md)
+#### 6. Auto-Diagramming Software Archtecture:
+`make diagrams` - requires `Graphviz` for PNG output — `make deps-graphviz` (or `make deps-all`)
+  * Constituent Commands / Utilities: 
+    * `code2flow` used to generate *Functional Component Activity Diagram*: 
+      * `uv run python utils/code2flow/diagram_c2f.py`
+    * `pyreverse` used to generates *Class & Dependency Diagrams*: 
+      * `uv run pyreverse -o png -p CATs -d images/pyreverse cats`
+#### 7. [Contribute!](docs/CONTRIBUTING.md)
 
 ## Concepts:
 
 ### CATs' Architectural Quantum:
 
-Organizations and collaborators participating will employ CATs for rapid ratification of service agreements within collaborative feedback loops of **[Data Initiatives](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative)**. CATs' apply an **Architectural Quantum** Domain-Driven Design principle described in **[Data Mesh of Data Products](https://martinfowler.com/articles/data-mesh-principles.html)** to reify Data Initiatives.(* **[Design Description](docs/DESIGN.md)**)
-
-The Action Plane is the Analytical Data Processing interface. The Action Plane orchestrates and supervises how virtual resources owned by the Data Product should be managed, routed, and processed and is stored “offmesh” (“offline”). It supervises the exchange of data between sub-Process components within the Data sub-Plane (Process) in adherence to Data Contracting Standards of organizations participating in a Data Mesh.
 ![CAT Kernel](images/CATkernel.jpeg)
+- The **Action Plane** is the Analytical Data Processing interface. The Action Plane orchestrates and supervises how virtual resources owned by the Data Product should be managed, routed, and processed and is stored “offmesh” (“offline”). It supervises the exchange of data between sub-Process components within the Data sub-Plane (Process) in adherence to Data Contracting Standards of organizations participating in a Data Mesh.
 
 #### Quantum Architecture Description as a [Minimal Federated Operating Model](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/)
 
