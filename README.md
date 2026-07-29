@@ -6,7 +6,9 @@
 
 *CAT Nodes* scale processing workload portability between client-server cloud platforms and mesh (p2p) networks with minimal rework or modification. *CAT Node's* enable this via their execution of horizontal, vertical, and heterogenious scallable **CATs** or *content-addressed data processing (/ transformation)* **workloads**. CATs are inputed & outputted as **BOMs** acting as *Data Provenance records* which are used to establishe a Data Mesh. The Data Mesh is established using BOMs because the edge protocol mechanism used for the [Content-Addressed Storage (CAS)](https://en.wikipedia.org/wiki/Content-addressable_storage) of CATs as BOMs is also the means of Data Transport that networks CAT Nodes as verifiable lineages of Data Provenance (* **[Details](docs/LineageOfProvenance.md)**). This enables the Mesh to grow naturally / heterogeneously scale when organizations communicate with BOMs as a means of cross-collaboration on *Data Products* within the feedback loops of their **Data Initiatives.**
 
-### Compotational Governance: CATs *Architectural Quantum* & *Control-Feedback Loop*:
+## Compotational Governance:
+
+### *Control-Feedback Loop* of CATs' *Architectural Quantum*:
 ![CATs Chaordic Kernel](images/CATs_chaordic_kernel.jpeg)
 *CAT Node's* **[Architectural Quantum (AQ)](https://martinfowler.com/articles/data-mesh-principles.html#LogicalArchitecturedataProductTheArchitecturalQuantum)** is a [*Minimal* **Federated Operating Model (FOM)**](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/) as the re-executable and exchangable *atomic unit* representating the architectural domain of Data Product contriburion. The AQ is content-addressed within a BOM containing the AQ's components such that organizations can collaborate on a Data Mesh with verifiable provenance of *interoperable AQ compoents*. CAT Node's runtime realization of the *minimal FOM / Quantum Architecture* is the **Ordering** of **Execution** is **Invoiced** into a **Bill-Of-Materials** as the following **Control-Feedback Loop**:
 * **Detailed** *Loop* [here](./docs/ControlFeedbackLoop.md)
@@ -21,7 +23,7 @@
   * **B: Content-Addressed Bills-of-Materials (BOMs)** - *BOMs* employ **Content Identifiers (CIDs)** as *Content-Addesable Storage* of CATs to provide a means of [Data Verification](https://en.wikipedia.org/wiki/Data_verification) & location-agnostic **data transportation / retrieval** via a unique identification of CAT content. CATs' use of this content-addressing mechanism establishes a self-service Data Mesh as a heterogeneously scalable Compute Platform deployable on [Kubernetes](https://kubernetes.io/) as CAT Node's execution paradigm (Structure [PaaS]). 
     * **3.** the *Node's* **Runtime** *emits* a **BOM** as the *Mesh-transportable Data Provenance record* to be *shared* & *re-executed* between Node
 
-### Content-Addressed BOMs used for Data Transport establishes and sustains Data Initiatives
+### How CATs' *Architectural Quantum* sustains *Data Initiatives*
 ![CATs BOM Activity](images/CATs_bom_activity_ag.jpeg)
 - **[Data Initiatives:](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative)** - Participating organizations and collaborators will employ CATs for rapid ratification of service agreements within collaborative feedback loops of **[Data Initiatives](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative)**. 
 - CATs' **Architectural Quantum (AQ)** is a [Minimal Federated Operating Model](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/) employed by CATs' **Action Plane** the *AQ Domain-Driven Design* as a principle described in **[Data Mesh of Data Products](https://martinfowler.com/articles/data-mesh-principles.html)** to *reify Data Initiatives* (**[Design Description](docs/DESIGN.md)**). 
