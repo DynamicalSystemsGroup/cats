@@ -23,7 +23,7 @@
   * **B: Content-Addressed Bills-of-Materials (BOMs)** - *BOMs* employ **Content Identifiers (CIDs)** as *Content-Addesable Storage* of CATs to provide a means of [Data Verification](https://en.wikipedia.org/wiki/Data_verification) & location-agnostic **data transportation / retrieval** via a unique identification of CAT content. CATs' use of this content-addressing mechanism establishes a self-service Data Mesh as a heterogeneously scalable Compute Platform deployable on [Kubernetes](https://kubernetes.io/) as CAT Node's execution paradigm (Structure [PaaS]). 
     * **3.** the *Node's* **Runtime** *emits* a **BOM** as the *Mesh-transportable Data Provenance record* to be *shared* & *re-executed* between Node
 
-### How CATs' *Architectural Quantum* sustains *Data Initiatives*
+### How CATs' *Architectural Quantum* sustains *Data Initiatives*:
 ![CATs BOM Activity](images/CATs_bom_activity_ag.jpeg)
 - **[Data Initiatives:](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative)** - Participating organizations and collaborators will employ CATs for rapid ratification of service agreements within collaborative feedback loops of **[Data Initiatives](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative)**. 
 - CATs' **Architectural Quantum (AQ)** is a [Minimal Federated Operating Model](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/) employed by CATs' **Action Plane** the *AQ Domain-Driven Design* as a principle described in **[Data Mesh of Data Products](https://martinfowler.com/articles/data-mesh-principles.html)** to *reify Data Initiatives* (**[Design Description](docs/DESIGN.md)**). 
