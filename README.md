@@ -18,14 +18,17 @@
     * **2.** the *Node's* **Executor** 
       * **a.** *executes* the *AQ components* as **Function [FaaS]** on **Structure [PaaS]**
       * **b.** **Invoices** the *execution of data prcessing* as staged output **Content-Addresses**
-  * **B: Content-Addressed Bills-of-Materials (BOMs)** -
+  * **B: Content-Addressed Bills-of-Materials (BOMs)** - *BOMs* employ **Content Identifiers (CIDs)** as *Content-Addesable Storage* of CATs to provide a means of [Data Verification](https://en.wikipedia.org/wiki/Data_verification) & location-agnostic **data transportation / retrieval** via a unique identification of CAT content. CATs' use of this content-addressing mechanism establishes a self-service Data Mesh as a heterogeneously scalable Compute Platform deployable on [Kubernetes](https://kubernetes.io/) as CAT Node's execution paradigm (Structure [PaaS]). 
     * **3.** the *Node's* **Runtime** *emits* a **BOM** as the *Mesh-transportable Data Provenance record* to be *shared* & *re-executed* between Node
 
 ### Content-Addressed BOMs used for Data Transport establishes and sustains Data Initiatives
 ![CATs BOM Activity](images/CATs_bom_activity_ag.jpeg)
-- **[Data Initiatives:](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative)** - Participating organizations and collaborators will employ CATs for rapid ratification of service agreements within collaborative feedback loops of **[Data Initiatives](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative)**. CATs' apply an **Architectural Quantum** *Domain-Driven Design* principle described in **[Data Mesh of Data Products](https://martinfowler.com/articles/data-mesh-principles.html)** to *reify* Data Initiatives.(* **[Design Description](docs/DESIGN.md)**)
-- **Collaboration:** The registration and cataloging of **BOMs** establishes and sustains *Data Initiatives* because content-addressing BOMs for **Data Provenance** makes CATs *reteivable, shareable, composable, re-executable, and iteroperable* such that they support *Inter & Intra-Orginizational Collaboration* on **Data Products**. *Data Initiatives* will be naturally established as a result of cross-collaboration on CAT Node's *Data Products* by communicating BOMs that produce CATs. Data Product teams with impliment CAT Nodes to produce interconnected *Data Services of CATs between Products* on a Data Mesh. 
-- **Data Transport:** *BOMs* employ **Content Identifiers (CIDs)** for Content-Addesable Storage to provide a means of location-agnostic data transportation / retrieval based on its content / CAT processes for [Data Verification](https://en.wikipedia.org/wiki/Data_verification). Therefore, the implementation of CATs' as content-addressed data processes establishes and self-services a scalable Data Platform as a Data Mesh network of interoperable and scalable computing workloads deployable on [Kubernetes](https://kubernetes.io/) as CATs execution paradigm. 
+- **[Data Initiatives:](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative)** - Participating organizations and collaborators will employ CATs for rapid ratification of service agreements within collaborative feedback loops of **[Data Initiatives](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative)**. 
+  - CATs' **Architectural Quantum (AQ)** is a [Minimal Federated Operating Model](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/) employed by CATs' **Action Plane** the *AQ Domain-Driven Design* as a principle described in **[Data Mesh of Data Products](https://martinfowler.com/articles/data-mesh-principles.html)** to *reify Data Initiatives* (**[Design Description](docs/DESIGN.md)**). 
+  - CATs' **Action Plane** is the *Analytical Data Processing interface* that orchestrates and supervises how virtual resources owned by *Data Product(s)* should be *managed, routed, and processed* in alignment with *Data Initiatives* and is stored “offmesh” (“offline”). The AQ supervises the exchange of data between sub-Process components within the Data sub-Plane (Process) in adherence to Data Contracting Standards of organizations participating in a Data Mesh.
+  - **Cross-Product Collaboration:** The registration and cataloging of **BOMs** for managment on the *Action Plane* establishes and sustains *Data Initiatives* because content-addressing BOMs for **Data Provenance** makes CATs *reteivable, shareable, composable, re-executable, and iteroperable* amongst independent teams such that they support *Inter & Intra-Orginizational Collaboration* on **Data Products**. *Data Initiatives* will be naturally established as a result of cross-collaboration on CAT Node's *Data Products* by communicating BOMs that produce CATs. 
+  - **Intra-Product Collaboration:** Multidisciplinary *Data Product teams* impliment CAT Nodes to produce interconnected *Data Services of CATs between Products* on a Data Mesh by *operating, contributing, and maintaining* different portions of the entire cloud-service model / XaaS in adherence to CATs' *Architectural Quantum*. Teams can submit contributions as CAT **Orders** based on Subject-Mater Expertise and/or their roles using CATs’ *Order API*. 
+  - CAT's **Order API** is used to generate an *Order* of CATs and is a part of BOM's Data Model for which can be utilized for a variety of Use-Cases.
 
 ## Get Started!:
 #### 0. Clone CATs:
@@ -35,9 +38,9 @@ cd cats
 uv python install   # installs the Python version pinned in .python-version
 uv sync             # creates .venv and installs locked dependencies from uv.lock
 ```
-  - See `[ENV.md](./docs/ENV.md)` for the full environment workflow, including the `ops` and `mac` extras.
+  - See [ENV.md](./docs/ENV.md) for the full environment workflow, including the `ops` and `mac` extras.
 #### 1. Installation:
-`make deps-all` - Runs on macOS or Linux (see the `[Makefile](./Makefile)` and `make help`), or follow `[DEPS.md](./docs/DEPS.md)` to install each dependency manually.
+`make deps-all` - Runs on macOS or Linux (see the [Makefile](./Makefile) and `make help`), or follow [DEPS.md](./docs/DEPS.md) to install each dependency manually.
 #### 2. [Node Lifecycle](./docs/NodeLifeCycle.md) — start / status / stop:
 ```bash
 make node-up     # content-store-ensure && node-start
@@ -45,7 +48,7 @@ make node-status # flask=up|down + content_store=ready|not_ready
 make node-stop   # Flask only — host Kubo left running
 ```
 *Optional:* `make node-down` = `make node-stop` + `ipfs shutdown`
-Full command reference, exit codes, and why ensure ≠ start: [`NodeLifeCycle.md`](./docs/NodeLifeCycle.md).
+Full command reference, exit codes, and why ensure ≠ start: [NodeLifeCycle.md](./docs/NodeLifeCycle.md).
 #### 3. [Demonstration](./docs/DEMO.md):
 CAT Node is shipped with *Techncal Use-Case CAT Workload Specifications ( Templates / "Recipies")* as *CAT **Orders*** for which proccess will be executed and **Invoiced**. This repository will feature a Scalable Scientific Computing application **Ordered** as a 2 CATs. This **Order** is specified to utilize [Ray](https://www.ray.io/) as an execution middleware framework **Plant (SaaS)** deployed on **[Kubernetes](https://kubernetes.io/)** for interoperable & parallelized distributed computing applications / Big Data processing with Scientific Computing enabled [ecosystem integrations](https://docs.ray.io/en/latest/ray-overview/ray-libraries.html) such as [Apache Spark](https://spark.apache.org/), and [PyTorch](https://pytorch.org/).
 #### 4. [Testing:](./docs/TEST.md) *CAT Node Integration & Unit Tests*
@@ -57,34 +60,8 @@ CAT Node is shipped with *Techncal Use-Case CAT Workload Specifications ( Templa
       * `uv run python utils/code2flow/diagram_c2f.py`
     * `pyreverse` used to generates *Class & Dependency Diagrams*: 
       * `uv run pyreverse -o png -p CATs -d images/pyreverse cats`
-#### 7. [Contribute!](docs/CONTRIBUTING.md)
 
-## Concepts:
-
-### CATs' Architectural Quantum:
-
-![CAT Kernel](images/CATkernel.jpeg)
-- The **Action Plane** is the Analytical Data Processing interface. The Action Plane orchestrates and supervises how virtual resources owned by the Data Product should be managed, routed, and processed and is stored “offmesh” (“offline”). It supervises the exchange of data between sub-Process components within the Data sub-Plane (Process) in adherence to Data Contracting Standards of organizations participating in a Data Mesh.
-
-#### Quantum Architecture Description as a [Minimal Federated Operating Model](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/)
-
-- **Function [FaaS]** is a Function-as-a-Service for scalable Data Processing and analytics: **Process [Composed Function]** + **InfraFunction [Actuator]**, authored via the **REPLaC (REPL as Code) Workflow UI** of Function [FaaS] (this demo: Marimo, e.g. [`cats_demo.py`](cats_demo.py)). *Functions* are deployed on **Structure [PaaS]**; mutating either *Process* or *InfraFunction* updates the CAT **Order** in alignment with CATs *Architectural Quantum’s* Functionality
-  - **Process [Composed Function]** is the composed callable graph (FaaS-composer analogue): **ingress / integration_cache / egress** (transport) plus `**integrated_subproc`** — the tHOF, i.e. the input→output data transform ([transfer function](https://en.wikipedia.org/wiki/Transfer_function)), often higher-order because it applies a batch function (e.g. via Ray `map_batches`). Process is the composition, not the notebook UI and not itself a tHOF. Mutating a ***Function's* Process [Composed Function]** produces a new **Order** whose `function_cid` reflects that update, for the Node's Factory to process on the next execution (*)
-  - **InfraFunction [Actuator]** receives the tHOF **Process [Composed Function]** submits and dispatches it onto the Plant (SaaS); transport callables run locally around that dispatch, not as Plant jobs
-    - Mutating InfraFunction [Actuator]'s dispatch configuration produces a new Order whose updated `function_cid` carries the updated actuator, alongside any Process-composed callable CIDs and any resulting `structure_cid` update reflecting the **Plant [SaaS]** it now targets (*)
-- **Structure [PaaS(as IaC)]** provisions and maintains the **Plant [SaaS]** as **Function’s [FaaS]** scalable execution environment. 
-  - **Plant [SaaS]** is composed from **InfraStructure [IaaS]** as **Structure's** dynamically scaled execution environment of 
-  **Function [FaaS]** — the runtime onto which **InfraFunction [Actuator]** dispatches the tHOF (`integrated_subproc`) submitted by **Process [Composed Function]**
-  - **InfraStructure (IaaS)** provisions and maintains the dynamically scaled infrastructure that composes a Plant (SaaS).
-    - The CAT Order is updated in alignment with event-driven functionality and operations: mutating InfraStructure 
-    (IaaS)'s provisioning produces a new Order with an updated `structure_cid` (*)
-
-(* Each of these Order mutations produces the next Order a subsequent CAT execution processes - see 
-**[NodeProductFlow.md](docs/NodeProductFlow.md)**, whose step 0 note documents how that next Order is (once the 
-not-yet-built registry exists) meant to be discovered rather than supplied out-of-band.)
-
-Each of these components is content-addressed and reconstituted at runtime with the same composition it was CID-ed with: the Factory consumes a single **Order CID** - resolving to Input Invoice, Function, and Structure CIDs - composes `Function` and constructs `Structure` from those CIDs, then instantiates a fresh, ephemeral **Executor** per CAT execution with them as its dependencies - `Structure` in turn composing its `Plant` from its `InfraStructure`, and `Function` its `Process` from its `InfraFunction` - and the Executor itself (not a layer above it) produces the resulting **Invoice CID**. 
-(* **[Quantum-as-CIDs details](docs/DESIGN.md#how-the-architectural-quantum-is-realized-as-content-addressed-cids)**)
+### [Contribute!](docs/CONTRIBUTING.md)
 
 ### CAT Mesh: CATs Data Mesh platform with Data Provenance
 
