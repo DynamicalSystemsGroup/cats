@@ -1,4 +1,4 @@
-### CAT Node's Architectural Quantum (Domain-Driven Design principle):
+# Domain-Driven Design: CAT Node's Quantum Architecture Principle:
 
 CAT Node uses the Architectural Quantum Domain-Driven Design principle described in 
 [**Data Mesh of Data Products**](https://martinfowler.com/articles/data-mesh-principles.html)
@@ -6,7 +6,7 @@ CAT Node uses the Architectural Quantum Domain-Driven Design principle described
 This design principle enables effective cross-domain collaboration on Data Products across business and 
 knowledge domains between cross-functional & multi-disciplinary teams and organizations.
 
-![alt_text](../images/CATkernel.jpeg)
+![CAT Kernel](images/CATkernel.jpeg)
 
 CAT’s architectural design and implementation are the result of applied Engineering, Computer Science, Network Science, 
 and Social Science. CATs is software executing on a network client ontological to an MicroKernel Operating System. CATs’ 
@@ -16,6 +16,25 @@ a product. Data Products use the Architectural Quantum domain-driven design prin
 “smallest unit of architecture that can be independently deployed with high functional cohesion, and includes all the 
 structural elements required for its function” 
 ([“Data Mesh Principles and Logical Architecture”](https://martinfowler.com/articles/data-mesh-principles.html#:~:text=smallest%20unit%20of%20architecture%20that%20can%20be%20independently%20deployed%20with%20high%20functional%20cohesion%2C%20and%20includes%20all%20the%20structural%20elements%20required%20for%20its%20function.) - Zhamak Dehghani, et al.).
+
+### Description: CATs' Architectural Quantum (AQ) as a [Minimal Federated Operating Model](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/)
+
+- **Function [FaaS]** is a Function-as-a-Service for scalable Data Processing and analytics: **Process [Composed Function]** + **InfraFunction [Actuator]**, authored via the **REPLaC (REPL as Code) Workflow UI** of Function [FaaS] (this demo: Marimo, e.g. [`cats_demo.py`](cats_demo.py)). *Functions* are deployed on **Structure [PaaS]**; mutating either *Process* or *InfraFunction* updates the CAT **Order** in alignment with CATs *Architectural Quantum’s* Functionality
+  - **Process [Composed Function]** is the composed callable graph (FaaS-composer analogue): **ingress / integration_cache / egress** (transport) plus `**integrated_subproc`** — the tHOF, i.e. the input→output data transform ([transfer function](https://en.wikipedia.org/wiki/Transfer_function)), often higher-order because it applies a batch function (e.g. via Ray `map_batches`). Process is the composition, not the notebook UI and not itself a tHOF. Mutating a ***Function's* Process [Composed Function]** produces a new **Order** whose `function_cid` reflects that update, for the Node's Factory to process on the next execution (*)
+  - **InfraFunction [Actuator]** receives the tHOF **Process [Composed Function]** submits and dispatches it onto the Plant (SaaS); transport callables run locally around that dispatch, not as Plant jobs
+    - Mutating InfraFunction [Actuator]'s dispatch configuration produces a new Order whose updated `function_cid` carries the updated actuator, alongside any Process-composed callable CIDs and any resulting `structure_cid` update reflecting the **Plant [SaaS]** it now targets (*)
+- **Structure [PaaS(as IaC)]** provisions and maintains the **Plant [SaaS]** as **Function’s [FaaS]** scalable execution environment. 
+  - **Plant [SaaS]** is composed from **InfraStructure [IaaS]** as **Structure's** dynamically scaled execution environment of 
+  **Function [FaaS]** — the runtime onto which **InfraFunction [Actuator]** dispatches the tHOF (`integrated_subproc`) submitted by **Process [Composed Function]**
+  - **InfraStructure (IaaS)** provisions and maintains the dynamically scaled infrastructure that composes a Plant (SaaS).
+    - The CAT Order is updated in alignment with event-driven functionality and operations: mutating InfraStructure 
+    (IaaS)'s provisioning produces a new Order with an updated `structure_cid` (*)
+
+(* Each of these Order mutations produces the next Order a subsequent CAT execution processes - see 
+**[NodeProductFlow.md](docs/NodeProductFlow.md)**, whose step 0 note documents how that next Order is (once the 
+not-yet-built registry exists) meant to be discovered rather than supplied out-of-band.)
+
+Each of these components is content-addressed and reconstituted at runtime with the same composition it was CID-ed with: the Factory consumes a single **Order CID** - resolving to Input Invoice, Function, and Structure CIDs - composes `Function` and constructs `Structure` from those CIDs, then instantiates a fresh, ephemeral **Executor** per CAT execution with them as its dependencies - `Structure` in turn composing its `Plant` from its `InfraStructure`, and `Function` its `Process` from its `InfraFunction` - and the Executor itself (not a layer above it) produces the resulting **Invoice CID**.
 
 ### How the Architectural Quantum is realized as content-addressed CIDs:
 
@@ -27,14 +46,8 @@ The Quantum's "smallest unit of architecture... with high functional cohesion" i
 
 The **Factory** reconstitutes this Quantum at runtime with the same composition it was CID-ed with: it composes `Function` and constructs `Structure` from the Order's `function_cid`/`structure_cid`, then instantiates the **Executor** with them as its dependencies. Each in turn composes its own CID-ed sub-component the same way - `Structure` composes its `Plant` from its `InfraStructure`, and `Function` composes its `Processor` from its `InfraFunction` - so Function [FaaS] executes on Structure [PaaS] by InfraFunction [Actuator] dispatching the tHOF (`integrated_subproc`) submitted by Process [Composed Function] onto Plant [SaaS], while ingress / integration_cache / egress run as local transport around that dispatch, exactly as the Quantum's applied disciplines describe below. Composition stays on the Order CID graph (sequential Executor stages); interim Control-Feedback Loop feedback uses Invoice stage CIDs (`ingress_data_cid`, `integration_data_cid`, `data_cid`) until Seed is implemented. The Executor itself - not a layer above it - is what produces the resulting **Invoice CID**, so the whole Order-in/Invoice-out cycle stays within the one independently-deployable, functionally-cohesive unit the Quantum principle calls for. (* **[CID-level details](BOM.md)**, * **[Lineage-of-Provenance context](LineageOfProvenance.md)**)
 
-### Collaborative value of CATs Architectural Quantum:
-The operation and maintenance of CATs’ Data Products on a Data Mesh can occur between independent teams that will 
-operate, contribute, and maintain different portions of the entire cloud-service model in adherence to CATs' 
-Architectural Quantum in a way suitable for their roles using the CATs’ API to serve individual Data Model entities on a 
-Data Mesh for a variety of use-cases. CAT’s Data Product teams can be multidisciplinary due to the fact they can operate 
-and maintain the different portions of the entire Web2 cloud service model based on role.
-
-### Data Product Team Example:
+### Data Product Team Example: 
+Multidisciplinary Data Product teams can *operate, contribute, and maintain* different portions the different portions of the entire cloud service model based on role in adherence to the AQ.
 * Applied discipline for **Functions (FaaS)**
   * **Data Science** involves exploratory data analysis (EDA), data cleaning and visualization, and 
   predictive modeling / machine learning to inform Control Plane decisions and strategies. 
