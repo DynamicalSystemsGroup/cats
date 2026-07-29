@@ -65,10 +65,9 @@ CAT Node is shipped with *Techncal Use-Case CAT Workload Specifications ( Templa
 
 ### [Contribute!](docs/CONTRIBUTING.md)
 
-### CAT Mesh: CATs Data Mesh platform with Data Provenance
+### Data Product Design Domains on a CAT Node Mesh:
 
 **In the following image:** 
-
 - Large ovals in the image above represent **Data Products** servicing each other with Data
 - "O" ovals are Operational Data web service endpoints
 - "D" ovals are Analytical Data web service endpoints
