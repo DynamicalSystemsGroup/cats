@@ -80,7 +80,7 @@ endef
 	deps-docker deps-uv deps-kind deps-kubectl deps-terraform deps-go deps-ipfs deps-helm \
 	deps-graphviz \
 	check-pkg-manager print-versions \
-	node-start node-stop node-status node-up content-store-ensure \
+	node-start node-stop node-status node-up node-down content-store-ensure \
 	execute-order diagrams
 
 CONTENT_STORE_UTILS := data/input/structure/infrastructure/content_store_utils.py
@@ -108,6 +108,7 @@ help:
 	@echo ""
 	@echo "Node lifecycle (AQ-safe: start asserts ContentStore; ensure heals; stop = Flask only):"
 	@echo "  make node-up               Convenience: content-store-ensure then node-start"
+	@echo "  make node-down             Convenience: node-stop then ipfs shutdown (Make-only)"
 	@echo "  make content-store-ensure  InfraStructure ContentStore.ensure CLI (heal/start Kubo)"
 	@echo "  make node-start            Assert bootstrap ContentStore ready, then bind Flask"
 	@echo "  make node-stop             Stop Flask Node only (never host Kubo)"
@@ -336,6 +337,11 @@ print-versions:
 	@command -v dot       >/dev/null && printf "%-10s %s\n" graphviz  "$$(dot -V 2>&1)"                 || printf "%-10s not installed (optional)\n" graphviz
 
 node-up: content-store-ensure node-start
+
+# Make-only teardown: Flask then host Kubo. Does not live in cats.node stop
+# (Node remains a ContentStore client; see docs/NodeLifeCycle.md).
+node-down: node-stop
+	-ipfs shutdown
 
 node-start:
 	uv run python -m cats.node start

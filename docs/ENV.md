@@ -20,7 +20,7 @@ The [MAC experiment](../experiments/mac/MAC.md) isn't a package extra — it's i
 and not part of the `cats` package's published dependencies.
 #### 2. Run commands in the environment (no manual activate/deactivate needed)
 ```bash
-make node-up                    # content-store-ensure then node-start (or split targets; see STORAGE.md)
+make node-up                    # content-store-ensure then node-start (see NodeLifeCycle.md)
 make node-stop                  # Flask only — never host Kubo
 uv run pytest tests/test_provenance.py
 ```

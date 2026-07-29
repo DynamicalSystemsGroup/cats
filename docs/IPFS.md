@@ -87,7 +87,7 @@ uv run python data/input/structure/infrastructure/content_store_utils.py ensure
 uv run python data/input/structure/infrastructure/content_store_utils.py status
 # or: make content-store-ensure
 
-# Node lifecycle (start asserts ContentStore ready; stop never stops Kubo)
+# Node lifecycle — full reference: NodeLifeCycle.md
 make content-store-ensure   # heal/start host Kubo if needed
 make node-start             # or: uv run python -m cats.node start
 make node-stop              # Flask only
@@ -95,10 +95,10 @@ make node-status            # flask=up|down + content_store=ready|not_ready
 uv run python -m cats.node ensure   # operator ContentStore.ensure, no Flask
 ```
 
-Content-store `status` exits 0 when the HTTP API is up, 1 otherwise. Node `status` exits 0 only when Flask
-is listening **and** ContentStore is ready. ContentMesh runs a **lazy bootstrap readiness soft-warn** on
-first IPFS use (no `ContentStore.ensure` / heal) if you skip Node start / the CLI — never on package
-import.
+See [`NodeLifeCycle.md`](./NodeLifeCycle.md) for the Node process lifecycle. Content-store `status` exits 0 when the
+HTTP API is up, 1 otherwise. Node `status` exits 0 only when Flask is listening **and** ContentStore is
+ready. ContentMesh runs a **lazy bootstrap readiness soft-warn** on first IPFS use (no
+`ContentStore.ensure` / heal) if you skip Node start / the CLI — never on package import.
 
 #### Manual start (optional)
 
@@ -117,11 +117,13 @@ This is expected and harmless — it just means a daemon is already up and servi
 
 ```bash
 ipfs shutdown
+# or full local teardown (Flask + Kubo): make node-down
 ```
 
 Stop host Kubo only when you intend to (operator). **Do not** tie shutdown to Node exit / `make node-stop` or
 Structure destroy — the content-store facet is meant to outlive those for BOM inspection and the next demo
-session.
+session. `make node-down` is the Make-only convenience that chains `node-stop` then `ipfs shutdown`; see
+[`NodeLifeCycle.md`](./NodeLifeCycle.md).
 
 #### Checking status
 

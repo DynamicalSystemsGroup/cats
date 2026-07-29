@@ -4,22 +4,10 @@
 
 ##### 0. Start Docker daemon:
 
-##### 1. IPFS content store (InfraStructure): see `[IPFS.md](./IPFS.md)`
+##### 1. IPFS content store + Node lifecycle: see [`NodeLifeCycle.md`](./NodeLifeCycle.md) (host Kubo detail: [`IPFS.md`](./IPFS.md))
 
 Host Kubo is InfraStructure’s long-lived **content-store facet**. **Before** `make node-start`, ensure
-the ContentStore API is up (Node start **asserts** only — it does not heal). ContentMesh soft-warns if
-the API is down and does **not** auto-ensure. Order-submitted TF `host_ipfs_daemon` create is the sole
-**automatic** ensure during Structure apply; `apply` then asserts readiness.
-
-```bash
-# from repo root — heal/start host Kubo (required before node-start if :5001 is down)
-make content-store-ensure
-# or: uv run python data/input/structure/infrastructure/content_store_utils.py ensure
-# or: uv run python -m cats.node ensure
-```
-
-Or run `ipfs daemon` yourself only if you want its logs in their own terminal. `make node-stop` / Node exit
-and Structure destroy do **not** stop host Kubo.
+the ContentStore API is up (Node start **asserts** only — it does not heal). See [`NodeLifeCycle.md`](./NodeLifeCycle.md).
 
 ##### 2. [Create the environment](./docs/ENV.md) and install dependencies *in Terminal C*:
 
@@ -34,13 +22,10 @@ pandas for the mesh workflow. `uv run` (below) uses this environment automatical
 
 ##### 3. Deploy CAT Node *in Terminal A*:
 
-Follow [Get Started! step 3](../README.md#get-started) in the README.
+Follow [`NodeLifeCycle.md`](./NodeLifeCycle.md) (or [Get Started!](../README.md#get-started)).
 ```bash
-make node-start
-```
-To stop Flask only afterward, see [Get Started! step 7](../README.md#get-started).
-```bash
-make node-stop
+make node-up                 # or: make content-store-ensure && make node-start
+make node-stop               # Flask only — host Kubo left running
 ```
 
 ##### 4. Establish Data (CAT) Mesh *in Terminal B*: [Demo](../cats_demo.py)

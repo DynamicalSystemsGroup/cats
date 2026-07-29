@@ -134,6 +134,7 @@ See [`MinIO.md`](./MinIO.md) and [`BOM.md`](./BOM.md) for Invoice stage CIDs.
 
 ## Related docs
 
+- [`NodeLifeCycle.md`](./NodeLifeCycle.md) — start / stop / status / ensure (Node process lifecycle)
 - [`INTEROP.md`](./INTEROP.md) — prove Plant/T&D interoperability per AQ component (incl. second Plant)
 - [`MinIO.md`](./MinIO.md) — operate the Structure MinIO shared object store
 - [`IPFS.md`](./IPFS.md) — host Kubo content-store facet + transport peering (`TransportContext`)
