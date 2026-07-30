@@ -72,6 +72,7 @@ make node-start
 
 - Strict bootstrap `ContentStore.is_ready` before Flask binds.
 - Clears a prior `cats.node` listener on the Node port (does not kill unrelated processes, e.g. AirPlay on 5000).
+- Fails loud if the port is still held by a non-`cats.node` process — set `CAT_NODE_PORT` (e.g. `5002`) when macOS AirPlay owns `:5000`.
 - On SIGINT / SIGTERM, exits without stopping host Kubo.
 
 ### Status
