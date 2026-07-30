@@ -1,4 +1,7 @@
-"""Feedback / identity Phase 1 seams (JSON-LD/PROV + DID; no AddressStore)."""
+"""Feedback / identity Phase 1 seams (JSON-LD/PROV + DID).
+
+AddressStore (Phase 2a gateway reads) is covered in test_address_store_gateway.py.
+"""
 
 from cats.network.feedback import attach_node_did, build_execution_bom
 from cats.network.identity import node_did, node_uri

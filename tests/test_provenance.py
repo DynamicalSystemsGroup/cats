@@ -17,6 +17,7 @@ import pytest
 
 from cats import DATA_HOME, CONTENT_MESH as contentMesh
 from cats import INPUT_STRUCTURE_HOME, INPUT_DATA_HOME
+from cats.network import _node_init_endpoint
 from cats.network.feedback import verify_execution_bom
 
 from data.input.function.process import (
@@ -264,7 +265,7 @@ def _create_order_request(*, integrated_subproc):
         infrafunction_subproc=infrafunction_subproc,
         data_dirpath=INPUT_DATA_HOME,
         structure_filepath=INPUT_STRUCTURE_HOME,
-        endpoint='http://127.0.0.1:5000/cat/node/init',
+        endpoint=_node_init_endpoint(),
     )
     pprint(order_request)
     print()

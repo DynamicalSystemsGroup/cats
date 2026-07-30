@@ -36,6 +36,7 @@ data/testing/
 data/input/order.json
 data/input/__pycache__/
 data/input/function/__pycache__/
+data/input/structure/**/__pycache__/
 data/input/.terraform/
 
 # data/input/structure — runtime artifacts
