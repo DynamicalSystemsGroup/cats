@@ -13,6 +13,10 @@ __marimo__/**
 .env
 *.zip
 
+# Node DID key material (did:key persistence under CATS_HOME)
+.cats/
+
+
 # --- Terraform (local state & cache; lock file is committed) ---
 **/.terraform/
 **/.terraform-data/
