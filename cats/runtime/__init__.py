@@ -3,8 +3,8 @@ from pathlib import Path
 
 from cats.factory import Factory
 from cats.network import ContentMesh
-from cats.network.feedback import build_execution_bom
-from cats.network.identity import node_uri as resolve_node_uri
+from cats.network.feedback import build_execution_bom, sign_execution_bom
+from cats.network.identity import node_did as resolve_node_did
 from cats.utils import subproc_run, executeCMD
 
 
@@ -98,15 +98,17 @@ class Runtime:
         executor = catFactory.produce()
         # invoice_cid (and structure_as_executed nesting / order_cid
         # backfill) is produced by Executor.execute() — Runtime.execute()
-        # only wraps invoice_cid + log_cid + node_uri into bom/bom_cid.
+        # wraps invoice_cid + log_cid + node_did, signs (Phase 1b), then
+        # mints bom_cid over the signed object.
         enhanced_bom, invoice_cid = executor.execute(order_request)
 
         # Structure as-executed nesting is on the Invoice (Executor-minted).
         bom = build_execution_bom(
             log_cid=enhanced_bom['log_cid'],
             invoice_cid=invoice_cid,
-            node_uri=resolve_node_uri(),
+            node_did=resolve_node_did(cats_home=self.CATS_HOME),
         )
+        bom = sign_execution_bom(bom, cats_home=self.CATS_HOME)
         bom_response = {
             'bom': bom,
             'bom_cid': self.contentMesh.ipfsClient.add_str(json.dumps(bom)),

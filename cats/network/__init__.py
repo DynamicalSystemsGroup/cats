@@ -2,16 +2,22 @@
 
 Public imports are stable; implementation lives in sibling modules.
 Plant CoD transport: ``cats.network.plant_transport.CoDTransport``.
-W3C-ready seams (kept): ``feedback`` / ``identity`` (no W3C libs yet).
-AddressStore adapter seam deferred — ContentMesh uses CatsIPFSClient directly.
+W3C Phase 1/1b seams: ``feedback`` (JSON-LD/PROV + Data Integrity) /
+``identity`` (DID + signing material). AddressStore deferred — ContentMesh
+uses CatsIPFSClient directly.
 """
 from cats.network.bootstrap import (
     _bootstrap_content_store_utils_path,
     _load_bootstrap_content_store_module,
 )
 from cats.network.content_mesh import ContentMesh
-from cats.network.feedback import attach_node_uri, build_execution_bom
-from cats.network.identity import node_uri
+from cats.network.feedback import (
+    attach_node_did,
+    build_execution_bom,
+    sign_execution_bom,
+    verify_execution_bom,
+)
+from cats.network.identity import load_node_signing_material, node_did, node_uri
 from cats.network.named_binds import (
     STOCK_INFRAFUNCTION_SLOT_QUALNAMES,
     STOCK_PROCESS_SLOT_QUALNAMES,
@@ -39,9 +45,13 @@ from cats.network.plant_transport import CoDTransport
 __all__ = [
     'ContentMesh',
     'CoDTransport',
+    'node_did',
     'node_uri',
+    'load_node_signing_material',
     'build_execution_bom',
-    'attach_node_uri',
+    'attach_node_did',
+    'sign_execution_bom',
+    'verify_execution_bom',
     'STRUCTURE_ROOT_DIRNAME',
     'STRUCTURE_ROOT_FILES',
     'FUNCTION_PACKAGE_NAMES',
