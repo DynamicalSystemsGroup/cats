@@ -216,9 +216,11 @@ version = "0.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "cloudpickle" },
+    { name = "cryptography" },
     { name = "flask" },
     { name = "python-dotenv" },
     { name = "requests" },
+    { name = "rfc8785" },
 ]
 
 [package.optional-dependencies]
@@ -241,6 +243,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "cloudpickle", specifier = ">=3.0.0" },
+    { name = "cryptography", specifier = ">=42.0.0" },
     { name = "flask", specifier = ">=3.0.0" },
     { name = "marimo", marker = "extra == 'ops'", specifier = ">=0.23.0" },
     { name = "pandas", marker = "extra == 'ops'", specifier = ">=2.2.3" },
@@ -248,6 +251,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "ray", extras = ["default", "data"], marker = "extra == 'ops'", specifier = ">=2.45.0" },
     { name = "requests", specifier = ">=2.31.0" },
+    { name = "rfc8785", specifier = ">=0.1.0" },
     { name = "tqdm", marker = "extra == 'ops'", specifier = ">=4.66.5" },
 ]
 provides-extras = ["ops"]
@@ -2051,6 +2055,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ac/c3/e2a2b89f2d3e2179abd6d00ebd70bff6273f37fb3e0cc209f48b39d00cbf/requests-2.34.2.tar.gz", hash = "sha256:f288924cae4e29463698d6d60bc6a4da69c89185ad1e0bcc4104f584e960b9ed", size = 142856, upload-time = "2026-05-14T19:25:27.735Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl", hash = "sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0", size = 73075, upload-time = "2026-05-14T19:25:26.443Z" },
+]
+
+[[package]]
+name = "rfc8785"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ef/2f/fa1d2e740c490191b572d33dbca5daa180cb423c24396b856f5886371d8b/rfc8785-0.1.4.tar.gz", hash = "sha256:e545841329fe0eee4f6a3b44e7034343100c12b4ec566dc06ca9735681deb4da", size = 14321, upload-time = "2024-09-27T16:33:31.206Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4d/78/119878110660b2ad709888c8a1614fce7e2fab39080ab960656dc8605bf6/rfc8785-0.1.4-py3-none-any.whl", hash = "sha256:520d690b448ecf0703691c76e1a34a24ddcd4fc5bc41d589cb7c58ec651bcd48", size = 9240, upload-time = "2024-09-27T16:33:29.683Z" },
 ]
 
 [[package]]
