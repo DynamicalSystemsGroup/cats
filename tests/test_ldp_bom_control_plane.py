@@ -84,7 +84,7 @@ def test_fetch_bom_envelope_verifies(monkeypatch, tmp_path):
             return bom
 
     class _Session:
-        def get(self, url, timeout=None):
+        def get(self, url, timeout=None, headers=None):
             assert url.endswith('/ldp/boms/QmX')
             return _Resp()
 
@@ -107,7 +107,7 @@ def test_fetch_bom_envelope_tamper_fails(monkeypatch, tmp_path):
             return bom
 
     class _Session:
-        def get(self, url, timeout=None):
+        def get(self, url, timeout=None, headers=None):
             return _Resp()
 
     with pytest.raises(LdpEnvelopeError, match='Data Integrity'):
@@ -168,6 +168,7 @@ def test_runtime_execute_publishes_ldp(monkeypatch, tmp_path):
     response = runtime.execute(factory, {'order_cid': 'QmOrder'})
     assert response['bom_cid'] == 'QmRuntimeBom'
     assert response['bom_ldp_uri'] == 'http://127.0.0.1:5002/ldp/boms/QmRuntimeBom'
+    assert response['bom_solid_uri'] is None
     stored = BomLdpStore(str(tmp_path)).get('QmRuntimeBom')
     assert stored is not None
     assert stored['invoice_cid'] == 'QmInvoice'
