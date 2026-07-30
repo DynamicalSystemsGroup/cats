@@ -8,7 +8,8 @@ import traceback
 
 from flask import Flask, request, jsonify
 
-from cats import RUNTIME
+from cats import CATS_HOME, RUNTIME
+from cats.network.ldp import register_ldp_routes
 
 catNode = Flask(__name__)
 
@@ -19,6 +20,9 @@ HOST = os.environ.get('CAT_NODE_HOST', '127.0.0.1')
 PORT = int(os.environ.get('CAT_NODE_PORT', 5000))
 
 logger = logging.getLogger(__name__)
+
+# Phase 2a control plane: LDP-shaped BOM envelope GETs (publish via Runtime).
+register_ldp_routes(catNode, cats_home=CATS_HOME)
 
 
 @catNode.route('/cat/node/init', methods=['POST'])

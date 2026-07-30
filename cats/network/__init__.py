@@ -4,7 +4,7 @@ Public imports are stable; implementation lives in sibling modules.
 Plant CoD transport: ``cats.network.plant_transport.CoDTransport``.
 W3C Phase 1/1b seams: ``feedback`` (JSON-LD/PROV + Data Integrity) /
 ``identity`` (DID + signing material). Phase 2a: ``AddressStore`` for
-gateway-first CID reads + verify; writes stay on CatsIPFSClient.
+gateway-first CID reads + verify; ``ldp`` Node-hosted BOM control plane.
 """
 from cats.network.address_store import (
     AddressStore,
@@ -12,6 +12,14 @@ from cats.network.address_store import (
     GatewayError,
     IpfsHttpGateway,
     verify_bytes_match_cid,
+)
+from cats.network.ldp import (
+    BomLdpStore,
+    LdpEnvelopeError,
+    bom_ldp_path,
+    bom_ldp_uri,
+    fetch_bom_envelope,
+    register_ldp_routes,
 )
 from cats.network.bootstrap import (
     _bootstrap_content_store_utils_path,
@@ -56,6 +64,12 @@ __all__ = [
     'GatewayError',
     'IpfsHttpGateway',
     'verify_bytes_match_cid',
+    'BomLdpStore',
+    'LdpEnvelopeError',
+    'bom_ldp_path',
+    'bom_ldp_uri',
+    'fetch_bom_envelope',
+    'register_ldp_routes',
     'CoDTransport',
     'node_did',
     'node_uri',
