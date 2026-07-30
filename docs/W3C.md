@@ -3,8 +3,8 @@
 Scope: **how provenance is modeled, attributed, signed, published, and discovered** — not Plant/MinIO/transport rewrites.
 
 ## One-line verdict (provenance)
-* `dev:` lineage is mostly **implicit** [CID](https://docs.ipfs.tech/concepts/content-addressing/) **threading**.
-* `w3c:` lineage is an **explicit,** [DID](https://www.w3.org/TR/did-core/)**-attributed**, [Data Integrity](https://www.w3.org/TR/vc-data-integrity/)**-signed** [JSON-LD](https://www.w3.org/TR/json-ld11/)/[PROV-O](https://www.w3.org/TR/prov-o/) **envelope**, published at [LDP](https://www.w3.org/TR/ldp/)/[Solid](https://solidproject.org/) **HTTP locators** peers can fetch and verify — while **CID remains the address of record** for referenced stage products. The remaining provenance gap is **registry / reverse lookup**, not signing.
+* `dev:` provenance is mostly **implicit** [CID](https://docs.ipfs.tech/concepts/content-addressing/) **threading**.
+* `w3c:` lineage is an **explicit,** [DID](https://www.w3.org/TR/did-core/)**-attributed**, [Data Integrity](https://www.w3.org/TR/vc-data-integrity/)**-signed** [JSON-LD](https://www.w3.org/TR/json-ld11/)/[PROV-O](https://www.w3.org/TR/prov-o/) **envelope**, published at [LDP](https://www.w3.org/TR/ldp/)/[Solid](https://solidproject.org/) **HTTP locators** peers can fetch and verify — while **CID remains the address of *provenance* record** for referenced stage products. The remaining provenance gap is **registry / reverse lookup**, not signing.
 
 ## Envelope vs stage payloads (unchanged discipline)
 Provenance package stays cheap:
