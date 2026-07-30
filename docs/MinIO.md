@@ -1,107 +1,115 @@
-### Manage the Structure MinIO Shared Object Store
+### Manage InfraStructure MinIO (scratch + durable Entity Relationship)
 
-CATs uses MinIO as InfraStructure [IaaS] **shared object store / scratch** for Plant-side parallel Ray
-writes (bucket `cats-scratch`). **MinIO is [S3-compatible](https://min.io/product/s3-compatibility)** —
-it speaks the Amazon S3 API — so Plant workers and `ObjectStore` address scratch with standard S3
-semantics (`s3://cats-scratch/…`, bucket/key layout, S3 SDK/CLI tools). That is the interop surface for
-job landing; a future S3-compatible backend would still sit behind the same `ObjectStore` /
-`JobHandle` contract (see [`INTEROP.md`](./INTEROP.md)). Durable post-run retrieval of integration
-outputs is via IPFS (`invoice.integration_data_cid`), not MinIO. See [`STORAGE.md`](./STORAGE.md).
+CATs runs **two hard-isolated MinIO daemons** under InfraStructure [IaaS], both
+[S3-compatible](https://min.io/product/s3-compatibility):
 
-MinIO access is **InfraStructure-as-Code** (directory model): the module under
-`data/input/structure/infrastructure/` is what `create_order_request()` CIDs as
-`infrastructure_cid`. Object-store config is resolved at runtime as `ObjectStore` via
-`InfraStructure.obj_store_context()` (importlib seam into `obj_store_utils.py`) — it is **not** a
-Service field. Job scratch write/download (`ObjectStore.begin_job` / `write_job_scratch` /
-`download_job_result`) and `JobHandle` live in that module tree: `write_job_scratch`
-stages pod-reachable MinIO config only. Ray landing (`ray_job_result_entrypoint.py`,
-`ray_compute_utils.py` / `RayComputePort`) ships under `plant/` (`plant_cid`) and is
-staged by `RayPlantPort.submit_job` — another Plant would ship its own landing under
-its `plant_cid`. `ObjectStore.result_uri` / `download_job_result` take **`JobHandle`**
-only. InfraFunction only orchestrates Plant dispatch via `PlantPort`. There is **no
-CAT Node HTTP API** for job scratch — use the Console, S3 API, or the module’s local
-CLI (`obj_store_utils.py`).
+| Daemon | Bucket | Role | Lifetime |
+|--------|--------|------|----------|
+| **Scratch** | `cats-scratch` | Plant parallel Ray job landing destined for IPFS (`integration_data_cid`) | Structure: ILM expire **7 days** + destroy `down -v` hard floor |
+| **Durable Entity Relationship** | `cats-durable` | Structure-namespaced Entity Relationship tables + global `er/current/` read index | Node: no ILM; survives Structure destroy; explicit `gc-er` only |
 
-#### Automatic lifecycle — usually nothing to do
+Plant workers and `ObjectStore` use standard S3 semantics (`s3://…`, bucket/key layout).
+Durable **CAT product** retrieval after a run remains IPFS (`invoice.integration_data_cid`),
+not MinIO scratch. Durable MinIO is for **Entity Relationship lookups** across Structure
+generations — not an IPFS substitute. See [`STORAGE.md`](./STORAGE.md).
 
-Structure’s Terraform (`Structure.deploy()` / `redeploy()` / `reconcile()`) starts MinIO via
-`shell_script.docker_compose_minio` in
-`data/input/structure/infrastructure/main.tf`:
+Access is **InfraStructure-as-Code** (directory model): `data/input/structure/infrastructure/`
+is CID’d as `infrastructure_cid`. Runtime resolution is `ObjectStore` via
+`InfraStructure.obj_store_context()` — **not** a Runtime field. Scratch:
+`begin_job` / `write_job_scratch` / `download_job_result` / `JobHandle`. Durable Entity
+Relationship: `er_uri` / `write_er` / `promote_er` / `resolve_er` / `gc_er`. Ray landing
+for scratch CSV stays Plant-owned under `plant_cid`. There is **no CAT Node HTTP API** —
+use Consoles, S3 API, or `obj_store_utils.py` CLI.
 
-1. `docker-compose -p structure -f …/minio_compose.yaml up -d --wait`
-2. Wait until `http://127.0.0.1:9000/minio/health/ready` succeeds
-3. Bootstrap bucket `cats-scratch` with `minio/mc`
+#### Automatic lifecycle
 
-Compose attaches MinIO to the external `kind` Docker network so Ray pods can reach the S3 API through
-that network’s gateway IP (`minio_endpoint_pod`). Named volume `structure_minio_data` keeps objects
-across container recreate for the Structure’s lifetime.
+Structure Terraform (`Structure.deploy()` / `redeploy()` / `reconcile()`) starts both
+MinIOs in `data/input/structure/infrastructure/main.tf`:
 
-On Structure destroy, Terraform runs `docker-compose … down -v`, which removes the container **and**
-the named volume (scratch is cleared with InfraStructure).
+**Scratch** (`shell_script.docker_compose_minio_scratch` + `minio_scratch_compose.yaml`):
+
+1. `docker-compose -p structure -f …/minio_scratch_compose.yaml up -d --wait`
+2. Health: `http://127.0.0.1:9000/minio/health/ready`
+3. `mc mb -p local/cats-scratch` + ILM expire 7 days
+4. Destroy: `docker-compose … down -v` (wipes `structure_minio_scratch_data`)
+
+**Durable** (`shell_script.docker_compose_minio_durable` + `minio_durable_compose.yaml`):
+
+1. `docker-compose -p structure -f …/minio_durable_compose.yaml up -d --wait`
+2. Health: `http://127.0.0.1:9100/minio/health/ready`
+3. `mc mb -p local/cats-durable` (no ILM)
+4. Destroy: **no-op** — leave daemon/volume (`node_minio_durable_data`) for the Node
+
+Both attach to the external `kind` network so Ray pods reach S3 via the kind gateway
+(`minio_scratch_endpoint_pod` / `minio_durable_endpoint_pod`).
 
 #### Endpoints
 
-MinIO exposes an **S3-compatible API** on `:9000` (plus a web Console on `:9001`):
+| Surface | Scratch | Durable Entity Relationship |
+|---------|---------|------------------------------|
+| S3 API | http://127.0.0.1:9000 | http://127.0.0.1:9100 |
+| Console | http://127.0.0.1:9001 | http://127.0.0.1:9101 |
+| Default user | `cats-scratch` | `cats-durable` |
+| Default password | `cats-scratch-secret` | `cats-durable-secret` |
 
-| Surface | URL |
-|---------|-----|
-| S3 API (S3-compatible) | http://127.0.0.1:9000 |
-| Console | http://127.0.0.1:9001 |
-
-Default credentials (`local.minio_root_user` / `local.minio_root_password` in
-`data/input/structure/infrastructure/main.tf`):
-
-- User: `cats-minio`
-- Password: `cats-minio-secret`
-
-Change these before deploying a Structure whose console would be reachable by anyone else. See also
-[`DASHBOARDS.md`](./DASHBOARDS.md).
-
-#### Health check
-
-```bash
-curl -sf http://127.0.0.1:9000/minio/health/ready
-```
-
-Succeeds (HTTP 200) when MinIO is ready; fails otherwise.
+Change credentials before exposing consoles. See [`DASHBOARDS.md`](./DASHBOARDS.md).
 
 #### Object layout
 
-Ray job result CSVs land under:
+**Scratch** (JobHandle):
 
 ```text
 cats-scratch/jobs/<uuid>/result/*.csv
 ```
 
-After a CAT run, the BOM `log` records a non-secret correlator:
+BOM `log.object_store_result_uri`: `s3://cats-scratch/jobs/<uuid>/result`
+
+**Durable Entity Relationship** (structure namespace + global pointer):
 
 ```text
-object_store_result_uri: s3://cats-scratch/jobs/<uuid>/result
+cats-durable/structures/<applied_structure_cid>/er/<name>/…
+cats-durable/er/current/<name>          # pointer JSON → structure-scoped URI
 ```
 
-Use that URI (or the Console) to find Structure-lifetime scratch objects. Host download + `cidDir` still
-produce `invoice.integration_data_cid` for durable IPFS access. Objects are **not** deleted after each
-`cidDir`; they remain until Structure destroy (`down -v`).
+Pointer shape:
 
-#### Accessing job scratch (no Node API)
+```json
+{"uri":"s3://cats-durable/structures/<cid>/er/<name>","structure_cid":"<cid>","name":"<name>"}
+```
 
-Preferred UI: [MinIO Console](http://127.0.0.1:9001) — browse `cats-scratch/jobs/…`.
+Writes go under the structure namespace; ambient Node reads use `resolve_er` after an
+explicit `promote_er`. BOM `log` may record `durable_er_uri` / `durable_er_pointer`
+when promote is used (otherwise `null`).
 
-Optional CLI shipped in the InfraStructure module (rides in `infrastructure_cid`):
+#### CLI (no Node API)
 
 ```bash
-# from repo root, with Structure MinIO up
+# Scratch
 uv run python data/input/structure/infrastructure/obj_store_utils.py list-jobs
 uv run python data/input/structure/infrastructure/obj_store_utils.py list-files <job_uuid>
 uv run python data/input/structure/infrastructure/obj_store_utils.py get-file <job_uuid> <name.csv>
+
+# Durable Entity Relationship
+uv run python data/input/structure/infrastructure/obj_store_utils.py write-er <structure_cid> <name> <local_path>
+uv run python data/input/structure/infrastructure/obj_store_utils.py list-er <structure_cid>
+uv run python data/input/structure/infrastructure/obj_store_utils.py promote-er <structure_cid> <name>
+uv run python data/input/structure/infrastructure/obj_store_utils.py resolve-er <name>
+
+# Pointer-aware GC (roots = er/current/*; never runs on Structure destroy)
+uv run python data/input/structure/infrastructure/obj_store_utils.py gc-er --dry-run
+uv run python data/input/structure/infrastructure/obj_store_utils.py gc-er --delete
+uv run python data/input/structure/infrastructure/obj_store_utils.py gc-er --structure <cid> --delete --force
 ```
 
-Override connection via `MINIO_ENDPOINT`, `MINIO_BUCKET`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` if needed.
-Correlate jobs with `log.object_store_result_uri` from the BOM.
+Env overrides: `MINIO_SCRATCH_*` (scratch; `MINIO_*` still accepted as fallback),
+`MINIO_DURABLE_*` (durable).
+
+**Nuclear wipe** (not normal GC): remove Docker volume `node_minio_durable_data` or
+`mc rb --force` on `cats-durable`.
 
 #### Related docs
 
-- [`STORAGE.md`](./STORAGE.md) — MinIO vs IPFS roles under InfraStructure [IaaS]
-- [`IPFS.md`](./IPFS.md) — host Kubo content-store facet (`ContentStore.ensure`)
-- [`DASHBOARDS.md`](./DASHBOARDS.md) — MinIO Console link
-- [`BOM.md`](./BOM.md#cat-node-http-bom-response) — `object_store_as_executed_cid` under Invoice and stage CIDs
+- [`STORAGE.md`](./STORAGE.md) — scratch vs durable Entity Relationship vs IPFS
+- [`IPFS.md`](./IPFS.md) — host Kubo content-store facet
+- [`DASHBOARDS.md`](./DASHBOARDS.md) — both MinIO Consoles
+- [`BOM.md`](./BOM.md#cat-node-http-bom-response) — `object_store_as_executed_cid` / log correlators

@@ -1,0 +1,7 @@
+### What is Content-Addressing & How do CATs use it?
+
+**Content-Addressing** is reffering to [Content-Addressed Storage (CAS)](https://en.wikipedia.org/wiki/Content-addressable_storage), which is a method of uniquely identifying and retrieving information based on its content rather than its location or address. CATs provides verifiable data processing and transport on a Mesh network of CATs interconnected by Content-Addressing Data Provenance records with *IPFS* **[CIDs](https://docs.ipfs.io/concepts/content-addressing/)** (Content-Identifiers) issued by an IPFS **[client](https://docs.ipfs.io/install/command-line/#official-distributions)** to identify and retrieve inputs, transformations, outputs, and infrastructure (as code [IaC]) for verifying transformation accuracy given CIDs.
+![CID Example](images/cid_example.jpeg)
+
+- IPFS serves as CATs' Data Mesh's network layer to provide parallelized data ingress and egress for IPFS data. This network portability closes the gap between data analysis and operations by connecting the network planes of XaaS with IPFS. CATs connect these network planes by 
+enabling the integration of FaaS onto PaaS (SaaS & IaaS) on a **Data Mesh** network of CATs. IPFS enables this connection as p2p distributed-computing job submission in addition to the client-server job submission provided by Ray.

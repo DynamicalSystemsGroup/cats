@@ -65,8 +65,8 @@ Using `[COMPONENTS.md](COMPONENTS.md)`'s three named Architectural Components, p
 the six: **Manufacturing plant**. It takes an Order (raw materials: Input Invoice + Function CID + Structure
 CID) and assembles/composes them into a finished product (the ephemeral Executor) - the
 assembly-from-specification pattern is exactly Manufacturing plant's definition.
-Order intake/staging is `Factory.accept` (reached via `Service.initFactory`); Service remains the
-Node/platform façade, not the manufacturing logic.
+Order intake/staging is `Factory.accept` (reached via `Runtime.initFactory`); Runtime remains the
+Node process-lifetime ambient, not the manufacturing logic.
 
 ### 2. the Architectural Quantum
 

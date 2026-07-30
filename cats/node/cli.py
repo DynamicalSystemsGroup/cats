@@ -1,52 +1,28 @@
-import os
-import sys
-
-# Ray's `uv run` integration rebuilds an isolated per-worker virtualenv from
-# pyproject.toml's base `dependencies` only, which omits `ray` itself (it
-# lives under the optional `ops` extra) - workers then fail with
-# `ModuleNotFoundError: No module named 'ray'`. Disabling it makes workers
-# inherit this process's own environment instead, where `ray` is already
-# installed. Must be set before anything below can spawn a Ray worker.
-os.environ.setdefault('RAY_ENABLE_UV_RUN_RUNTIME_ENV', '0')
-
-# Running this file by path (`python cats/node.py`) only puts its own
-# directory - not the repo root - on sys.path. `data/` (holding Process
-# [Composed Function] under data/input/function/process/ and InfraFunction
-# [Actuator] under data/input/function/infrafunction/) lives at the repo
-# root, sibling to `cats/`, and isn't part of the installed `cats` package
-# - so it's only importable once the repo root is on sys.path. That's
-# needed here because InfraFunction unpickles those functions by their
-# `data.input.function.process`/`data.input.function.infrafunction`
-# module paths (see cats/executor/function/__init__.py), which requires
-# `import data` to succeed in *this* process.
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if REPO_ROOT not in sys.path:
-    sys.path.insert(0, REPO_ROOT)
+"""AQ-safe Node process lifecycle CLI: start|stop|status|ensure."""
+from __future__ import annotations
 
 import argparse
 import logging
-import json
+import os
 import signal
 import socket
 import subprocess
 import time
-import traceback
 
-from flask import Flask, request, jsonify
-from cats import CATS_HOME, SERVICE
+from cats import CATS_HOME, RUNTIME
 from cats.network import _load_bootstrap_content_store_module
+from cats.node.app import HOST, PORT, catNode
 
-catNode = Flask(__name__)
-
-# Overridable so multiple CAT Node peers can eventually run side-by-side
-# (e.g. simulating a local mesh). ContentMesh Order endpoints use the same
-# CAT_NODE_HOST / CAT_NODE_PORT defaults via `_node_base_url()`.
-HOST = os.environ.get('CAT_NODE_HOST', '127.0.0.1')
-PORT = int(os.environ.get('CAT_NODE_PORT', 5000))
-
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# Command-line markers for our peer-edge process (``python -m cats.node`` /
+# legacy ``cats/node.py`` path invocations). Unrelated listeners on the same
+# port (e.g. macOS AirPlay on 5000) must not be killed.
+_NODE_CMD_MARKERS = ('cats.node', 'cats/node', 'node.py')
+
+
+def _is_cats_node_cmd(cmd: str) -> bool:
+    return any(marker in cmd for marker in _NODE_CMD_MARKERS)
 
 
 def _flask_listening(host: str, port: int) -> bool:
@@ -57,12 +33,12 @@ def _flask_listening(host: str, port: int) -> bool:
 
 
 def _stop_node_process(host: str, port: int) -> None:
-    """Kill any leftover node.py still bound to our port.
+    """Kill any leftover cats.node peer still bound to our port.
 
     Agent/chat sessions launch this server in the background and don't
     always terminate it when the session ends, so a stale process can be
     left holding the port for a future run to collide with. Only processes
-    whose command line matches this script are killed - other programs on
+    whose command line matches this package are killed - other programs on
     the port (e.g. macOS's AirPlay Receiver on 5000) are left alone.
 
     Never touches InfraStructure ContentStore (host Kubo).
@@ -91,7 +67,7 @@ def _stop_node_process(host: str, port: int) -> None:
         except (OSError, subprocess.SubprocessError):
             continue
 
-        if not info or 'node.py' not in info:
+        if not info or not _is_cats_node_cmd(info):
             continue  # leave unrelated processes (e.g. AirPlay) alone
 
         ppid = info.split(None, 1)[0]
@@ -103,10 +79,10 @@ def _stop_node_process(host: str, port: int) -> None:
                 ).stdout
             except (OSError, subprocess.SubprocessError):
                 continue
-            if 'node.py' not in parent_cmd:
+            if not _is_cats_node_cmd(parent_cmd):
                 continue
             logger.warning(
-                "Killing node.py process (pid %s) still bound to %s:%d",
+                "Killing cats.node process (pid %s) still bound to %s:%d",
                 target, host, port,
             )
             try:
@@ -123,7 +99,7 @@ def _stop_node_process(host: str, port: int) -> None:
 
 
 def _free_stale_port(host: str, port: int) -> None:
-    """Alias used by start — clear a prior node.py listener before bind."""
+    """Alias used by start — clear a prior cats.node listener before bind."""
     _stop_node_process(host, port)
 
 
@@ -135,7 +111,7 @@ def _bootstrap_content_store_ensure():
     """
     module = _load_bootstrap_content_store_module(CATS_HOME)
     module.ContentStore.ensure(cwd=CATS_HOME)
-    SERVICE.contentMesh._bootstrap_content_store_ensured = True
+    RUNTIME.contentMesh._bootstrap_content_store_ensured = True
 
 
 def _bootstrap_content_store_assert_ready():
@@ -146,40 +122,14 @@ def _bootstrap_content_store_assert_ready():
     """
     module = _load_bootstrap_content_store_module(CATS_HOME)
     if module.ContentStore.is_ready():
-        SERVICE.contentMesh._bootstrap_content_store_ensured = True
+        RUNTIME.contentMesh._bootstrap_content_store_ensured = True
         return
     raise RuntimeError(
         'Host Kubo ContentStore API not ready. Run '
-        '`make content-store-ensure` or `uv run python cats/node.py ensure` '
+        '`make content-store-ensure` or `uv run python -m cats.node ensure` '
         'before node start (start asserts only; TF host_ipfs_daemon create '
         'is the sole automatic Order-submitted ensure).'
     )
-
-
-@catNode.route('/cat/node/init', methods=['POST'])
-def execute_init_cat():
-    try:
-        order_request = request.get_json()
-        order_request["order"] = json.loads(SERVICE.contentMesh.cat(order_request["order_cid"]))
-        order_request['invoice'] = json.loads(SERVICE.contentMesh.cat(order_request['order']['invoice_cid']))
-
-        # IPFS checks
-        # if 'bom_cid' not in bom:
-        #     return jsonify({'error': 'CID not provided'}), 400
-
-        catFactory, updated_order_request = SERVICE.initFactory(
-            order_request, order_request["invoice"]["data_cid"]
-        )
-        bom_response = SERVICE.execute(catFactory, updated_order_request)
-
-        # Return BOM
-        response = jsonify(bom_response)
-        return response
-
-    except Exception as e:
-        logger.error("An error occurred: %s", traceback.format_exc())
-        response = jsonify({'error': str(e)})
-        return response
 
 
 def _handle_stop_signal(signum, frame):
@@ -278,7 +228,3 @@ def main(argv=None):
     if args.command == 'ensure':
         return _cmd_ensure()
     return 1
-
-
-if __name__ == '__main__':
-    raise SystemExit(main())

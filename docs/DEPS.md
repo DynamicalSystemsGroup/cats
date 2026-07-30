@@ -31,7 +31,7 @@
   rm "terraform_${VER}_darwin_arm64.zip"
   terraform -version
   # > Note: use `darwin_amd64` instead of `darwin_arm64` on Intel Macs. After installing, restart
-  #  > `cats/node.py` so the running process picks up the new binary on `PATH`.
+  #  > `python -m cats.node` so the running process picks up the new binary on `PATH`.
   #  > When running Terraform manually from the repo root:
   #  >   export TF_DATA_DIR="$PWD/data/input/structure/.terraform-data"
   #  >   export INTEGRATION_INPUT_DATA_CACHE="$PWD/data/cache/integration/outputs"

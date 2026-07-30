@@ -1,15 +1,16 @@
 services:
-  minio:
+  minio_scratch:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: cats-minio
-      MINIO_ROOT_PASSWORD: cats-minio-secret
+      MINIO_ROOT_USER: cats-scratch
+      MINIO_ROOT_PASSWORD: cats-scratch-secret
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - structure_minio_data:/data
+      # Structure-lifetime scratch; destroyed with compose down -v.
+      - structure_minio_scratch_data:/data
     # Docker scopes a published port's host-side reachability to the
     # bridge network the container's own (primary) interface sits on -
     # publishing alone does not make it reachable via every other Docker
@@ -24,4 +25,4 @@ networks:
     external: true
 
 volumes:
-  structure_minio_data:
+  structure_minio_scratch_data:

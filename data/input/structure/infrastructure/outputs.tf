@@ -3,24 +3,46 @@ output "docker_compose_ipfs_transport_id" {
   value       = shell_script.docker_compose_ipfs_transport.id
 }
 
-output "minio_endpoint_host" {
-  # Static: docker-compose publishes MinIO's S3 API port straight to the
-  # host, at a fixed port, regardless of how the container itself is
-  # scheduled.
-  value      = "http://127.0.0.1:9000"
-  depends_on = [shell_script.docker_compose_minio]
+# --- Scratch MinIO (Structure lifetime) ---
+
+output "minio_scratch_endpoint_host" {
+  description = "Scratch MinIO S3 API on the host."
+  value       = "http://127.0.0.1:9000"
+  depends_on  = [shell_script.docker_compose_minio_scratch]
 }
 
-output "minio_bucket" {
-  value = local.minio_bucket
+output "minio_scratch_bucket" {
+  value = local.minio_scratch_bucket
 }
 
-output "minio_access_key" {
-  value     = local.minio_root_user
+output "minio_scratch_access_key" {
+  value     = local.minio_scratch_root_user
   sensitive = true
 }
 
-output "minio_secret_key" {
-  value     = local.minio_root_password
+output "minio_scratch_secret_key" {
+  value     = local.minio_scratch_root_password
+  sensitive = true
+}
+
+# --- Durable Entity Relationship MinIO (Node lifetime) ---
+
+output "minio_durable_endpoint_host" {
+  description = "Durable Entity Relationship MinIO S3 API on the host."
+  value       = "http://127.0.0.1:9100"
+  depends_on  = [shell_script.docker_compose_minio_durable]
+}
+
+output "minio_durable_bucket" {
+  value = local.minio_durable_bucket
+}
+
+output "minio_durable_access_key" {
+  value     = local.minio_durable_root_user
+  sensitive = true
+}
+
+output "minio_durable_secret_key" {
+  value     = local.minio_durable_root_password
   sensitive = true
 }

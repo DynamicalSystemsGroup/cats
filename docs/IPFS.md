@@ -16,7 +16,7 @@ end-to-end for adds **and** reads (`cat` / `get` / `ls` / `dag export`) — it d
 `http://{IPFS_API_HOST}:{IPFS_API_PORT}/api/v0/id` (same env as `connect()`). Optional override:
 `CATS_IPFS_API_ID_URL` (full URL) if you need a non-derived probe path.
 
-Order submit URLs use the same `CAT_NODE_HOST` / `CAT_NODE_PORT` defaults as `cats/node.py`
+Order submit URLs use the same `CAT_NODE_HOST` / `CAT_NODE_PORT` defaults as `cats.node`
 (default `http://127.0.0.1:5000/cat/node/init`).
 
 #### Ownership
@@ -57,9 +57,9 @@ jobs in this module.
 | **Execution (mutate)** | TF `shell_script.host_ipfs_daemon` create (bare `terraform apply` or via Executor) | Order-submitted under `INPUT_STRUCTURE_HOME/.../content_store_utils.py` |
 | **Execution (assert)** | `InfraStructure.apply` after `terraform apply` | Same Order-submitted tree (`ContentStore.is_ready`) |
 
-* **Node start** (`cats/node.py start`) — **strict** bootstrap `ContentStore.is_ready` before Flask binds
+* **Node start** (`python -m cats.node start`) — **strict** bootstrap `ContentStore.is_ready` before Flask binds
   (assert-only; does not heal). Fail loud if Kubo is down — run `make content-store-ensure` /
-  `cats/node.py ensure` first. `stop` kills Flask only — **Node stop ≠ content-store stop**.
+  `python -m cats.node ensure` first. `stop` kills Flask only — **Node stop ≠ content-store stop**.
 * **Node ensure** — operator heal facade: repo-tree `ContentStore.ensure` (no Flask).
 * **ContentMesh bootstrap** (`ensure_bootstrap_content_store`) — **lazy** readiness soft-warn on the
   default tree only; does **not** call `ensure`. **Not** Order-bound.
@@ -87,18 +87,18 @@ uv run python data/input/structure/infrastructure/content_store_utils.py ensure
 uv run python data/input/structure/infrastructure/content_store_utils.py status
 # or: make content-store-ensure
 
-# Node lifecycle (start asserts ContentStore ready; stop never stops Kubo)
+# Node lifecycle — full reference: NodeLifeCycle.md
 make content-store-ensure   # heal/start host Kubo if needed
-make node-start             # or: uv run python cats/node.py start
+make node-start             # or: uv run python -m cats.node start
 make node-stop              # Flask only
 make node-status            # flask=up|down + content_store=ready|not_ready
-uv run python cats/node.py ensure   # operator ContentStore.ensure, no Flask
+uv run python -m cats.node ensure   # operator ContentStore.ensure, no Flask
 ```
 
-Content-store `status` exits 0 when the HTTP API is up, 1 otherwise. Node `status` exits 0 only when Flask
-is listening **and** ContentStore is ready. ContentMesh runs a **lazy bootstrap readiness soft-warn** on
-first IPFS use (no `ContentStore.ensure` / heal) if you skip Node start / the CLI — never on package
-import.
+See [`NodeLifeCycle.md`](./NodeLifeCycle.md) for the Node process lifecycle. Content-store `status` exits 0 when the
+HTTP API is up, 1 otherwise. Node `status` exits 0 only when Flask is listening **and** ContentStore is
+ready. ContentMesh runs a **lazy bootstrap readiness soft-warn** on first IPFS use (no
+`ContentStore.ensure` / heal) if you skip Node start / the CLI — never on package import.
 
 #### Manual start (optional)
 
@@ -117,11 +117,13 @@ This is expected and harmless — it just means a daemon is already up and servi
 
 ```bash
 ipfs shutdown
+# or full local teardown (Flask + Kubo): make node-down
 ```
 
 Stop host Kubo only when you intend to (operator). **Do not** tie shutdown to Node exit / `make node-stop` or
 Structure destroy — the content-store facet is meant to outlive those for BOM inspection and the next demo
-session.
+session. `make node-down` is the Make-only convenience that chains `node-stop` then `ipfs shutdown`; see
+[`NodeLifeCycle.md`](./NodeLifeCycle.md).
 
 #### Checking status
 

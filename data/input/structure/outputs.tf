@@ -14,32 +14,59 @@ output "plant_ray_dashboard_address" {
   value = module.plant.ray_dashboard_address
 }
 
-output "infrastructure_minio_endpoint_host" {
-  value = module.infrastructure.minio_endpoint_host
+# --- Scratch MinIO (Structure lifetime) ---
+
+output "infrastructure_minio_scratch_endpoint_host" {
+  value = module.infrastructure.minio_scratch_endpoint_host
 }
 
-output "infrastructure_minio_endpoint_pod" {
-  # Ray pods reach module.infrastructure's MinIO not via any in-cluster
-  # Service, but via ordinary pod egress routing to the kind Docker
-  # network's gateway IP - see data.docker_network.kind in main.tf.
-  # ipam_config has one entry per IP family (kind's network is dual-stack);
-  # filter for the IPv4 gateway specifically since IPv6 ones contain ":".
+output "infrastructure_minio_scratch_endpoint_pod" {
+  # Ray pods reach scratch MinIO via the kind Docker network gateway —
+  # see data.docker_network.kind in main.tf. Filter IPv4 gateway.
   value = "http://${[
     for cfg in data.docker_network.kind.ipam_config : cfg.gateway
     if !strcontains(cfg.gateway, ":")
   ][0]}:9000"
 }
 
-output "infrastructure_minio_bucket" {
-  value = module.infrastructure.minio_bucket
+output "infrastructure_minio_scratch_bucket" {
+  value = module.infrastructure.minio_scratch_bucket
 }
 
-output "infrastructure_minio_access_key" {
-  value     = module.infrastructure.minio_access_key
+output "infrastructure_minio_scratch_access_key" {
+  value     = module.infrastructure.minio_scratch_access_key
   sensitive = true
 }
 
-output "infrastructure_minio_secret_key" {
-  value     = module.infrastructure.minio_secret_key
+output "infrastructure_minio_scratch_secret_key" {
+  value     = module.infrastructure.minio_scratch_secret_key
+  sensitive = true
+}
+
+# --- Durable Entity Relationship MinIO (Node lifetime) ---
+
+output "infrastructure_minio_durable_endpoint_host" {
+  value = module.infrastructure.minio_durable_endpoint_host
+}
+
+output "infrastructure_minio_durable_endpoint_pod" {
+  # Durable Entity Relationship MinIO on the same kind gateway, port 9100.
+  value = "http://${[
+    for cfg in data.docker_network.kind.ipam_config : cfg.gateway
+    if !strcontains(cfg.gateway, ":")
+  ][0]}:9100"
+}
+
+output "infrastructure_minio_durable_bucket" {
+  value = module.infrastructure.minio_durable_bucket
+}
+
+output "infrastructure_minio_durable_access_key" {
+  value     = module.infrastructure.minio_durable_access_key
+  sensitive = true
+}
+
+output "infrastructure_minio_durable_secret_key" {
+  value     = module.infrastructure.minio_durable_secret_key
   sensitive = true
 }

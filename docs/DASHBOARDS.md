@@ -1,7 +1,7 @@
 # Dashboards
 
 Once a CAT Node's Structure is deployed — Terraform runs from `Structure.reconcile()` /
-`deploy()` / `redeploy()` during CAT execution (`cats/node.py` hosts the HTTP API; see
+`deploy()` / `redeploy()` during CAT execution (`cats.node` hosts the HTTP API; see
 [Demo](./DEMO.md) / [Test](./TEST.md)) — these UIs stay at fixed `localhost` addresses for
 the Structure's lifetime.
 
@@ -15,30 +15,36 @@ the Structure's lifetime.
 - Static NodePort `30265` → host `8265` via kind `extraPortMappings`
   (`data/input/structure/plant/main.tf`).
 
-### [MinIO Console](http://127.0.0.1:9001)
+### [MinIO Console — scratch](http://127.0.0.1:9001)
 
 - **URL:** http://127.0.0.1:9001 (S3 API: http://127.0.0.1:9000)
-- **Credentials:** `cats-minio` / `cats-minio-secret`
-  (`local.minio_root_user` / `local.minio_root_password` in
-  `data/input/structure/infrastructure/main.tf`) — change these before deploying a
-  Structure whose console would be reachable by anyone else.
-- Console for InfraStructure [IaaS] shared object store / scratch (`cats-scratch`) used for
-  Plant parallel Ray writes (`jobs/<uuid>/result`). Named volume `structure_minio_data` retains
-  objects for the Structure's lifetime; durable integration outputs are IPFS
-  (`invoice.integration_data_cid`), not MinIO. Compose:
-  `data/input/structure/infrastructure/minio_compose.yaml`.
-- Runtime config is `ObjectStore` from `InfraStructure.obj_store_context()` (Order-submitted
-  `infrastructure/obj_store_utils.py`) — **not** Service fields. BOM `log` may record
-  `object_store_result_uri` for Structure-lifetime correlation; credential-free endpoints land in
-  Invoice `object_store_as_executed_cid` via `ObjectStore.snapshot()` (see
-  [`BOM.md` Nest tree](./BOM.md#cat-node-http-bom-response)).
-- There is **no CAT Node HTTP API** for scratch — use this Console, the S3 API, or:
+- **Credentials:** `cats-scratch` / `cats-scratch-secret`
+- Structure-lifetime scratch (`cats-scratch` / `jobs/<uuid>/result`). Volume
+  `structure_minio_scratch_data`; ILM 7 days + Structure destroy `down -v`. Integration
+  outputs for provenance remain IPFS (`invoice.integration_data_cid`).
+  Compose: `infrastructure/minio_scratch_compose.yaml`.
 
-  ```bash
-  uv run python data/input/structure/infrastructure/obj_store_utils.py list-jobs
-  ```
+### [MinIO Console — durable Entity Relationship](http://127.0.0.1:9101)
 
-  Details: [`MinIO.md`](./MinIO.md), roles: [`STORAGE.md`](./STORAGE.md).
+- **URL:** http://127.0.0.1:9101 (S3 API: http://127.0.0.1:9100)
+- **Credentials:** `cats-durable` / `cats-durable-secret`
+- Node-lifetime Entity Relationship store (`cats-durable`):
+  `structures/<applied_structure_cid>/er/<name>/` plus `er/current/<name>` pointers.
+  Volume `node_minio_durable_data` survives Structure destroy; GC via `gc-er` only.
+  Compose: `infrastructure/minio_durable_compose.yaml`.
+
+Both are resolved as one `ObjectStore` from `InfraStructure.obj_store_context()` — **not**
+Runtime fields. BOM `log` may record `object_store_result_uri` (scratch) and optional
+`durable_er_uri` / `durable_er_pointer`; credential-free endpoints land in Invoice
+`object_store_as_executed_cid` via `ObjectStore.snapshot()` (see
+[`BOM.md`](./BOM.md#cat-node-http-bom-response)). No CAT Node HTTP API — Consoles, S3, or:
+
+```bash
+uv run python data/input/structure/infrastructure/obj_store_utils.py list-jobs
+uv run python data/input/structure/infrastructure/obj_store_utils.py resolve-er <name>
+```
+
+Details: [`MinIO.md`](./MinIO.md), roles: [`STORAGE.md`](./STORAGE.md).
 
 ### [IPFS WebUI](http://127.0.0.1:5001/webui)
 

@@ -2,11 +2,12 @@
 
 Ships in `plant/` (`plant_cid`). Copied into the Ray job working_dir as
 ``entrypoint.py`` by ``RayPlantPort.submit_job``. Credentials stay in
-object_store_config.json (written by ObjectStore; pod-reachable MinIO).
+object_store_scratch_config.json (written by ObjectStore; pod-reachable
+scratch MinIO — not the durable Entity Relationship store).
 
 This Plant's landing assumes Ray Dataset + ``write_csv``; another Plant
-ships its own entrypoint under its ``plant_cid``. IaaS stays MinIO config /
-``JobHandle`` only.
+ships its own entrypoint under its ``plant_cid``. IaaS stays scratch MinIO
+config / ``JobHandle`` only.
 
 Wires Plant ``RayComputePort`` into Process ``integrated_subproc`` so
 Function stays Plant-agnostic (no ``import ray`` in Process).
@@ -21,17 +22,17 @@ from ray_compute_utils import RayComputePort
 with open('subproc.pkl', 'rb') as subproc_file:
     subproc = cloudpickle.load(subproc_file)
 
-with open('object_store_config.json', encoding='utf-8') as config_file:
-    object_store_config = json.load(config_file)
+with open('object_store_scratch_config.json', encoding='utf-8') as config_file:
+    scratch_config = json.load(config_file)
 
 object_store_fs = S3FileSystem(
-    endpoint_override=object_store_config['endpoint'],
-    access_key=object_store_config['access_key'],
-    secret_key=object_store_config['secret_key'],
+    endpoint_override=scratch_config['endpoint'],
+    access_key=scratch_config['access_key'],
+    secret_key=scratch_config['secret_key'],
     scheme='http',
 )
 object_store_output_key = '{}/{}/result'.format(
-    object_store_config['bucket'], object_store_config['prefix']
+    scratch_config['bucket'], scratch_config['prefix']
 )
 
 # Every node writes its own blocks directly to the shared object store, so

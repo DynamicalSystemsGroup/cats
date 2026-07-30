@@ -7,7 +7,7 @@ import threading
 import time
 
 def _node_base_url():
-    """Flask Node base URL — same defaults as cats/node.py CAT_NODE_*."""
+    """Flask Node base URL — same defaults as cats.node CAT_NODE_*."""
     host = os.environ.get('CAT_NODE_HOST', '127.0.0.1')
     port = int(os.environ.get('CAT_NODE_PORT', '5000'))
     return f'http://{host}:{port}'
