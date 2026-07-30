@@ -46,6 +46,16 @@ The Quantum's "smallest unit of architecture... with high functional cohesion" i
 
 The **Factory** reconstitutes this Quantum at runtime with the same composition it was CID-ed with: it composes `Function` and constructs `Structure` from the Order's `function_cid`/`structure_cid`, then instantiates the **Executor** with them as its dependencies. Each in turn composes its own CID-ed sub-component the same way - `Structure` composes its `Plant` from its `InfraStructure`, and `Function` composes its `Processor` from its `InfraFunction` - so Function [FaaS] executes on Structure [PaaS] by InfraFunction [Actuator] dispatching the tHOF (`integrated_subproc`) submitted by Process [Composed Function] onto Plant [SaaS], while ingress / integration_cache / egress run as local transport around that dispatch, exactly as the Quantum's applied disciplines describe below. Composition stays on the Order CID graph (sequential Executor stages); interim Control-Feedback Loop feedback uses Invoice stage CIDs (`ingress_data_cid`, `integration_data_cid`, `data_cid`) until Seed is implemented. The Executor itself - not a layer above it - is what produces the resulting **Invoice CID**, so the whole Order-in/Invoice-out cycle stays within the one independently-deployable, functionally-cohesive unit the Quantum principle calls for. (* **[CID-level details](BOM.md)**, * **[Lineage-of-Provenance context](LineageOfProvenance.md)**)
 
+### Example: Data Product Design Domains on a CAT Node Mesh
+
+**In the following image:**
+- Large ovals in the image above represent **Data Products** servicing each other with Data
+- "O" ovals are Operational Data web service endpoints
+- "D" ovals are Analytical Data web service endpoints
+- Source: [Data Mesh Principles and Logical Architecture](https://martinfowler.com/articles/data-mesh-principles.html) - Zhamak Dehghani, et al.
+
+![Data Product Domain](../images/data_product_domain.jpeg)
+
 ### Data Product Team Example: 
 Multidisciplinary Data Product teams can *operate, contribute, and maintain* different portions the different portions of the entire cloud service model based on role in adherence to the AQ.
 * Applied discipline for **Functions (FaaS)**
