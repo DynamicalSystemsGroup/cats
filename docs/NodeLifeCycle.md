@@ -74,6 +74,9 @@ make node-start
 - Clears a prior `cats.node` listener on the Node port (does not kill unrelated processes, e.g. AirPlay on 5000).
 - Fails loud if the port is still held by a non-`cats.node` process — set `CAT_NODE_PORT` (e.g. `5002`) when macOS AirPlay owns `:5000`.
 - On SIGINT / SIGTERM, exits without stopping host Kubo.
+- Serves Order entry at `POST /cat/node/init` and Phase 2a LDP control plane:
+  - `GET /ldp/boms/` — Basic Container listing published BOM URIs
+  - `GET /ldp/boms/<bom_cid>` — signed ExecutionBom JSON-LD (publish via `Runtime.execute` only; HTTP PUT → 405)
 
 ### Status
 
