@@ -9,8 +9,15 @@ and MinIO (T&D).
 The Python side talks to that daemon with a thin sync Kubo HTTP RPC client
 (`cats/network/clients/ipfs_client.py` → `http://{IPFS_API_HOST}:{IPFS_API_PORT}/api/v0/*`,
 defaults `127.0.0.1:5001`, via `requests`), not `ipfshttpclient`. **ContentMesh** uses that client
-end-to-end for adds **and** reads (`cat` / `get` / `ls` / `dag export`) — it does not shell out to the
-`ipfs` CLI. The CLI remains operator-only (manual `ipfs daemon` / `ipfs shutdown` / debugging).
+for **writes** and for `get` / `ls` / `dag export`. **`cat` / `catObj`** go through
+`cats.network.address_store.AddressStore` (Phase 2a gateway-first):
+
+| Env | Role |
+|-----|------|
+| `IPFS_GATEWAY_URL` | Optional base URL (e.g. `http://127.0.0.1:8080`). When set, reads prefer `GET {url}/ipfs/{cid}`, then verify with Kubo `only-hash`. Unset → RPC `cat` only (default CI/local). |
+| `CATS_CID_VERIFY` | Set to `1` to run the same only-hash check on RPC cats. Gateway fetches always verify. |
+
+Mesh reads do not require Bitswap swarm connect; Bitswap remains the T&D peer path and an optional fill when Kubo itself must fetch remote blocks. No `ipfs` CLI from ContentMesh. The CLI remains operator-only (manual `ipfs daemon` / `ipfs shutdown` / debugging).
 
 **Same API address for ensure/status:** `ContentStore.is_ready` / `ensure` probe
 `http://{IPFS_API_HOST}:{IPFS_API_PORT}/api/v0/id` (same env as `connect()`). Optional override:

@@ -53,3 +53,5 @@ Details: [`MinIO.md`](./MinIO.md), roles: [`STORAGE.md`](./STORAGE.md).
   Python talks to the same daemon via `cats/network/clients/ipfs_client.py` (Kubo HTTP RPC). See
   [`IPFS.md`](./IPFS.md) for how/when the daemon starts.
 - Gateway: `http://127.0.0.1:8080/ipfs/<cid>` for raw CID bytes without the WebUI.
+  ContentMesh Phase 2a reads use the same plane when `IPFS_GATEWAY_URL=http://127.0.0.1:8080`
+  (see [`IPFS.md`](./IPFS.md) / [`STORAGE.md`](./STORAGE.md)).

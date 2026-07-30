@@ -28,8 +28,8 @@ A **single** host Kubo (default `127.0.0.1:5001`, one `IPFS_PATH`) carries two t
 | **Content-store** | Mesh / Control-Feedback CIDs (Order, Invoice, BOM, Function/Structure-as-Code) via ContentMesh | Long-lived; outlives Structure destroy and `node stop` |
 | **Bitswap peer of T&D** | Host is peered to Structure Docker Kubo peers so migrate/stage can resolve host-added CIDs | Peering is Structure-lifetime; the host daemon itself is not |
 
-**ContentMesh** (`cats.network.content_mesh`) owns content-store mesh I/O and Order compose/submit via `CatsIPFSClient` (Kubo RPC).
-JSON-LD + PROV-O BOM packaging (`build_execution_bom`) with Data Integrity signing (`sign_execution_bom`, `eddsa-jcs-2022`) and Node `node_did` key material live under `cats.network.feedback` / `identity` (Phase 1b — not Plant). An `AddressStore` adapter seam is deferred; addresses remain CIDs.
+**ContentMesh** (`cats.network.content_mesh`) owns content-store mesh I/O and Order compose/submit. **Writes** (add / pin) go through `CatsIPFSClient` (Kubo RPC on `:5001`). **Reads** (`cat` / `catObj`) go through **`AddressStore`** (Phase 2a): when `IPFS_GATEWAY_URL` is set, fetch `GET {gateway}/ipfs/{cid}` then verify bytes against the CID via Kubo `add?only-hash=true`; on gateway miss/failure, fall back to Kubo RPC `cat`. CID remains the address of record; the gateway URL is a locator only. Bitswap/DHT are not required for mesh `cat` (optional fallback when no gateway locator exists; T&D peering unchanged). Set `CATS_CID_VERIFY=1` to also verify RPC cats.
+JSON-LD + PROV-O BOM packaging (`build_execution_bom`) with Data Integrity signing (`sign_execution_bom`, `eddsa-jcs-2022`) and Node `node_did` key material live under `cats.network.feedback` / `identity` (Phase 1b — not Plant).
 Plant CoD transport (IPFS↔MinIO job orchestration) is separate —
 `cats.network.plant_transport.CoDTransport` (forthcoming; not ContentMesh).
 
