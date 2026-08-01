@@ -17,6 +17,8 @@ import pytest
 
 from cats import DATA_HOME, CONTENT_MESH as contentMesh
 from cats import INPUT_STRUCTURE_HOME, INPUT_DATA_HOME
+from cats.network import _node_init_endpoint
+from cats.network.feedback import verify_execution_bom
 
 from data.input.function.process import (
     egress,
@@ -123,10 +125,23 @@ def assert_provenance_record(bom_response, order_request):
     bom = bom_response['bom']
     assert 'bom_cid' not in bom
 
-    for key in ('invoice_cid', 'log_cid', 'node_uri'):
+    for key in ('invoice_cid', 'log_cid', 'node_did'):
         assert bom.get(key), f'bom.{key} should be set'
+    assert str(bom['node_did']).startswith('did:'), (
+        f'bom.node_did must be a DID, got {bom["node_did"]!r}'
+    )
+    assert bom.get('@context'), 'bom.@context should be set (JSON-LD Phase 1)'
+    assert bom.get('@type'), 'bom.@type should be set (JSON-LD Phase 1)'
+    proof = bom.get('proof')
+    assert isinstance(proof, dict), 'bom.proof should be set (Phase 1b)'
+    assert proof.get('type') == 'DataIntegrityProof'
+    assert proof.get('cryptosuite') == 'eddsa-jcs-2022'
+    assert proof.get('proofValue'), 'bom.proof.proofValue missing'
+    verify_execution_bom(bom)
+    assert 'node_uri' not in bom
     assert 'plant_snapshot_cid' not in bom
     assert 'infrastructure_snapshot_cid' not in bom
+
 
     flat = bom_response['flat_bom']
     invoice = flat['invoice']
@@ -250,7 +265,7 @@ def _create_order_request(*, integrated_subproc):
         infrafunction_subproc=infrafunction_subproc,
         data_dirpath=INPUT_DATA_HOME,
         structure_filepath=INPUT_STRUCTURE_HOME,
-        endpoint='http://127.0.0.1:5000/cat/node/init',
+        endpoint=_node_init_endpoint(),
     )
     pprint(order_request)
     print()

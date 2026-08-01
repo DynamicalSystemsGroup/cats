@@ -145,6 +145,27 @@ class KuboRpcClient:
         )
         return response.json()['Hash']
 
+    def only_hash_bytes(self, data: bytes, *, filename: str = 'blob') -> str:
+        """Return the CID Kubo would assign without writing to the repo."""
+        response = self._post(
+            'add',
+            params={'only-hash': 'true', 'pin': 'false'},
+            files={'file': (filename, data, 'application/octet-stream')},
+        )
+        return response.json()['Hash']
+
+    def cid_format(self, cid: str, *, version: int = 1) -> str:
+        """Normalize ``cid`` via Kubo ``/api/v0/cid/format`` (best-effort)."""
+        response = self._post(
+            'cid/format',
+            params={'arg': cid, 'v': str(version)},
+        )
+        payload = response.json()
+        formatted = payload.get('Formatted') or payload.get('CidStr') or payload.get('cid')
+        if not formatted:
+            raise KuboRpcError('cid/format', response.status_code, response.text[:500])
+        return str(formatted)
+
     def add_str(self, string: str, **kwargs) -> str:
         return self.add_bytes(string.encode('utf-8'), filename='blob', **kwargs)
 
@@ -176,13 +197,20 @@ class KuboRpcClient:
         return self._add_directory(path)
 
     def _add_directory(self, directory: Path) -> list[dict]:
-        """Multipart recursive add matching `ipfs add -r` / cidDir expectations."""
+        """Multipart recursive add matching `ipfs add -r` / cidDir expectations.
+
+        Skips ``__pycache__`` / ``*.pyc`` so importing Order-submitted utils
+        cannot change plant/infrastructure CIDs between CAT runs.
+        """
         base = directory.parent
         parts = []
-        for dirpath, _dirnames, filenames in os.walk(directory):
+        for dirpath, dirnames, filenames in os.walk(directory):
+            dirnames[:] = [d for d in dirnames if d != '__pycache__']
             rel_dir = os.path.relpath(dirpath, base)
             parts.append(('file', (rel_dir, b'', 'application/x-directory')))
             for filename in filenames:
+                if filename.endswith('.pyc'):
+                    continue
                 full = Path(dirpath) / filename
                 rel = os.path.relpath(full, base)
                 parts.append(
@@ -252,6 +280,12 @@ class CatsIPFSClient:
 
     def add_bytes(self, data: bytes, **kwargs) -> str:
         return self._client.add_bytes(data, **kwargs)
+
+    def only_hash_bytes(self, data: bytes, **kwargs) -> str:
+        return self._client.only_hash_bytes(data, **kwargs)
+
+    def cid_format(self, cid: str, *, version: int = 1) -> str:
+        return self._client.cid_format(cid, version=version)
 
     def add_str(self, string: str, **kwargs) -> str:
         return self._client.add_str(string, **kwargs)

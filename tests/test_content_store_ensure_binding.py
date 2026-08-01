@@ -267,6 +267,43 @@ def test_apply_does_not_call_content_store_ensure(tmp_path, monkeypatch):
     infra.runtime.executeCMD.assert_called()
 
 
+def test_destroy_runs_stale_structure_cleanup(tmp_path, monkeypatch):
+    """destroy heals stale Plant/compose state before terraform destroy."""
+    structure_home = tmp_path / 'order_structure'
+    utils_path = (
+        structure_home
+        / 'infrastructure'
+        / 'content_store_utils.py'
+    )
+    _write_fake_content_store_utils(utils_path, 'order-submitted', ready=True)
+    infra = _infra_with_structure_home(structure_home, tmp_path / 'cats_home')
+
+    cleanup_calls = []
+    monkeypatch.setattr(
+        infra,
+        '_cleanup_stale_structure_state',
+        lambda: cleanup_calls.append('cleanup'),
+    )
+    monkeypatch.setattr(
+        'cats.executor.structure.infrastructure.configure_terraform_data_dir',
+        lambda *_a, **_k: None,
+    )
+    monkeypatch.setattr(
+        'cats.executor.structure.infrastructure.ensure_integration_cache_env',
+        lambda *_a, **_k: None,
+    )
+    monkeypatch.setattr(
+        'cats.executor.structure.infrastructure.terraform_bin',
+        lambda *_a, **_k: 'terraform',
+    )
+
+    infra.destroy()
+
+    assert cleanup_calls == ['cleanup']
+    infra.runtime.executeCMD.assert_called()
+    assert 'destroy' in infra.runtime.executeCMD.call_args.args[0]
+
+
 def test_meshclient_init_does_not_call_bootstrap_ensure(tmp_path, monkeypatch):
     """ContentMesh construction does not probe or ensure ContentStore."""
     calls = []

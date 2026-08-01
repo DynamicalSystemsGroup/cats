@@ -148,9 +148,33 @@ class InfraStructure:
             'host_ipfs_daemon so create re-runs.'
         )
 
+    def _cleanup_stale_structure_state(self):
+        """Drop TF state that cannot refresh when host resources are gone.
+
+        Same healers as ``apply`` — required before ``destroy`` too, because
+        ``redeploy()`` destroys first. If kind was wiped (Docker Desktop reset)
+        while Plant resources remain in state, bare ``terraform destroy`` fails
+        on refresh (``could not locate any control plane nodes``).
+        """
+        self.compose()._load_plant_utils().cleanup_stale_plant_state(
+            self.INPUT_STRUCTURE_HOME,
+            terraform_bin(self.runtime),
+            configure_tf_data_dir=configure_terraform_data_dir,
+        )
+        cleanup_stale_docker_compose_ipfs_transport_state(
+            self.runtime, self.INPUT_STRUCTURE_HOME
+        )
+        self._load_obj_store_module().cleanup_stale_obj_store_state(
+            self.INPUT_STRUCTURE_HOME,
+            terraform_bin(self.runtime),
+            configure_tf_data_dir=configure_terraform_data_dir,
+        )
+
     def destroy(self):
         print('Destroy Structure!')
         configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
+        ensure_integration_cache_env(self.runtime)
+        self._cleanup_stale_structure_state()
         self.runtime.executeCMD(
             f'{terraform_bin(self.runtime)} destroy --auto-approve',
             cwd=self.INPUT_STRUCTURE_HOME
@@ -194,17 +218,7 @@ class InfraStructure:
         ensure_integration_cache_env(self.runtime)
         # ContentStore.ensure is à la carte TF (host_ipfs_daemon create), not
         # Python apply — Executor only asserts readiness after terraform apply.
-        self.compose()._load_plant_utils().cleanup_stale_plant_state(
-            self.INPUT_STRUCTURE_HOME,
-            terraform_bin(self.runtime),
-            configure_tf_data_dir=configure_terraform_data_dir,
-        )
-        cleanup_stale_docker_compose_ipfs_transport_state(self.runtime, self.INPUT_STRUCTURE_HOME)
-        self._load_obj_store_module().cleanup_stale_obj_store_state(
-            self.INPUT_STRUCTURE_HOME,
-            terraform_bin(self.runtime),
-            configure_tf_data_dir=configure_terraform_data_dir,
-        )
+        self._cleanup_stale_structure_state()
         self.runtime.executeCMD(
             f'{terraform_bin(self.runtime)} apply --auto-approve',
             cwd=self.INPUT_STRUCTURE_HOME

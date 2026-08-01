@@ -35,11 +35,29 @@ def test_start_asserts_ready_before_run(monkeypatch):
         cli, '_bootstrap_content_store_assert_ready', fake_assert
     )
     monkeypatch.setattr(cli, '_free_stale_port', lambda *a, **k: None)
+    monkeypatch.setattr(cli, '_flask_listening', lambda *a, **k: False)
     monkeypatch.setattr(app.catNode, 'run', fake_run)
     monkeypatch.setattr(cli.signal, 'signal', lambda *a, **k: None)
 
     assert node.main(['start']) == 0
     assert calls == ['assert', 'run']
+
+
+def test_start_rejects_foreign_port_holder(monkeypatch):
+    """start exits when the Node port is held by a non-cats.node process."""
+    monkeypatch.setattr(
+        cli, '_bootstrap_content_store_assert_ready', lambda: None
+    )
+    monkeypatch.setattr(cli, '_free_stale_port', lambda *a, **k: None)
+    monkeypatch.setattr(cli, '_flask_listening', lambda *a, **k: True)
+    monkeypatch.setattr(cli, '_cats_node_on_port', lambda *a, **k: False)
+    run_called = []
+    monkeypatch.setattr(
+        app.catNode, 'run', lambda **k: run_called.append(True)
+    )
+
+    assert node.main(['start']) == 1
+    assert run_called == []
 
 
 def test_bare_main_defaults_to_start(monkeypatch):
@@ -84,7 +102,7 @@ def test_stop_uses_port_helper_only(monkeypatch):
 
 
 def test_status_exit_codes(monkeypatch):
-    """status is 0 only when both Flask and ContentStore are ready."""
+    """status is 0 only when both cats.node Flask and ContentStore are ready."""
     class FakeCS:
         ready = True
 
@@ -98,6 +116,8 @@ def test_status_exit_codes(monkeypatch):
         lambda cats_home: SimpleNamespace(ContentStore=FakeCS),
     )
 
+    # TCP-only listeners (e.g. AirPlay) must not count as flask=up.
+    monkeypatch.setattr(cli, '_cats_node_on_port', lambda *a, **k: True)
     monkeypatch.setattr(cli, '_flask_listening', lambda *a, **k: True)
     FakeCS.ready = True
     assert node.main(['status']) == 0
@@ -105,7 +125,7 @@ def test_status_exit_codes(monkeypatch):
     FakeCS.ready = False
     assert node.main(['status']) == 1
 
-    monkeypatch.setattr(cli, '_flask_listening', lambda *a, **k: False)
+    monkeypatch.setattr(cli, '_cats_node_on_port', lambda *a, **k: False)
     FakeCS.ready = True
     assert node.main(['status']) == 1
 

@@ -40,14 +40,17 @@ The sibling `order.structure_filepath` field just records the directory name (e.
 
 ### CAT Node HTTP BOM response
 
-`Runtime.execute()` returns `{ bom_cid, bom }`. The HTTP envelope's `bom` holds only `invoice_cid`, `log_cid`, and `node_uri`. Observed Plant / InfraStructure state is nested under the Invoice as `structure_as_executed_cid` — parallel to as-Code `order.structure_cid`, but a different CID/bytes (observation, not IaC). Executor mints that nest bottom-up **before** `invoice_cid`. `infrastructure_as_executed` currently carries only `object_store_as_executed_cid` (`InfraStructure.snapshot`); transport / ContentStore facets may widen later. `bom_cid` is response-only (never written into the CID'd `bom` object).
+`Runtime.execute()` returns `{ bom_cid, bom, bom_ldp_uri, bom_solid_uri }`. The HTTP envelope's `bom` is a **JSON-LD + PROV-O** package (`build_execution_bom`) holding address refs only: `invoice_cid`, `log_cid`, `node_did`, plus `@context` / `@type` / `prov:wasAttributedTo` / `prov:wasGeneratedBy`, then **signed** with a W3C Data Integrity proof (`sign_execution_bom`, cryptosuite `eddsa-jcs-2022`). Observed Plant / InfraStructure state is nested under the Invoice as `structure_as_executed_cid` — parallel to as-Code `order.structure_cid`, but a different CID/bytes (observation, not IaC). Executor mints that nest bottom-up **before** `invoice_cid`. `infrastructure_as_executed` currently carries only `object_store_as_executed_cid` (`InfraStructure.snapshot`); transport / ContentStore facets may widen later. `bom_cid` is response-only (never written into the CID'd `bom` object) and is the CID of the **signed** BOM (proof included). `bom_ldp_uri` is the Phase 2a Node LDP cache locator (`http://{CAT_NODE_HOST}:{CAT_NODE_PORT}/ldp/boms/{bom_cid}`) — also persisted under `{CATS_HOME}/.cats/ldp/boms/` for `GET`. When Solid is configured (`SOLID_POD_BASE_URL`), `bom_solid_uri` is the dual-published pod locator; peers may `fetch_bom_envelope` on either URI, verify the proof, and resolve CID refs via AddressStore. See [`SOLID.md`](SOLID.md). HTTP Flask bind is Node lifecycle — **not** BOM attribution; attribution is `node_did` (`did:key:…` from `{CATS_HOME}/.cats/node_did.json`, or `CAT_NODE_DID` when it matches that keyfile).
 
 ```text
 HTTP JSON response  (Runtime.execute → jsonify)
-├── bom_cid  →  content-address of the `bom` object below
+├── bom_cid       →  content-address of the `bom` object below
+├── bom_ldp_uri   →  Node LDP GET locator (local cache)
+├── bom_solid_uri →  Solid pod URI when configured (else null)
 │
-└── bom  →  bom JSON
+└── bom  →  signed JSON-LD / PROV-O ExecutionBom (Data Integrity)
     │
+    ├── @context / @type  (includes data-integrity/v2)
     ├── invoice_cid  →  output Invoice JSON
     │   │   Minted by Executor after as-executed CIDs are written.
     │   │
@@ -78,8 +81,13 @@ HTTP JSON response  (Runtime.execute → jsonify)
     │       stage CID mirrors, plant_rebuilt, object_store_result_uri,
     │       durable_er_uri / durable_er_pointer (optional)
     │
-    └── node_uri  (string, not a CID)
-            http://CAT_NODE_HOST:CAT_NODE_PORT
+    ├── node_did  (DID string, not a CID; not the Flask HTTP URL)
+    │       did:key:…  (keyfile; CAT_NODE_DID only if it matches)
+    ├── prov:wasAttributedTo  →  { @id: node_did }
+    ├── prov:wasGeneratedBy   →  Activity using ipfs://<invoice_cid>
+    └── proof  →  DataIntegrityProof (eddsa-jcs-2022)
+            type, cryptosuite, created, verificationMethod,
+            proofPurpose, proofValue (multibase z…)
 ```
 
 Example `plant_as_executed` content (`Plant.snapshot()` after `Structure.reconcile()`):

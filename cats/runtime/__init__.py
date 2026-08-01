@@ -1,11 +1,17 @@
 import json
+import logging
 from pathlib import Path
 
 from cats.factory import Factory
 from cats.network import ContentMesh
-from cats.network.feedback import build_execution_bom
-from cats.network.identity import node_uri as resolve_node_uri
+from cats.network.feedback import build_execution_bom, sign_execution_bom
+from cats.network.identity import node_did as resolve_node_did
+from cats.network.ldp import BomLdpStore, bom_ldp_uri
+from cats.network.ldp.ldn import announce_bom
+from cats.network.ldp.solid_client import SolidBomPublisher, solid_configured
 from cats.utils import subproc_run, executeCMD
+
+logger = logging.getLogger(__name__)
 
 
 class Runtime:
@@ -98,17 +104,37 @@ class Runtime:
         executor = catFactory.produce()
         # invoice_cid (and structure_as_executed nesting / order_cid
         # backfill) is produced by Executor.execute() — Runtime.execute()
-        # only wraps invoice_cid + log_cid + node_uri into bom/bom_cid.
+        # wraps invoice_cid + log_cid + node_did, signs (Phase 1b), then
+        # mints bom_cid over the signed object.
         enhanced_bom, invoice_cid = executor.execute(order_request)
 
         # Structure as-executed nesting is on the Invoice (Executor-minted).
         bom = build_execution_bom(
             log_cid=enhanced_bom['log_cid'],
             invoice_cid=invoice_cid,
-            node_uri=resolve_node_uri(),
+            node_did=resolve_node_did(cats_home=self.CATS_HOME),
         )
+        bom = sign_execution_bom(bom, cats_home=self.CATS_HOME)
+        bom_cid = self.contentMesh.ipfsClient.add_str(json.dumps(bom))
+        # Phase 2a control plane: local Node LDP cache + optional Solid dual-write.
+        BomLdpStore(self.CATS_HOME).put(bom_cid, bom)
         bom_response = {
             'bom': bom,
-            'bom_cid': self.contentMesh.ipfsClient.add_str(json.dumps(bom)),
+            'bom_cid': bom_cid,
+            'bom_ldp_uri': bom_ldp_uri(bom_cid),
+            'bom_solid_uri': None,
         }
+        if solid_configured():
+            # Fail Runtime when Solid is configured and PUT fails (dual-write
+            # consistency). LDN announce is best-effort and never fails execute.
+            bom_solid_uri = SolidBomPublisher().publish(bom_cid, bom)
+            bom_response['bom_solid_uri'] = bom_solid_uri
+            try:
+                announce_bom(None, bom_cid, bom_solid_uri)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning(
+                    'LDN announce unexpected error for %s: %s',
+                    bom_cid,
+                    exc,
+                )
         return bom_response
