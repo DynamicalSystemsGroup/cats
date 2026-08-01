@@ -317,12 +317,12 @@ class ContentMesh(OrderOps):
         if output is None:
             output = self.CATS_HOME
         dest = os.path.join(output, filepath)
-        self.ipfsClient.get(cid, dest)
+        self.addressStore.get(cid, dest)
         return filepath
 
     def testGet(self, cid: str, output: str):
         self.ensure_bootstrap_content_store()
-        self.ipfsClient.get(cid, output)
+        self.addressStore.get(cid, output)
         print(f'IPFS download of {output} completed successfully.')
 
     def cat(self, cid: str):
@@ -379,7 +379,7 @@ class ContentMesh(OrderOps):
 
     def getCar(self, cid: str, filepath: str):
         self.ensure_bootstrap_content_store()
-        self.ipfsClient.dag_export(cid, filepath)
+        self.addressStore.dag_export(cid, filepath)
 
     def convertBOMtoCAR(self, bom_cid: str, filepath: str):
         self.getCar(bom_cid, filepath)

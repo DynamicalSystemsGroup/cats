@@ -3,10 +3,15 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from typing import Any
 
 from cats.network.address_store.cid_verify import verify_bytes_match_cid
 from cats.network.address_store.gateway import GatewayError, IpfsHttpGateway
+from cats.network.address_store.unixfs_extract import (
+    UnixfsExtractError,
+    extract_unixfs_from_car,
+)
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
@@ -64,3 +69,38 @@ class AddressStore:
     def cat_obj(self, cid: str) -> Any:
         """JSON-decode ``cat`` bytes (helper; ContentMesh.catObj returns raw bytes)."""
         return json.loads(self.cat(cid))
+
+    def dag_export(self, cid: str, filepath: str) -> None:
+        """Export DAG as CAR: gateway ``?format=car`` first, else Kubo RPC."""
+        if self.gateway is not None:
+            try:
+                self.gateway.dag_export(cid, filepath)
+                return
+            except GatewayError:
+                pass
+        self.ipfs.dag_export(cid, filepath)
+
+    def get(self, cid: str, dest_path: str) -> str:
+        """Materialize CID at ``dest_path``.
+
+        Gateway file GET for UnixFS files; directories via CAR + UnixFS extract;
+        Kubo RPC ``get`` as fallback (HAMT/symlink/incomplete CAR).
+        """
+        if self.gateway is not None:
+            try:
+                return self.gateway.get_file(cid, dest_path)
+            except GatewayError:
+                pass
+            try:
+                with tempfile.TemporaryDirectory(prefix='cats-car-get-') as tmp:
+                    car_path = os.path.join(tmp, 'dag.car')
+                    self.gateway.dag_export(cid, car_path)
+                    return extract_unixfs_from_car(
+                        car_path,
+                        cid,
+                        dest_path,
+                        ipfs_client=self.ipfs,
+                    )
+            except (GatewayError, UnixfsExtractError, OSError, ValueError):
+                pass
+        return self.ipfs.get(cid, dest_path)
