@@ -36,7 +36,8 @@ flowchart TB
   Factory --> Executor
   Executor --> function
   Executor --> structure
-  Process -->|"TransportPort ComputePort"| Infra
+  Process -->|"TransportPort"| Infra
+  Process -->|"IoPort ComputePort"| Plant
   InfraFn -->|"PlantPort JobHandle"| Plant
   InfraFn --> Infra
 ```
@@ -47,10 +48,13 @@ These seams are how interoperability is supposed to work without rewriting Funct
 
 | Port / API | Owner (Function) | Adapter (Structure) | Demo implementation |
 |------------|------------------|---------------------|---------------------|
-| **TransportPort** | Process ingress / egress / integration_cache | `TransportContext` | Docker Kubo peers + host Bitswap |
-| **ComputePort** | Process `process_*` tHOF | `RayComputePort` (job working_dir) | Ray Data `map_batches` |
+| **TransportPort** | Process ingress / egress / integration_cache (`n=1`) | `TransportContext` | Docker Kubo peers + host Bitswap |
+| **IoPort** | Process ingress / egress when `num_partitions > 1` | `RayIoPort` (`plant/ray_io_utils.py`) | Partition CAR layout via ContentMesh / AddressStore; optional Plant job (`CATS_IO_VIA_JOB`) |
+| **ComputePort** | Process `process_*` tHOF | `RayComputePort` (job working_dir) | Ray Data `map_batches`; `num_partitions` aligns blocks to `part-*` layout |
 | **PlantPort** | InfraFunction actuator | `RayPlantPort` | Ray Job Submission |
 | **JobHandle** / ObjectStore | InfraFunction scratch correlator; durable Entity Relationship façade | `begin_job` / `write_job_scratch`; `er_uri` / `promote_er` / `resolve_er` / `gc_er` | Scratch MinIO `cats-scratch` + durable MinIO `cats-durable` |
+
+**Partition I/O:** set `CATS_IO_PARTITIONS=n` (`n=1` default keeps TransportPort.migrate). For `n>1`, ingress/egress use IoPort and produce/consume a UnixFS directory of `part-00000.car` … `part-{n-1:05d}.car` (stable shuffle keys). Invoice stage fields remain single root CIDs.
 
 Process public surface is locked by `process.__all__` and
 [`tests/test_process_public_surface.py`](../tests/test_process_public_surface.py)
@@ -70,7 +74,7 @@ Process public surface is locked by `process.__all__` and
 
 | Sub-component | Contract | Status | Prove plan |
 |---------------|----------|--------|------------|
-| **Process [Composed Function]** | `TransportPort` + `ComputePort`; no Ray; public `__all__` | Contract + demo (Ray adapter behind ComputePort) | Unchanged Process modules against second ComputePort adapter (**2f**); keep `TYPE_CHECKING`-only `data.*` imports |
+| **Process [Composed Function]** | `TransportPort` + `IoPort` + `ComputePort`; no Ray; public `__all__` | Contract + demo (Ray adapters behind IoPort / ComputePort) | Unchanged Process modules against second Plant adapters (**2f**); keep `TYPE_CHECKING`-only `data.*` imports |
 | **InfraFunction [Actuator]** | `PlantPort` + `JobHandle`; no Job Submission client | Contract + demo (RayPlantPort) | Unchanged `infrafunction_subproc` against second PlantPort + scratch landing (**2f**) |
 
 ### Structure [PaaS]
