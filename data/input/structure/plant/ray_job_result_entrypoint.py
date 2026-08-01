@@ -13,6 +13,7 @@ Wires Plant ``RayComputePort`` into Process ``integrated_subproc`` so
 Function stays Plant-agnostic (no ``import ray`` in Process).
 """
 import json
+import os
 
 import ray.cloudpickle as cloudpickle
 from pyarrow.fs import S3FileSystem
@@ -39,5 +40,24 @@ object_store_output_key = '{}/{}/result'.format(
 # this stays genuinely distributed regardless of how many nodes
 # participate in producing the Dataset that ComputePort returns.
 compute = RayComputePort()
-ds_out = subproc('input', compute)
-ds_out.write_csv(object_store_output_key, filesystem=object_store_fs)
+try:
+    num_partitions = int(os.environ.get('CATS_IO_PARTITIONS', '1') or '1')
+except ValueError:
+    num_partitions = 1
+try:
+    ds_out = subproc('input', compute, num_partitions=num_partitions)
+except TypeError:
+    # Legacy tHOF bind without num_partitions.
+    ds_out = subproc('input', compute)
+
+if num_partitions > 1:
+    # Stable part-* names so egress can CAR-wrap 1:1 (no shuffle rename).
+    try:
+        shards = ds_out.split(num_partitions, equal=True)
+    except TypeError:
+        shards = ds_out.split(num_partitions)
+    for i, shard in enumerate(shards):
+        part_key = '{}/part-{:05d}'.format(object_store_output_key, i)
+        shard.write_csv(part_key, filesystem=object_store_fs)
+else:
+    ds_out.write_csv(object_store_output_key, filesystem=object_store_fs)

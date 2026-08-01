@@ -20,6 +20,16 @@ from typing import Protocol, runtime_checkable
 class ComputePort(Protocol):
     """Thin Process-facing compute surface (Function-owned contract)."""
 
-    def run_transfer(self, batch_fn, input_path: str, *, zip_with_range: bool = False):
-        """Run distributed transfer; adapter defines return type (Ray: Dataset)."""
+    def run_transfer(
+        self,
+        batch_fn,
+        input_path: str,
+        *,
+        zip_with_range: bool = False,
+        num_partitions: int = 1,
+    ):
+        """Run distributed transfer; adapter defines return type (Ray: Dataset).
+
+        ``num_partitions`` aligns Ray blocks with ingress CAR partition layout.
+        """
         ...

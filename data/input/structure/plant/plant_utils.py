@@ -23,6 +23,7 @@ from typing import Optional
 UTILS_FILENAME = 'plant_utils.py'
 ENTRYPOINT_FILENAME = 'ray_job_result_entrypoint.py'
 COMPUTE_UTILS_FILENAME = 'ray_compute_utils.py'
+IO_UTILS_FILENAME = 'ray_io_utils.py'
 JOB_ENTRYPOINT_NAME = 'entrypoint.py'
 
 # Terraform / kind identifiers for this Plant (module.plant in Structure root).
@@ -164,6 +165,30 @@ def plant_port_from_context(plant) -> RayPlantPort:
             'PlantContext.job_endpoint is required to build RayPlantPort'
         )
     return RayPlantPort(job_endpoint)
+
+
+def io_port_from_context(plant, mesh, *, via_job: bool = False):
+    """Build Function-owned IoPort (RayIoPort) from Plant + ContentMesh.
+
+    Default ``via_job=False`` runs partition CAR layout ops on the Executor
+    against ``mesh`` (Plant-owned code). Set ``via_job=True`` to submit
+    ``ray_io_entrypoint`` on PlantPort.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    io_path = os.path.join(here, IO_UTILS_FILENAME)
+    if not os.path.isfile(io_path):
+        raise FileNotFoundError(io_path)
+    spec = importlib.util.spec_from_file_location('plant_ray_io_utils', io_path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    # Ensure sibling partition_layout import resolves from plant/.
+    plant_dir = here
+    if plant_dir not in sys.path:
+        sys.path.insert(0, plant_dir)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    plant_port = plant_port_from_context(plant) if plant is not None else None
+    return module.RayIoPort(mesh, plant_port=plant_port, via_job=via_job)
 
 
 def load_plant_utils(structure_home: str):

@@ -58,7 +58,9 @@ class _FakeCompute:
     def __init__(self):
         self.calls = []
 
-    def run_transfer(self, batch_fn, input_path, *, zip_with_range=False):
+    def run_transfer(
+        self, batch_fn, input_path, *, zip_with_range=False, num_partitions: int = 1
+    ):
         self.calls.append((batch_fn, input_path, zip_with_range))
         return f'dataset-for-{input_path}'
 
