@@ -20,6 +20,7 @@ def test_build_execution_bom_includes_node_did_and_cid_keys():
     assert bom['@context'][0] == 'https://www.w3.org/ns/prov#'
     assert bom['prov:wasAttributedTo'] == {'@id': 'did:key:zTest'}
     assert bom['prov:wasGeneratedBy']['@type'] == 'prov:Activity'
+    assert bom['prov:wasGeneratedBy']['@id'] == '#executorRun'
     assert bom['prov:wasGeneratedBy']['prov:used'] == {'@id': 'ipfs://inv'}
     assert 'plant_snapshot_cid' not in bom
     assert 'infrastructure_snapshot_cid' not in bom

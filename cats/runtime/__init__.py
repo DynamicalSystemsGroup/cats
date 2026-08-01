@@ -109,10 +109,35 @@ class Runtime:
         enhanced_bom, invoice_cid = executor.execute(order_request)
 
         # Structure as-executed nesting is on the Invoice (Executor-minted).
+        # Stage CIDs feed signed PROV wasDerivedFrom edges (intra-run lineage).
+        invoice = enhanced_bom.get('invoice') or {}
+        order = enhanced_bom.get('order') or {}
+        order_cid = (
+            invoice.get('order_cid')
+            or order_request.get('order_cid')
+            or order.get('order_cid')
+        )
+        input_data_cid = None
+        input_invoice_cid = order.get('invoice_cid')
+        if input_invoice_cid:
+            try:
+                input_invoice = json.loads(
+                    self.contentMesh.cat(input_invoice_cid)
+                )
+                input_data_cid = input_invoice.get('data_cid')
+            except Exception:
+                input_data_cid = None
+
         bom = build_execution_bom(
             log_cid=enhanced_bom['log_cid'],
             invoice_cid=invoice_cid,
             node_did=resolve_node_did(cats_home=self.CATS_HOME),
+            order_cid=order_cid,
+            input_data_cid=input_data_cid,
+            ingress_data_cid=invoice.get('ingress_data_cid'),
+            integration_data_cid=invoice.get('integration_data_cid'),
+            data_cid=invoice.get('data_cid'),
+            structure_as_executed_cid=invoice.get('structure_as_executed_cid'),
         )
         bom = sign_execution_bom(bom, cats_home=self.CATS_HOME)
         bom_cid = self.contentMesh.ipfsClient.add_str(json.dumps(bom))
