@@ -22,7 +22,7 @@ The Control-Feedback Loop’s provenance surface is:
 2. **Executor run** (activity) → Invoice + stage CIDs  
 3. **BOM** (HTTP / control-plane package) → points at Invoice + logs + agent  
 
-Stage products (`ingress_data_cid`, `integration_data_cid`, `data_cid`, `structure_as_executed_cid`) stay **out of the envelope as bytes** — only addresses. Seed remains deferred ([#187](https://github.com/DynamicalSystemsGroup/cats/issues/187)). See also [`LineageOfProvenance.md`](docs/LineageOfProvenance.md) and [`BOM.md`](docs/BOM.md).
+Stage products (`ingress_data_cid`, `integration_data_cid`, `data_cid`, `structure_as_executed_cid`, `seed_cid`) stay **out of the envelope as bytes** — only addresses; `seed_cid` now resolves to a populated Process replay dictionary ([#187](https://github.com/DynamicalSystemsGroup/cats/issues/187)). See also [`LineageOfProvenance.md`](docs/LineageOfProvenance.md) and [`BOM.md`](docs/BOM.md).
 
 ---
 
