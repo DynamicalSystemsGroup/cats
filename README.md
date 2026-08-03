@@ -33,29 +33,39 @@ A *Data Product's **Domain*** is the [Domain-Driven Design's (DDDs) bounded cont
     - CAT's **Order API** is used to generate an *Order* of CATs and is a part of BOM's Data Model for which can be utilized for a variety of Use-Cases.
 
 ## Get Started!:
-#### 0. Clone CATs:
+#### 0. Clone & Install CAT Node:
+a. Clone and `cd` into CATs:
 ```bash
 git clone git@github.com:DynamicalSystemsGroup/cats.git
 cd cats
-uv python install   # installs the Python version pinned in .python-version
-uv sync             # creates .venv and installs locked dependencies from uv.lock
 ```
+b. Installs uv & pinned Python version, and creates .venv installs with locked dependencies from uv.lock:
+```bash
+make deps-uv-sync
+```
+  - See [DEPS — uv](./docs/DEPS.md#uv) for the manual steps behind `make deps-uv-sync`.
   - See [ENV.md](./docs/ENV.md) for the full environment workflow, including the `ops` and `mac` extras.
 #### 1. Installation:
 `make deps-all` - Runs on macOS or Linux (see the [Makefile](./Makefile) and `make help`), or follow [DEPS.md](./docs/DEPS.md) to install each dependency manually.
-#### 2. [Node Lifecycle](./docs/NodeLifeCycle.md) — start / status / stop:
+#### 2. [Storage](./docs/STORAGE.md) — content-store init (one-time):
+Before first `node-up`, initialize the host content-store if it does not already exist:
+```bash
+make content-store-init   # idempotent: creates the local content-store when missing
+```
+Does **not** start the content-store service — that is `content-store-ensure` / `node-up`. After you finish using CAT Node, shut the content-store down (`make content-store-shutdown`, or `make node-down` to stop Flask and the content-store together). Details: [STORAGE.md](./docs/STORAGE.md).
+#### 3. [Node Lifecycle](./docs/NodeLifeCycle.md) — start / status / stop:
 ```bash
 make node-up     # content-store-ensure && node-start
 make node-status # flask=up|down + content_store=ready|not_ready
-make node-stop   # Flask only — host Kubo left running
+make node-stop   # Flask only — host content-store left running
 ```
-*Optional:* `make node-down` = `make node-stop` + `ipfs shutdown`
+*Optional:* `make node-down` = `make node-stop` + `make content-store-shutdown`
 Full command reference, exit codes, and why ensure ≠ start: [NodeLifeCycle.md](./docs/NodeLifeCycle.md).
-#### 3. [Demonstration](./docs/DEMO.md):
+#### 4. [Demonstration](./docs/DEMO.md):
 CAT Node is shipped with *Techncal Use-Case CAT Workload Specifications ( Templates / "Recipies")* as *CAT **Orders*** for which proccess will be executed and **Invoiced**. This repository will feature a Scalable Scientific Computing application **Ordered** as a 2 CATs. This **Order** is specified to utilize [Ray](https://www.ray.io/) as an execution middleware framework **Plant (SaaS)** deployed on **[Kubernetes](https://kubernetes.io/)** for interoperable & parallelized distributed computing applications / Big Data processing with Scientific Computing enabled [ecosystem integrations](https://docs.ray.io/en/latest/ray-overview/ray-libraries.html) such as [Apache Spark](https://spark.apache.org/), and [PyTorch](https://pytorch.org/).
-#### 4. [Testing:](./docs/TEST.md) *CAT Node Integration & Unit Tests*
-#### 5. [Dashboards](./docs/DASHBOARDS.md)
-#### 6. Auto-Diagramming Software Archtecture:
+#### 5. [Testing:](./docs/TEST.md) *CAT Node Integration & Unit Tests*
+#### 6. [Dashboards](./docs/DASHBOARDS.md)
+#### 7. Auto-Diagramming Software Archtecture:
 `make diagrams` - requires `Graphviz` for PNG output — `make deps-graphviz` (or `make deps-all`)
   * Constituent Commands / Utilities: 
     * `code2flow` used to generate *Functional Component Activity Diagram*: 

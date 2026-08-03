@@ -7,6 +7,7 @@ dependencies (`uv.lock`). uv creates/updates `./.venv` automatically — there's
 ```bash
 # CATs working directory
 cd cats
+pip install uv
 uv python install
 ```
 ##### 1. Create/refresh `.venv` and install locked dependencies:
