@@ -79,7 +79,7 @@ class _FakePlantPort:
 
 
 def test_process_uses_compute_port_no_ray():
-    """Process tHOFs use ComputePort and must not import Ray adapters."""
+    """Process hotFs use ComputePort and must not import Ray adapters."""
     from data.input.function import process as proc
     from data.input.function.process.compute_port import ComputePort
 

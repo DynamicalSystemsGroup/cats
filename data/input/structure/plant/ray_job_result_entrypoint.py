@@ -1,4 +1,4 @@
-"""Ray job entrypoint: run tHOF via ComputePort and write CSV shards to scratch.
+"""Ray job entrypoint: run hotF via ComputePort and write CSV shards to scratch.
 
 Ships in `plant/` (`plant_cid`). Copied into the Ray job working_dir as
 ``entrypoint.py`` by ``RayPlantPort.submit_job``. Credentials stay in
@@ -47,7 +47,7 @@ except ValueError:
 try:
     ds_out = subproc('input', compute, num_partitions=num_partitions)
 except TypeError:
-    # Legacy tHOF bind without num_partitions.
+    # Legacy hotF bind without num_partitions.
     ds_out = subproc('input', compute)
 
 if num_partitions > 1:

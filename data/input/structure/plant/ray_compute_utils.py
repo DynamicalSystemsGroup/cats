@@ -1,7 +1,7 @@
-"""Plant Ray ComputePort adapter (distributed Ray Data tHOF runner).
+"""Plant Ray ComputePort adapter (distributed Ray Data hotF runner).
 
 Ships inside `plant/` (`plant_cid`). Copied into the Ray job working_dir
-beside ``entrypoint.py`` by ``RayPlantPort.submit_job`` so Process tHOFs
+beside ``entrypoint.py`` by ``RayPlantPort.submit_job`` so Process hotFs
 can call ``ComputePort.run_transfer`` without importing Ray in Function CID.
 
 Maps Ray Data batches onto this demo's batch ABI

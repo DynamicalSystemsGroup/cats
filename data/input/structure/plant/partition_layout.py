@@ -33,7 +33,7 @@ def list_part_cars(directory: str | Path) -> list[Path]:
 
 
 def list_part_shards(directory: str | Path) -> list[Path]:
-    """Sorted non-CAR ``part-*`` files/dirs (tHOF CSV outputs)."""
+    """Sorted non-CAR ``part-*`` files/dirs (hotF CSV outputs)."""
     root = Path(directory)
     return sorted(
         p for p in root.glob('part-*')

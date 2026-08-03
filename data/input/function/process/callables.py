@@ -5,11 +5,11 @@
 #     migrate / stage_for_plant. When num_partitions > 1, ingress/egress also
 #     take an IoPort (Plant-backed partitioned CAR I/O). Process does not own
 #     Docker/IPFS peers or peering (Structure-owned T&D swarm connect).
-#   - process_0 / process_1 (Order slot: integrated_subproc) — the Transfer
-#     Higher-Order Function (tHOF): input→output data transform via
+#   - process_0 / process_1 (Order slot: integrated_subproc) — the Higher-Order
+#     Transfer Function (hotF): input→output data transform via
 #     ComputePort.run_transfer (Plant-agnostic). Ray Data orchestration lives
 #     in Plant RayComputePort, wired by the Plant-owned job entrypoint.
-# InfraFunction [Actuator] dispatches only the tHOF onto Plant [SaaS]; transport
+# InfraFunction [Actuator] dispatches only the hotF onto Plant [SaaS]; transport
 # runs locally around that dispatch. Executor wires `transport` like
 # object_store/plant.
 #
@@ -81,14 +81,14 @@ def function_1(batch: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
 
 
 def process_0(input, compute: ComputePort, *, num_partitions: int = 1):
-    """tHOF: petal-area transfer via ComputePort (Ray adapter supplies Dataset)."""
+    """hotF: petal-area transfer via ComputePort (Ray adapter supplies Dataset)."""
     return compute.run_transfer(
         function_0, input, zip_with_range=True, num_partitions=num_partitions
     )
 
 
 def process_1(input, compute: ComputePort, *, num_partitions: int = 1):
-    """tHOF: duplicate petal-area transfer via ComputePort."""
+    """hotF: duplicate petal-area transfer via ComputePort."""
     return compute.run_transfer(
         function_1, input, zip_with_range=False, num_partitions=num_partitions
     )

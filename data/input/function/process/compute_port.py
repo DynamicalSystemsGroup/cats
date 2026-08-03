@@ -1,4 +1,4 @@
-"""Function-owned compute port contract for Process [Composed Function] tHOFs.
+"""Function-owned compute port contract for Process [Composed Function] hotFs.
 
 Process ``integrated_subproc`` callables depend on ``ComputePort`` only —
 ``run_transfer(batch_fn, input_path, ...)``. They must not import Ray or
@@ -9,7 +9,7 @@ Demo batch ABI (adapter concern): ``batch_fn`` is
 adapter maps engine batches onto that shape (see docs/INTEROP.md §2g).
 
 The Ray job entrypoint wires Order-submitted ``RayComputePort`` into the
-tHOF so distributed Ray Data stays behind the Plant adapter.
+hotF so distributed Ray Data stays behind the Plant adapter.
 """
 from __future__ import annotations
 
