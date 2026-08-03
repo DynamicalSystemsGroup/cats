@@ -50,11 +50,11 @@ These seams are how interoperability is supposed to work without rewriting Funct
 |------------|------------------|---------------------|---------------------|
 | **TransportPort** | Process ingress / egress / integration_cache (`n=1`) | `TransportContext` | Docker Kubo peers + host Bitswap |
 | **IoPort** | Process ingress / egress when `num_partitions > 1` | `RayIoPort` (`plant/ray_io_utils.py`) | Partition CAR layout via ContentMesh / AddressStore; optional Plant job (`CATS_IO_VIA_JOB`) |
-| **ComputePort** | Process `process_*` tHOF | `RayComputePort` (job working_dir) | Ray Data `map_batches`; `num_partitions` aligns blocks to `part-*` layout |
+| **ComputePort** | Process `process_*` hotF | `RayComputePort` (job working_dir) | Ray Data `map_batches`; `num_partitions` aligns blocks to `part-*` layout |
 | **PlantPort** | InfraFunction actuator | `RayPlantPort` | Ray Job Submission |
 | **JobHandle** / ObjectStore | InfraFunction scratch correlator; durable Entity Relationship façade | `begin_job` / `write_job_scratch`; `er_uri` / `promote_er` / `resolve_er` / `gc_er` | Scratch MinIO `cats-scratch` + durable MinIO `cats-durable` |
 
-**Partition I/O:** set `CATS_IO_PARTITIONS=n` (`n=1` default keeps TransportPort.migrate). For `n>1`, ingress/egress use IoPort and produce/consume a UnixFS directory of `part-00000.car` … `part-{n-1:05d}.car` (stable shuffle keys). Invoice stage fields remain single root CIDs.
+**Partition I/O:** set `CATS_IO_PARTITIONS=n` (`n=1` default keeps TransportPort.migrate). For `n>1`, ingress/egress use IoPort and produce/consume a UnixFS directory of `part-00000.car` … `part-{n-1:05d}.car` (stable shuffle keys). Invoice stage fields remain single root CIDs. Invoice `seed_cid` now *records* the `num_partitions` observed for the run (plus a Process/NumPy-usable `rng_seed` int a second Plant's `ComputePort` may map to its own engine RNG); `CATS_IO_PARTITIONS` remains the demo-fallback *selector* of `n` until the Executor reads it from Seed instead ([#187](https://github.com/DynamicalSystemsGroup/cats/issues/187); see [`populate_invoice_seed_field`](../.cursor/plans/populate_invoice_seed_field_c499fe02.plan.md) plan).
 
 Process public surface is locked by `process.__all__` and
 [`tests/test_process_public_surface.py`](../tests/test_process_public_surface.py)
@@ -100,7 +100,7 @@ adapter modules).
 1. Order-submitted Plant module implementing **PlantPort** (`submit_job` / `wait`) for a non-Ray runtime
    (e.g. local subprocess pool, plain Kubernetes Job, or Spark — product choice).
 2. Matching **ComputePort** adapter (and job entrypoint or equivalent) that runs
-   `batch_fn` / tHOF intent without requiring Process to import that engine. Adapter may map
+   `batch_fn` / hotF intent without requiring Process to import that engine. Adapter may map
    engine batches onto this demo’s batch ABI (`Dict[str, np.ndarray]` for `function_0` /
    `function_1`) — see **2g**.
 3. Scratch path via **JobHandle** (MinIO OK for v1 of the second Plant).

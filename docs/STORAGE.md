@@ -70,7 +70,7 @@ Process transport callables depend on Function-owned **`TransportPort`**
 Peering **mutate** is TF `ipfs_transport_peering` every reconcile; Executor `apply`
 only **asserts** containers ready — not Process heal.
 
-Process tHOFs depend on Function-owned **`ComputePort`** (`run_transfer`); the Plant-owned
+Process hotFs depend on Function-owned **`ComputePort`** (`run_transfer`); the Plant-owned
 Ray job entrypoint (staged by **`RayPlantPort.submit_job`**) wires **`RayComputePort`**
 (no `import ray` in Process). Demo **batch ABI** is
 `Dict[str, np.ndarray] -> Dict[str, np.ndarray]` — the ComputePort adapter maps engine
@@ -111,7 +111,7 @@ content-addressed record after the run.
 
 ## How they connect in one CAT execution
 
-1. InfraFunction dispatches Process’s tHOF (`integrated_subproc`) onto Plant via **PlantPort**
+1. InfraFunction dispatches Process’s hotF (`integrated_subproc`) onto Plant via **PlantPort**
    (this demo: Ray Job on KubeRay).
 2. Plant stages entrypoint + **ComputePort** (`RayComputePort`) into the job working_dir;
    workers write CSV shards to MinIO (`cats-scratch/jobs/<uuid>/result/`) — genuinely distributed.
