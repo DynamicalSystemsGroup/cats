@@ -209,6 +209,8 @@ class ContentMesh(OrderOps):
         invoice['order'] = json.loads(
             self.cat(invoice['order_cid']),
         )
+        if invoice.get('seed_cid'):
+            invoice['seed'] = json.loads(self.cat(invoice['seed_cid']))
         invoice['order']['flat'] = {
             'function': json.loads(self.cat(invoice['order']["function_cid"])),
             'structure': json.loads(self.cat(invoice['order']["structure_cid"])),
