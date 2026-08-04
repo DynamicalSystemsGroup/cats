@@ -18,9 +18,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict
-
-import numpy as np
+from typing import TYPE_CHECKING, Any, Dict
 
 if TYPE_CHECKING:
     from data.input.function.process.compute_port import ComputePort
@@ -66,14 +64,14 @@ def integration_cache(input_dir_cid, cwd, transport: TransportPort, data_cache=N
     )
 
 
-def function_0(batch: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+def function_0(batch: Dict[str, Any]) -> Dict[str, Any]:
     vec_a = batch["petal length (cm)"].astype('double')
     vec_b = batch["petal width (cm)"].astype('double')
     batch["petal area (cm^2)"] = vec_a * vec_b
     return batch
 
 
-def function_1(batch: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+def function_1(batch: Dict[str, Any]) -> Dict[str, Any]:
     vec_a = batch["petal length (cm)"].astype('double')
     vec_b = batch["petal width (cm)"].astype('double')
     batch["DUPLICATE petal area (cm^2)"] = vec_a * vec_b
