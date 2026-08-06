@@ -1,6 +1,6 @@
 # What kind of "Plant" is a CAT Node?
 
-CATs' architecture is built around the "Plant" family of engineering analogies referenced throughout `[README.md](../README.md)`, `[COMPONENTS.md](COMPONENTS.md)`, and `[NodeProductFlow.md](NodeProductFlow.md)`. This article answers a more literal version of that question: mapped against Wikipedia's own **[Plant (disambiguation) - Heavy industry and engineering](https://en.wikipedia.org/wiki/Plant_(disambiguation)#Heavy_industry_and_engineering)** listed a s follows:
+CATs' architecture is built around the "Plant" family of engineering analogies referenced throughout `[README.md](../README.md)`, `[COMPONENTS.md](COMPONENTS.md)`, and `[ControlFeedbackLoop.md](ControlFeedbackLoop.md)`. This article answers a more literal version of that question: mapped against Wikipedia's own **[Plant (disambiguation) - Heavy industry and engineering](https://en.wikipedia.org/wiki/Plant_(disambiguation)#Heavy_industry_and_engineering)** listed a s follows:
 
 - **Represented Plants:**
   - [Plant (control theory)](https://en.wikipedia.org/wiki/Plant_(control_theory)) - the combination of process and actuator & analogous to CAT Node's Function [FaaS]
@@ -14,7 +14,7 @@ CATs' architecture is built around the "Plant" family of engineering analogies r
 **Questions:**
 
 - what type of "plant" is the **CAT Node** as a whole, and
-- what type of "plant" is each of its constituent **Architectural Components** (`[COMPONENTS.md](COMPONENTS.md)`: the Factory, the Architectural Quantum, the ephemeral Executor) and their nested sub-components (`[NodeProductFlow.md](NodeProductFlow.md)`: Function/Process/InfraFunction, Structure/Plant/InfraStructure), taken separately.
+- what type of "plant" is each of its constituent **Architectural Components** (`[COMPONENTS.md](COMPONENTS.md)`: the Factory, the Architectural Quantum, the ephemeral Executor) and their nested sub-components (`[ControlFeedbackLoop.md](ControlFeedbackLoop.md)`: Function/Process/InfraFunction, Structure/Plant/InfraStructure), taken separately.
 
 ## Caveat: which "Power plant" article actually applies
 
@@ -57,7 +57,7 @@ analog anywhere in CATs' architecture.
 ## Per-component breakdown
 
 Using `[COMPONENTS.md](COMPONENTS.md)`'s three named Architectural Components, plus the nested components
-`[NodeProductFlow.md](NodeProductFlow.md)` defines the actual "plant"-like behavior for:
+`[ControlFeedbackLoop.md](ControlFeedbackLoop.md)` defines the actual "plant"-like behavior for:
 
 ### 1. the Factory
 
@@ -70,7 +70,7 @@ Node process-lifetime ambient, not the manufacturing logic.
 
 ### 2. the Architectural Quantum
 
-Per `[NodeProductFlow.md](NodeProductFlow.md)` step 0B, the Architectural Quantum is `Function [FaaS]` +
+Per `[ControlFeedbackLoop.md](ControlFeedbackLoop.md)` step 2B, the Architectural Quantum is `Function [FaaS]` +
 `Structure [PaaS]`. It isn't a single type; it's the *union* of the next two rows, since it's defined as
 Function's dependency on Structure, not a standalone facility:
 
@@ -93,7 +93,7 @@ Station generation + Transmission & Distribution (T&D) model (per the caveat abo
 
 Doesn't fit any of the six categories itself. It doesn't generate, transmit, manufacture, or process anything on
 its own; it's the *runtime that operates* the other plants - dispatching Function [FaaS] onto Structure [PaaS]
-via InfraFunction [Actuator] dispatching onto Plant [SaaS] (`[NodeProductFlow.md](NodeProductFlow.md)` step 2a). Structurally
+via InfraFunction [Actuator] dispatching onto Plant [SaaS] (`[ControlFeedbackLoop.md](ControlFeedbackLoop.md)` step 4A). Structurally
 it's closer to a plant *operator/control-room process* than to a plant itself - it's the thing standing between
 the Manufacturing-plant output (a composed Function+Structure pair) and those components' own actual execution.
 
@@ -114,6 +114,6 @@ the Manufacturing-plant output (a composed Function+Structure pair) and those co
 
 
 See also: `[COMPONENTS.md](COMPONENTS.md)` for the Node's top-level Architectural Components,
-`[NodeProductFlow.md](NodeProductFlow.md)` for how they're exercised per execution,
+`[ControlFeedbackLoop.md](ControlFeedbackLoop.md)` for how they're exercised per execution,
 `[DESIGN.md](DESIGN.md)` for how the Architectural Quantum is realized as content-addressed CIDs, and
 `[INTEROP.md](INTEROP.md)` for proving Plant/T&D interoperability across AQ components.
