@@ -8,37 +8,46 @@
 > steps below document what each target does and remain the reference for manual installs or troubleshooting.
 
 0. [**Docker:**](https://docs.docker.com/desktop/install/mac-install/) (`make deps-docker`)
-1. [**uv**](https://docs.astral.sh/uv/) (>= 0.7.0) — manages the pinned Python interpreter, virtual environment
+1. [**Homebrew**](https://brew.sh/) — macOS package manager used by later `make deps-*` targets
+  (`kind`, `kubectl`, `go`, `ipfs`, optional `graphviz`). Install if `brew` is not
+  already on `PATH`:
+  ```bash
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  ```
+  On Apple Silicon, follow the installer note to add Homebrew to your shell `PATH` (typically
+  `eval "$(/opt/homebrew/bin/brew shellenv)"` in `~/.zprofile` or `~/.bash_profile`).
+2. <a id="uv"></a>[**uv**](https://docs.astral.sh/uv/) (>= 0.7.0) — manages the pinned Python interpreter, virtual environment
   (`.venv`), and locked dependencies (`uv.lock`) for CATs. Install it, then let it install the Python version
   pinned in [`.python-version`](../.python-version):
   ```bash
-  curl -LsSf https://astral.sh/uv/install.sh | sh
   cd <path-to>/cats
-  uv python install   # installs Python 3.12.5 per .python-version; no separate Python install needed
+  pip install uv      # installs uv
+  uv python install   # installs the Python version pinned in .python-version
+  uv sync             # creates .venv and installs locked dependencies from uv.lock
   ```
-  (`make deps-uv` runs the same two steps. See [`ENV.md`](./ENV.md) for the full `uv sync` / `uv run` workflow.)
-2. [**kind**](https://kind.sigs.k8s.io/docs/user/quick-start/#installing-from-release-binaries) (>= 0.20.0)
+  (`make deps-uv-sync` runs the same three steps. See [`ENV.md`](./ENV.md) for the full `uv sync` / `uv run` workflow.)
+3. [**kind**](https://kind.sigs.k8s.io/docs/user/quick-start/#installing-from-release-binaries) (>= 0.20.0)
   (`make deps-kind`)
-3. [**kubectl**](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) (>= 1.27.3") (`make deps-kubectl`)
-4. [**Terraform**:](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli) (>= 1.15.7) (`make deps-terraform`)
-  * Use Terraform's standalone binary if `brew install` fails due to an outdated Xcode, download the official precompiled binary directly and place it on your `PATH` (e.g. the project's `.venv/bin`, created by `uv sync`) — this is exactly what `make deps-terraform` falls back to automatically:
+4. [**kubectl**](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) (>= 1.27.3") (`make deps-kubectl`)
+5. [**Terraform**:](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli) (pinned **1.15.7**) (`make deps-terraform`)
+  Pins the official HashiCorp binary into the uv-managed project env (`.venv/bin`), not Homebrew
+  or “latest”. `make deps-terraform` runs `deps-uv-sync` first, then installs if that pin is missing:
   ```bash
   cd <path-to>/cats
-  VER=1.15.7   # adjust as needed
-  curl -LO "https://releases.hashicorp.com/terraform/${VER}/terraform_${VER}_darwin_arm64.zip"
-  unzip "terraform_${VER}_darwin_arm64.zip"
-  mv terraform .venv/bin/
-  rm "terraform_${VER}_darwin_arm64.zip"
-  terraform -version
-  # > Note: use `darwin_amd64` instead of `darwin_arm64` on Intel Macs. After installing, restart
-  #  > `python -m cats.node` so the running process picks up the new binary on `PATH`.
-  #  > When running Terraform manually from the repo root:
-  #  >   export TF_DATA_DIR="$PWD/data/input/structure/.terraform-data"
-  #  >   export INTEGRATION_INPUT_DATA_CACHE="$PWD/data/cache/integration/outputs"
-  #  > (Use absolute paths; docker-compose treats relative volume paths as named volumes.)
+  make deps-terraform
+  # equivalent manual steps:
+  # VER=1.15.7
+  # curl -fsSLO "https://releases.hashicorp.com/terraform/${VER}/terraform_${VER}_<os>_<arch>.zip"
+  # unzip -o "terraform_${VER}_<os>_<arch>.zip" -d .venv/bin
+  # rm "terraform_${VER}_<os>_<arch>.zip"
+  .venv/bin/terraform -version   # or: uv run terraform -version
+  # > When running Terraform manually from the repo root:
+  # >   export TF_DATA_DIR="$PWD/data/input/structure/.terraform-data"
+  # >   export INTEGRATION_INPUT_DATA_CACHE="$PWD/data/cache/integration/outputs"
+  # > (Use absolute paths; docker-compose treats relative volume paths as named volumes.)
   ```
-5. [**Go**](https://go.dev/dl/) (>= v3.13.1) (`make deps-go`)
-6. [**IPFS Kubo**](https://docs.ipfs.tech/install/command-line/#system-requirements) (>= 0.21.0) (`make deps-ipfs`)
+6. [**Go**](https://go.dev/dl/) (>= v3.13.1) (`make deps-go`)
+7. [**IPFS Kubo**](https://docs.ipfs.tech/install/command-line/#system-requirements) (>= 0.21.0) (`make deps-ipfs`)
   (See [`IPFS.md`](./IPFS.md) for running/managing the host daemon.)
 * [**helm**](https://helm.sh/docs/intro/install/) (>= 3.12.1) — optional; `terraform apply` manages Helm
   releases itself via the `hashicorp/helm` provider, which talks to the Helm SDK directly and doesn't shell

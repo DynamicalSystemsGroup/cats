@@ -77,10 +77,11 @@ define version_ge
 endef
 
 .PHONY: help deps deps-all \
-	deps-docker deps-uv deps-kind deps-kubectl deps-terraform deps-go deps-ipfs deps-helm \
+	deps-docker deps-uv deps-uv-sync deps-kind deps-kubectl deps-terraform deps-go deps-ipfs deps-helm \
 	deps-graphviz \
 	check-pkg-manager print-versions \
-	node-start node-stop node-status node-up node-down content-store-ensure \
+	node-start node-stop node-status node-up node-down \
+	content-store-init content-store-ensure content-store-shutdown \
 	execute-order diagrams
 
 CONTENT_STORE_UTILS := data/input/structure/infrastructure/content_store_utils.py
@@ -94,10 +95,10 @@ help:
 	@echo "  make deps-all        Same as 'deps', plus optional helm + Graphviz"
 	@echo "  make deps-docker     Verify/install Docker"
 	@echo "  make deps-uv         Install uv + the pinned Python interpreter"
+	@echo "  make deps-uv-sync    deps-uv then uv sync (.venv + locked deps)"
 	@echo "  make deps-kind       Install latest kind (>= $(KIND_MIN_VERSION))"
 	@echo "  make deps-kubectl    Install latest kubectl (>= $(KUBECTL_MIN_VERSION))"
-	@echo "  make deps-terraform  Install latest Terraform (>= $(TERRAFORM_MIN_VERSION));"
-	@echo "                       package manager first, falling back to the standalone binary"
+	@echo "  make deps-terraform  Install Terraform $(TERRAFORM_MIN_VERSION) into .venv/bin"
 	@echo "  make deps-go         Install latest Go (>= $(GO_MIN_VERSION))"
 	@echo "  make deps-ipfs       Install latest IPFS Kubo (>= $(IPFS_MIN_VERSION))"
 	@echo "  make deps-helm       Install the optional helm CLI (>= $(HELM_MIN_VERSION));"
@@ -108,10 +109,12 @@ help:
 	@echo ""
 	@echo "Node lifecycle (AQ-safe: start asserts ContentStore; ensure heals; stop = Flask only):"
 	@echo "  make node-up               Convenience: content-store-ensure then node-start"
-	@echo "  make node-down             Convenience: node-stop then ipfs shutdown (Make-only)"
-	@echo "  make content-store-ensure  InfraStructure ContentStore.ensure CLI (heal/start Kubo)"
+	@echo "  make node-down             Convenience: node-stop then content-store-shutdown"
+	@echo "  make content-store-init    One-time content-store repo create if missing"
+	@echo "  make content-store-ensure  Heal/start host content-store service"
+	@echo "  make content-store-shutdown  Stop host content-store service (not Flask)"
 	@echo "  make node-start            Assert bootstrap ContentStore ready, then bind Flask"
-	@echo "  make node-stop             Stop Flask Node only (never host Kubo)"
+	@echo "  make node-stop             Stop Flask Node only (never host content-store)"
 	@echo "  make node-status           Flask listen + ContentStore ready"
 	@echo "  make execute-order ORDER_CID=<cid>  In-process Order execute (no Flask)"
 	@echo ""
@@ -147,15 +150,19 @@ deps-docker:
 		echo "Added $$(whoami) to the docker group - log out/in (or run 'newgrp docker') for it to take effect."; \
 	fi
 
-# 1. uv (docs/DEPS.md item 1) - upstream installer already detects OS/arch itself
-# and always installs the latest uv release.
+# 1. uv (docs/DEPS.md item 1) - install via pip, then let uv install the pinned
+# Python interpreter from .python-version.
 deps-uv:
 	@if command -v uv >/dev/null; then \
 		echo "uv already installed: $$(uv --version)"; \
 	else \
-		curl -LsSf https://astral.sh/uv/install.sh | sh; \
+		pip install uv; \
 	fi
 	uv python install   # installs the Python version pinned in .python-version
+
+# deps-uv + locked project env (README / ENV.md: uv sync)
+deps-uv-sync: deps-uv
+	uv sync
 
 # 2. kind (docs/DEPS.md item 2) - not reliably packaged across Linux distros,
 # so Linux always fetches the latest GitHub release (falling back to the
@@ -206,29 +213,19 @@ deps-kubectl:
 		rm -f kubectl; \
 	fi
 
-# 4. Terraform (docs/DEPS.md item 4) - try the package manager first, then
-# fall back to the standalone binary, resolving "latest" via HashiCorp's
-# checkpoint API (the same mechanism `terraform` itself uses for its own
-# upgrade-available notices) rather than a hardcoded version.
-deps-terraform:
-	@if command -v terraform >/dev/null; then \
-		CURRENT=$$(terraform -version | head -n1 | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+'); \
-		if $(call version_ge,$$CURRENT,$(TERRAFORM_MIN_VERSION)); then \
-			echo "terraform already installed: v$$CURRENT (>= $(TERRAFORM_MIN_VERSION) required)"; \
-		else \
-			echo "WARNING: installed terraform v$$CURRENT is older than the required >= $(TERRAFORM_MIN_VERSION); consider upgrading."; \
-		fi; \
-	elif [ "$(OS_NAME)" = "darwin" ] && command -v brew >/dev/null && brew install terraform; then \
-		: ; \
+# 5. Terraform (docs/DEPS.md item 5) - pin HashiCorp binary into the uv-managed
+# .venv/bin (not brew / not "latest"). Requires deps-uv-sync so .venv exists.
+deps-terraform: deps-uv-sync
+	@VER=$(TERRAFORM_MIN_VERSION); \
+	mkdir -p .venv/bin; \
+	if [ -x .venv/bin/terraform ] && \
+		.venv/bin/terraform -version | head -n1 | grep -q "$$VER"; then \
+		echo "terraform already installed in .venv: v$$VER"; \
 	else \
-		LATEST=$$(curl -fsSL https://checkpoint-api.hashicorp.com/v1/check/terraform 2>/dev/null | grep -o '"current_version":"[^"]*"' | cut -d'"' -f4); \
-		if [ -z "$$LATEST" ]; then LATEST=$(TERRAFORM_MIN_VERSION); echo "Could not detect the latest Terraform release; using floor v$$LATEST"; fi; \
-		echo "Installing Terraform v$$LATEST standalone binary for $(OS_NAME)/$(ARCH)..."; \
-		curl -LO "https://releases.hashicorp.com/terraform/$$LATEST/terraform_$${LATEST}_$(OS_NAME)_$(ARCH).zip"; \
-		unzip -o "terraform_$${LATEST}_$(OS_NAME)_$(ARCH).zip"; \
-		mkdir -p .venv/bin; \
-		mv terraform .venv/bin/; \
-		rm "terraform_$${LATEST}_$(OS_NAME)_$(ARCH).zip"; \
+		echo "Installing Terraform v$$VER into .venv/bin for $(OS_NAME)/$(ARCH)..."; \
+		curl -fsSLO "https://releases.hashicorp.com/terraform/$$VER/terraform_$${VER}_$(OS_NAME)_$(ARCH).zip"; \
+		unzip -o "terraform_$${VER}_$(OS_NAME)_$(ARCH).zip" -d .venv/bin; \
+		rm -f "terraform_$${VER}_$(OS_NAME)_$(ARCH).zip"; \
 		.venv/bin/terraform -version; \
 	fi
 
@@ -330,7 +327,13 @@ print-versions:
 	@command -v uv        >/dev/null && printf "%-10s %s\n" uv        "$$(uv --version)"                || printf "%-10s not installed\n" uv
 	@command -v kind      >/dev/null && printf "%-10s %s\n" kind      "$$(kind version)"                || printf "%-10s not installed\n" kind
 	@command -v kubectl   >/dev/null && printf "%-10s %s\n" kubectl   "$$(kubectl version --client)"    || printf "%-10s not installed\n" kubectl
-	@command -v terraform >/dev/null && printf "%-10s %s\n" terraform "$$(terraform -version | head -n1)" || printf "%-10s not installed\n" terraform
+	@if [ -x .venv/bin/terraform ]; then \
+		printf "%-10s %s\n" terraform "$$(.venv/bin/terraform -version | head -n1) (.venv)"; \
+	elif command -v terraform >/dev/null; then \
+		printf "%-10s %s\n" terraform "$$(terraform -version | head -n1)"; \
+	else \
+		printf "%-10s not installed\n" terraform; \
+	fi
 	@command -v go        >/dev/null && printf "%-10s %s\n" go        "$$(go version)"                  || printf "%-10s not installed\n" go
 	@command -v ipfs      >/dev/null && printf "%-10s %s\n" ipfs      "$$(ipfs version)"                || printf "%-10s not installed\n" ipfs
 	@command -v helm      >/dev/null && printf "%-10s %s\n" helm      "$$(helm version --short)"        || printf "%-10s not installed (optional)\n" helm
@@ -338,10 +341,9 @@ print-versions:
 
 node-up: content-store-ensure node-start
 
-# Make-only teardown: Flask then host Kubo. Does not live in cats.node stop
-# (Node remains a ContentStore client; see docs/NodeLifeCycle.md).
-node-down: node-stop
-	-ipfs shutdown
+# Make-only teardown: Flask then host content-store. Does not live in
+# cats.node stop (Node remains a ContentStore client; see docs/NodeLifeCycle.md).
+node-down: node-stop content-store-shutdown
 
 node-start:
 	uv run python -m cats.node start
@@ -352,8 +354,28 @@ node-stop:
 node-status:
 	uv run python -m cats.node status
 
+# One-time host content-store repo create. Does not start the service (use
+# content-store-ensure / node-up). Idempotent when the repo config exists.
+content-store-init:
+	@command -v ipfs >/dev/null || { \
+		echo "ipfs not found on PATH; run: make deps-ipfs"; \
+		exit 1; \
+	}
+	@IPFS_PATH="$${IPFS_PATH:-$$HOME/.ipfs}"; \
+	if [ -f "$$IPFS_PATH/config" ]; then \
+		echo "Content-store already initialized: $$IPFS_PATH"; \
+	else \
+		echo "Initializing content-store at $$IPFS_PATH..."; \
+		ipfs init; \
+	fi
+
 content-store-ensure:
 	uv run python $(CONTENT_STORE_UTILS) ensure
+
+# Stop host content-store service only (never Flask / cats.node).
+# Leading '-' keeps node-down usable when the service is already down.
+content-store-shutdown:
+	-ipfs shutdown
 
 # In-process Runtime.execute (same path as POST /cat/node/init, no Flask).
 # Example order_cid: QmNU5EAmWNDc7U3bjZ8X2rzjD3iN83KXcarsvnyk8AXA9o

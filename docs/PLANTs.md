@@ -31,8 +31,8 @@ generation / Transmission & Distribution (T&D) architecture.
 
 For CATs, the meaningful match is the **Power Station** sense: `Plant [SaaS]` generates compute
 (Ray/KubeRay), `InfraStructure [IaaS]` is the Transmission & Distribution (T&D) substrate (IPFS/MinIO/Docker Compose)
-the generated results move through. Job **landing** (entrypoint + `ComputePort` adapter) is Plant-owned
-under `plant_cid`; scratch correlators (`ObjectStore` / `JobHandle`) stay IaaS — see [`INTEROP.md`](./INTEROP.md) §2g.
+the generated results move through. Job **landing** (hotF entrypoint + `ComputePort` / `IoPort` adapters) is Plant-owned
+under `plant_cid` (`RayComputePort`, `RayIoPort`); scratch correlators (`ObjectStore` / `JobHandle`) stay IaaS — see [`INTEROP.md`](./INTEROP.md).
 The Physical-Plant-internal "Power plants" taxonomy doesn't map onto that
 generation / Transmission & Distribution (T&D) split; at most, its primary-systems/balance-of-plant-systems distinction loosely echoes
 `Plant [SaaS]` (generation-specific core) vs. `InfraStructure [IaaS]` (generic supporting substrate reusable
@@ -76,7 +76,7 @@ Function's dependency on Structure, not a standalone facility:
 
 - **Function [FaaS]** (`Process [Composed Function]` + `InfraFunction [Actuator]`) -> **Plant (control theory)** as a whole -
 "the combination of process and actuator" is verbatim Function's own composition (Process [Composed Function] = the
-composed callable graph / FaaS-composer analogue: transport/`ComputePort` callables plus a Plant-agnostic tHOF = the "process"; InfraFunction [Actuator] = the actuator dispatching that tHOF onto compute via `PlantPort`). Orders are authored via the REPLaC Workflow UI of Function [FaaS] (Marimo in this demo).
+composed callable graph / FaaS-composer analogue: transport/`ComputePort` callables plus a Plant-agnostic hotF = the "process"; InfraFunction [Actuator] = the actuator dispatching that hotF onto compute via `PlantPort`). Orders are authored via the REPLaC Workflow UI of Function [FaaS] (Marimo in this demo).
   - `Process [Composed Function]` alone -> the **process** half of Plant (control theory)
   - `InfraFunction [Actuator]` alone -> the **actuator** half of Plant (control theory)
 - **Structure [PaaS]** (`Plant [SaaS]` + `InfraStructure [IaaS]`) -> **Power plant**, specifically the Power

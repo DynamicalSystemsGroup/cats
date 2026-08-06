@@ -9,6 +9,7 @@ from cats.executor.structure._tf import (
     configure_terraform_data_dir,
     ensure_integration_cache_env,
     ensure_provider_binaries_executable,
+    heal_stale_terraform_state_lock,
     modules_installed,
     providers_cached,
     terraform_bin,
@@ -154,8 +155,10 @@ class InfraStructure:
         Same healers as ``apply`` — required before ``destroy`` too, because
         ``redeploy()`` destroys first. If kind was wiped (Docker Desktop reset)
         while Plant resources remain in state, bare ``terraform destroy`` fails
-        on refresh (``could not locate any control plane nodes``).
+        on refresh (``could not locate any control plane nodes``). Also clears
+        a stale local state lock left by Ctrl-C during apply/destroy.
         """
+        heal_stale_terraform_state_lock(self.INPUT_STRUCTURE_HOME)
         self.compose()._load_plant_utils().cleanup_stale_plant_state(
             self.INPUT_STRUCTURE_HOME,
             terraform_bin(self.runtime),

@@ -351,8 +351,8 @@ class OrderOps:
         finally:
             shutil.rmtree(staging_parent, ignore_errors=True)
         # Process [Composed Function]: transport callables (ingress,
-        # integration_cache, egress) plus the tHOF (integrated_subproc —
-        # input→output data transform). Process is the composition, not a tHOF.
+        # integration_cache, egress) plus the hotF (integrated_subproc —
+        # input→output data transform). Process is the composition, not a hotF.
         process = {
             'ingress_subproc_cid': self.bind_subproc(
                 ingress_subproc, process_source_cid
@@ -367,7 +367,7 @@ class OrderOps:
                 integration_cache_subproc, process_source_cid
             ),
         }
-        # InfraFunction [Actuator]: dispatches the tHOF (integrated_subproc)
+        # InfraFunction [Actuator]: dispatches the hotF (integrated_subproc)
         # onto the Plant (see Processor.Integration() in
         # cats/executor/function/__init__.py). Transport callables are not
         # Plant jobs.

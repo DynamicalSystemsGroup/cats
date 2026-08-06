@@ -4,7 +4,7 @@ Public imports are stable; implementation lives in sibling modules.
 Plant CoD transport: ``cats.network.plant_transport.CoDTransport``.
 W3C Phase 1/1b seams: ``feedback`` (JSON-LD/PROV + Data Integrity) /
 ``identity`` (DID + signing material). Phase 2a: ``AddressStore`` for
-gateway-first CID reads + verify; ``ldp`` Node-hosted BOM control plane.
+gateway-first CID reads + pure UnixFS verify; ``ldp`` Node-hosted BOM control plane.
 """
 from cats.network.address_store import (
     AddressStore,

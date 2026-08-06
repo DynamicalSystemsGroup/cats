@@ -22,7 +22,7 @@ The Control-Feedback Loop’s provenance surface is:
 2. **Executor run** (activity) → Invoice + stage CIDs  
 3. **BOM** (HTTP / control-plane package) → points at Invoice + logs + agent  
 
-Stage products (`ingress_data_cid`, `integration_data_cid`, `data_cid`, `structure_as_executed_cid`) stay **out of the envelope as bytes** — only addresses. Seed remains deferred ([#187](https://github.com/DynamicalSystemsGroup/cats/issues/187)). See also [`LineageOfProvenance.md`](docs/LineageOfProvenance.md) and [`BOM.md`](docs/BOM.md).
+Stage products (`ingress_data_cid`, `integration_data_cid`, `data_cid`, `structure_as_executed_cid`, `seed_cid`) stay **out of the envelope as bytes** — only addresses; `seed_cid` now resolves to a populated Process replay dictionary ([#187](https://github.com/DynamicalSystemsGroup/cats/issues/187)). See also [`LineageOfProvenance.md`](docs/LineageOfProvenance.md) and [`BOM.md`](docs/BOM.md).
 
 ---
 
@@ -38,8 +38,8 @@ Stage products (`ingress_data_cid`, `integration_data_cid`, `data_cid`, `structu
 | **Peer verify path** | Trust fetch + CID | `fetch_bom_envelope` → **`verify_execution_bom`** (Node or Solid URL) |
 | **Announce to mesh** | — | Best-effort [LDN](https://www.w3.org/TR/ldn/) Announce (`bom_cid`, `bom_solid_uri`) when Solid configured |
 | **ACL on write** | N/A (no Solid) | Solid [WAC](https://solid.github.io/web-access-control-spec/) (Node Write; readers / public Read); Node LDP PUT stays **405** |
-| **Backward “which BOM made this `data_cid`?”** | Gap ([`LineageOfProvenance.md`](docs/LineageOfProvenance.md)) | **Still a gap** — signed envelopes + locators help *if you have the URI*; registry / richer `wasDerivedFrom` still deferred |
-| **Stage feedback** | Invoice stage CIDs | **Unchanged** as data-plane addresses; now reachable after envelope verify via [AddressStore](docs/IPFS.md) / [IPFS HTTP Gateway](https://docs.ipfs.tech/reference/http/gateway/) |
+| **Backward “which BOM made this `data_cid`?”** | Gap ([`LineageOfProvenance.md`](docs/LineageOfProvenance.md)) | **Still a gap** — signed envelopes + locators help *if you have the URI*; **registry** still deferred (intra-run `wasDerivedFrom` is landed) |
+| **Stage feedback** | Invoice stage CIDs | Same CID addresses on Invoice; signed BOM also carries `stageLineage` PROV entities (reachable after envelope verify via [AddressStore](docs/IPFS.md)) |
 | **Large payloads** | [MinIO](https://min.io/) + IPFS CIDs | Same discipline — envelope never embeds stage bytes ([`STORAGE.md`](docs/STORAGE.md)) |
 
 ---
@@ -49,7 +49,7 @@ Stage products (`ingress_data_cid`, `integration_data_cid`, `data_cid`, `structu
 | Technology | Spec / reference | Provenance role | `dev` | `w3c` |
 | --- | --- | --- | --- | --- |
 | **JSON-LD 1.1** | [W3C TR](https://www.w3.org/TR/json-ld11/) | Semantic shape of the BOM package | No | Yes |
-| **PROV-O** | [W3C TR](https://www.w3.org/TR/prov-o/) | Explicit Agent / Activity / Entity edges | No | Partial (attribution + generated-by; full stage `wasDerivedFrom` mesh still thin) |
+| **PROV-O** | [W3C TR](https://www.w3.org/TR/prov-o/) | Explicit Agent / Activity / Entity edges | No | Yes for intra-run (attribution + `#executorRun` + `stageLineage` `wasDerivedFrom`); cross-CAT registry still open |
 | **DID Core** | [W3C TR](https://www.w3.org/TR/did-core/) | Decentralized agent identity framework | No | Yes (method below) |
 | **did:key** | [W3C CCG](https://w3c-ccg.github.io/did-method-key/) | Node DID from Ed25519 public key | No | Yes |
 | **Verifiable Credentials Data Model 2.0** | [W3C TR](https://www.w3.org/TR/vc-data-model-2.0/) | Framing for cryptographically verifiable claims (DI proofs on envelope) | No | Partial (DI proof on ExecutionBom; not a full VC issuance pipeline) |
@@ -72,8 +72,8 @@ Stage products (`ingress_data_cid`, `integration_data_cid`, `data_cid`, `structu
 | Technology | Spec / reference | Role on `w3c` |
 | --- | --- | --- |
 | **IPFS / CID** | [Content addressing](https://docs.ipfs.tech/concepts/content-addressing/), [CIDs](https://docs.ipfs.tech/concepts/content-addressing/#identifier-formats) | Address of record for Invoice/log/stage products |
-| **IPFS HTTP Gateway** | [Gateway API](https://docs.ipfs.tech/reference/http/gateway/) | Opt-in AddressStore reads (`IPFS_GATEWAY_URL`) |
-| **Kubo** | [Kubo](https://docs.ipfs.tech/install/command-line/) | Writes + only-hash verify oracle |
+| **IPFS HTTP Gateway** | [Gateway API](https://docs.ipfs.tech/reference/http/gateway/) | Opt-in AddressStore reads (`IPFS_GATEWAY_URL`): `cat`, file `get`, directory CAR extract, CAR `dag_export` |
+| **Kubo** | [Kubo](https://docs.ipfs.tech/install/command-line/) | Writes + RPC fallback; only-hash verify oracle for exotic layouts |
 | **Multibase** | [multibase](https://github.com/multiformats/multibase) | `did:key` / proofValue encoding helpers |
 
 Product docs: [`SOLID.md`](docs/SOLID.md), [`IPFS.md`](docs/IPFS.md), [`STORAGE.md`](docs/STORAGE.md).
@@ -84,9 +84,9 @@ Product docs: [`SOLID.md`](docs/SOLID.md), [`IPFS.md`](docs/IPFS.md), [`STORAGE.
 
 | Loop concept | PROV-ish role | Implementation on `w3c` |
 | --- | --- | --- |
-| Order | Plan / [`prov:Entity`](https://www.w3.org/TR/prov-o/#Entity) | Still CID on Invoice (`order_cid`) |
-| Executor run | [`prov:Activity`](https://www.w3.org/TR/prov-o/#Activity) | Implied via envelope + `prov:wasGeneratedBy` → Invoice |
-| Invoice + stage CIDs | Generated entities / feedback | Unchanged minting in Executor; referenced, not inlined |
+| Order | Plan / [`prov:Entity`](https://www.w3.org/TR/prov-o/#Entity) | Still CID on Invoice (`order_cid`); also `prov:used` by `#executorRun` |
+| Executor run | [`prov:Activity`](https://www.w3.org/TR/prov-o/#Activity) | `#executorRun` on signed BOM (`prov:wasGeneratedBy`) |
+| Invoice + stage CIDs | Generated entities / feedback | Minted on Invoice; mirrored as `stageLineage` `prov:Entity` + `wasDerivedFrom` |
 | CAT Node | [`prov:Agent`](https://www.w3.org/TR/prov-o/#Agent) | `node_did` + proof `verificationMethod` |
 | BOM | Signed provenance **package** | `build_execution_bom` + `sign_execution_bom`; published at LDP/Solid |
 
