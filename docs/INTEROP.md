@@ -3,7 +3,7 @@
 Plans to **prove** interoperability for every Architectural Quantum (AQ) component and
 sub-component — not only that ports exist for today’s KubeRay demo.
 
-See [`COMPONENTS.md`](./COMPONENTS.md), [`NodeProductFlow.md`](./NodeProductFlow.md),
+See [`COMPONENTS.md`](./COMPONENTS.md), [`ControlFeedbackLoop.md`](./ControlFeedbackLoop.md),
 [`PLANTs.md`](./PLANTs.md), [`BOM.md`](./BOM.md), and [`STORAGE.md`](./STORAGE.md).
 
 ## What “proved” means

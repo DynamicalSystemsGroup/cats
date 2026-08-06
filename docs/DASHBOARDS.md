@@ -9,7 +9,7 @@ the Structure's lifetime.
 
 - **URL:** http://127.0.0.1:8265
 - Plant [SaaS] (`module.plant`) KubeRay UI — jobs, actors, resources, logs for Ray Jobs that
-  InfraFunction dispatches (`Processor.Integration()` → Job Submission API).
+  InfraFunction dispatches (`Processor.Integration()` — runtime of Process [Composed Function] → Job Submission API).
 - Live address is `Plant.snapshot()['ray_dashboard_address']`, threaded into
   `Function.execute(…, dashboard_address=…)`. It is **not** a Service field.
 - Static NodePort `30265` → host `8265` via kind `extraPortMappings`

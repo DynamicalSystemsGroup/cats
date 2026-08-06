@@ -6,6 +6,8 @@
   Submits CAT0 and CAT1 **once** (module-scoped fixture), then asserts full provenance
   records (Order Function/Structure pairing, Invoice stage CIDs, BOM log + Plant /
   InfraStructure snapshots) and CAT0/CAT1 `data_cid` lineage equality. Needs Session 1 below.
+  This is also the only live coverage of the ephemeral **Executor** path (Factory →
+  Executor → Invoice/BOM); there is no dedicated `test_executor*.py` module.
   See [`BOM.md`](./BOM.md) and [`LineageOfProvenance.md`](./LineageOfProvenance.md).
 - **Unit** — the other `tests/test_*.py` modules: mocked / in-process / source guards
   (lineage helpers, named binds, ports, IaaS utils, ContentMesh RPC, Node CLI, etc.).
