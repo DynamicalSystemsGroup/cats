@@ -13,6 +13,10 @@ __marimo__/**
 .env
 *.zip
 
+# Node DID key material (did:key persistence under CATS_HOME)
+.cats/
+
+
 # --- Terraform (local state & cache; lock file is committed) ---
 **/.terraform/
 **/.terraform-data/
@@ -32,6 +36,7 @@ data/testing/
 data/input/order.json
 data/input/__pycache__/
 data/input/function/__pycache__/
+data/input/structure/**/__pycache__/
 data/input/.terraform/
 
 # data/input/structure — runtime artifacts

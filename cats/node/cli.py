@@ -32,6 +32,31 @@ def _flask_listening(host: str, port: int) -> bool:
         return probe.connect_ex((host, port)) == 0
 
 
+def _listen_pids(port: int) -> list[str]:
+    try:
+        return subprocess.run(
+            ['lsof', '-t', f'-i:{port}', '-sTCP:LISTEN'],
+            capture_output=True, text=True, timeout=5,
+        ).stdout.split()
+    except (OSError, subprocess.SubprocessError):
+        return []
+
+
+def _cats_node_on_port(port: int) -> bool:
+    """True when a cats.node process (not AirPlay/etc.) listens on ``port``."""
+    for pid in _listen_pids(port):
+        try:
+            cmd = subprocess.run(
+                ['ps', '-p', pid, '-o', 'command='],
+                capture_output=True, text=True, timeout=5,
+            ).stdout
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if _is_cats_node_cmd(cmd):
+            return True
+    return False
+
+
 def _stop_node_process(host: str, port: int) -> None:
     """Kill any leftover cats.node peer still bound to our port.
 
@@ -46,12 +71,8 @@ def _stop_node_process(host: str, port: int) -> None:
     if not _flask_listening(host, port):
         return
 
-    try:
-        pids = subprocess.run(
-            ['lsof', '-t', f'-i:{port}', '-sTCP:LISTEN'],
-            capture_output=True, text=True, timeout=5,
-        ).stdout.split()
-    except (OSError, subprocess.SubprocessError):
+    pids = _listen_pids(port)
+    if not pids:
         return
 
     killed_any = False
@@ -158,6 +179,16 @@ def _cmd_start():
     # kill its own monitor process out from under itself.
     if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         _free_stale_port(HOST, PORT)
+        if _flask_listening(HOST, PORT) and not _cats_node_on_port(PORT):
+            logger.error(
+                'Port %s:%d is in use by a non-cats.node process '
+                '(common on macOS: AirPlay Receiver on 5000). '
+                'Set CAT_NODE_PORT to a free port, e.g. '
+                '`CAT_NODE_PORT=5002 make node-start`.',
+                HOST,
+                PORT,
+            )
+            return 1
     signal.signal(signal.SIGINT, _handle_stop_signal)
     signal.signal(signal.SIGTERM, _handle_stop_signal)
     catNode.run(host=HOST, port=PORT, debug=True, use_reloader=False)
@@ -176,7 +207,8 @@ def _cmd_stop():
 
 def _cmd_status():
     """Report Flask listen + ContentStore readiness; exit 0 only if both OK."""
-    flask_up = _flask_listening(HOST, PORT)
+    # TCP alone is not enough — macOS AirPlay often owns :5000.
+    flask_up = _cats_node_on_port(PORT)
     try:
         module = _load_bootstrap_content_store_module(CATS_HOME)
         store_ready = module.ContentStore.is_ready()
@@ -185,6 +217,12 @@ def _cmd_status():
         store_ready = False
 
     print(f'flask={"up" if flask_up else "down"}')
+    if not flask_up and _flask_listening(HOST, PORT):
+        print(
+            f'note: {HOST}:{PORT} accepts TCP but is not cats.node '
+            f'(set CAT_NODE_PORT if AirPlay/other owns the port)',
+            flush=True,
+        )
     print(f'content_store={"ready" if store_ready else "not_ready"}')
     return 0 if flask_up and store_ready else 1
 

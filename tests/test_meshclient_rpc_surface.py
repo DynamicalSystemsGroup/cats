@@ -37,18 +37,20 @@ def test_node_init_endpoint_uses_cat_node_env(monkeypatch):
     assert _node_init_endpoint() == 'http://192.168.1.10:6000/cat/node/init'
 
 
-def test_cat_and_cat_obj_delegate_to_ipfs_client(monkeypatch):
-    """cat / catObj delegate to CatsIPFSClient.cat / cat_bytes."""
+def test_cat_and_cat_obj_delegate_via_address_store(monkeypatch):
+    """cat / catObj read via AddressStore (RPC fallback when gateway unset)."""
+    monkeypatch.delenv('IPFS_GATEWAY_URL', raising=False)
+    monkeypatch.delenv('CATS_CID_VERIFY', raising=False)
     fake = MagicMock()
-    fake.cat.return_value = '{"k": 1}'
-    fake.cat_bytes.return_value = b'\x80\x04'
+    fake.cat_bytes.side_effect = lambda cid: (
+        b'{"k": 1}' if cid == 'QmX' else b'\x80\x04'
+    )
     client = ContentMesh(ipfsClient=fake, CATS_HOME=str(REPO_ROOT))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
 
     assert client.cat('QmX') == '{"k": 1}'
-    fake.cat.assert_called_once_with('QmX')
     assert client.catObj('QmY') == b'\x80\x04'
-    fake.cat_bytes.assert_called_once_with('QmY')
+    assert fake.cat_bytes.call_count == 2
 
 
 def test_get_and_get_car_delegate(monkeypatch, tmp_path):
@@ -175,10 +177,12 @@ def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
 
 def test_cat_submit_uses_requests(monkeypatch, capsys):
     """catSubmit POSTs the order_request JSON via requests and returns the BOM."""
+    monkeypatch.delenv('IPFS_GATEWAY_URL', raising=False)
+    monkeypatch.delenv('CATS_CID_VERIFY', raising=False)
     fake = MagicMock()
-    fake.cat.return_value = json.dumps(
+    fake.cat_bytes.return_value = json.dumps(
         {'endpoint': 'http://127.0.0.1:5000/cat/node/init', 'invoice_cid': 'QmI'}
-    )
+    ).encode('utf-8')
     client = ContentMesh(ipfsClient=fake, CATS_HOME=str(REPO_ROOT))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
 

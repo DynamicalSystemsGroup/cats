@@ -17,6 +17,8 @@ import pytest
 
 from cats import DATA_HOME, CONTENT_MESH as contentMesh
 from cats import INPUT_STRUCTURE_HOME, INPUT_DATA_HOME
+from cats.network import _node_init_endpoint
+from cats.network.feedback import verify_execution_bom
 
 from data.input.function.process import (
     egress,
@@ -123,10 +125,23 @@ def assert_provenance_record(bom_response, order_request):
     bom = bom_response['bom']
     assert 'bom_cid' not in bom
 
-    for key in ('invoice_cid', 'log_cid', 'node_uri'):
+    for key in ('invoice_cid', 'log_cid', 'node_did'):
         assert bom.get(key), f'bom.{key} should be set'
+    assert str(bom['node_did']).startswith('did:'), (
+        f'bom.node_did must be a DID, got {bom["node_did"]!r}'
+    )
+    assert bom.get('@context'), 'bom.@context should be set (JSON-LD Phase 1)'
+    assert bom.get('@type'), 'bom.@type should be set (JSON-LD Phase 1)'
+    proof = bom.get('proof')
+    assert isinstance(proof, dict), 'bom.proof should be set (Phase 1b)'
+    assert proof.get('type') == 'DataIntegrityProof'
+    assert proof.get('cryptosuite') == 'eddsa-jcs-2022'
+    assert proof.get('proofValue'), 'bom.proof.proofValue missing'
+    verify_execution_bom(bom)
+    assert 'node_uri' not in bom
     assert 'plant_snapshot_cid' not in bom
     assert 'infrastructure_snapshot_cid' not in bom
+
 
     flat = bom_response['flat_bom']
     invoice = flat['invoice']
@@ -178,15 +193,29 @@ def assert_provenance_record(bom_response, order_request):
     for key in STRUCTURE_PAIRING_KEYS:
         assert structure[key], f'structure.{key} should be set'
 
-    # --- Invoice: data + stage CIDs; Seed still null (#187) ---
+    # --- Invoice: data + stage CIDs; Seed (#187) ---
     assert invoice.get('data_cid'), 'invoice.data_cid should be set'
     assert invoice.get('ingress_data_cid'), 'invoice.ingress_data_cid should be set'
     assert invoice.get('integration_data_cid'), (
         'invoice.integration_data_cid should be set'
     )
-    assert 'seed_cid' in invoice, 'invoice.seed_cid key should be present'
-    assert invoice['seed_cid'] is None, (
-        'invoice.seed_cid is still deferred (#187); expected null'
+    assert invoice.get('seed_cid'), 'invoice.seed_cid should be a real CID, not null'
+    seed = invoice.get('seed')
+    assert seed is not None, (
+        'flat_bom.invoice.seed should be resolved by flatten_bom from seed_cid'
+    )
+    assert set(seed) == {'seed', 'rng_seed', 'num_partitions'}, (
+        f'seed keys unexpected: {seed!r}'
+    )
+    assert isinstance(seed['seed'], str) and seed['seed'], (
+        f"seed['seed'] should be a non-empty identity hex: {seed!r}"
+    )
+    assert isinstance(seed['rng_seed'], int) and 0 <= seed['rng_seed'] <= 0x7FFFFFFF, (
+        f"seed['rng_seed'] should be a non-negative 31-bit int "
+        f"(np.random.default_rng / Ray Data seed=-safe): {seed!r}"
+    )
+    assert isinstance(seed['num_partitions'], int) and seed['num_partitions'] >= 1, (
+        f"seed['num_partitions'] should be a positive int: {seed!r}"
     )
     assert invoice.get('structure_as_executed_cid'), (
         'invoice.structure_as_executed_cid should be set'
@@ -233,6 +262,7 @@ def assert_provenance_record(bom_response, order_request):
         'input_data_cid': input_invoice['data_cid'],
         'output_data_cid': invoice['data_cid'],
         'invoice': invoice,
+        'seed': seed,
         'log': log,
         'function': function,
         'structure': structure,
@@ -250,7 +280,7 @@ def _create_order_request(*, integrated_subproc):
         infrafunction_subproc=infrafunction_subproc,
         data_dirpath=INPUT_DATA_HOME,
         structure_filepath=INPUT_STRUCTURE_HOME,
-        endpoint='http://127.0.0.1:5000/cat/node/init',
+        endpoint=_node_init_endpoint(),
     )
     pprint(order_request)
     print()
@@ -380,4 +410,15 @@ class TestProvenanceCATs:
         assert np.array_equal(
             cat_runs.cat0.linked_output_df.values,
             cat_runs.cat1.input_df.values,
+        )
+
+    def test_cat0_cat1_seed_uniqueness(self, cat_runs):
+        """CAT0 and CAT1 each mint a distinct Seed replay dict (#187)."""
+        seed0 = cat_runs.cat0.provenance['seed']
+        seed1 = cat_runs.cat1.provenance['seed']
+        assert seed0['seed'] != seed1['seed'], (
+            'CAT0/CAT1 seed identity hex should differ per execution'
+        )
+        assert seed0['rng_seed'] != seed1['rng_seed'], (
+            'CAT0/CAT1 rng_seed should differ (derived from distinct seed hex)'
         )

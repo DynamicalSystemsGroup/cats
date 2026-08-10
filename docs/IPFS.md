@@ -9,8 +9,21 @@ and MinIO (T&D).
 The Python side talks to that daemon with a thin sync Kubo HTTP RPC client
 (`cats/network/clients/ipfs_client.py` → `http://{IPFS_API_HOST}:{IPFS_API_PORT}/api/v0/*`,
 defaults `127.0.0.1:5001`, via `requests`), not `ipfshttpclient`. **ContentMesh** uses that client
-end-to-end for adds **and** reads (`cat` / `get` / `ls` / `dag export`) — it does not shell out to the
-`ipfs` CLI. The CLI remains operator-only (manual `ipfs daemon` / `ipfs shutdown` / debugging).
+for **writes** and for `ls`. **`cat` / `catObj` / `get` / `getCar`** go through
+`cats.network.address_store.AddressStore` (Phase 2a gateway-first):
+
+| Env | Role |
+|-----|------|
+| `IPFS_GATEWAY_URL` | Optional base URL (e.g. `http://127.0.0.1:8080`). When set, reads prefer gateway (`GET /ipfs/{cid}`, CAR via `?format=car`, file `get`); else Kubo RPC. |
+| `CATS_CID_VERIFY` | Set to `1` to verify RPC cats too. Gateway `cat` always verifies. |
+
+**CID verify** (gateway hygiene): pure-Python UnixFS File CID for Kubo’s default importer (single- and multi-block balanced `size-262144` dag-pb Files; no Kubo required on the happy path); Kubo `add?only-hash=true` remains the fallback for exotic layouts (trickle, `raw-leaves`, custom chunker, directories).
+
+**Directory `get`:** gateway file GET for UnixFS files; directories via trustless CAR (`?format=car`) + pure-Python UnixFS extract (File + flat Directory); Kubo RPC `get` remains the fallback for HAMT/symlink/incomplete CAR.
+
+**Partition CAR layout (Process IoPort):** when `CATS_IO_PARTITIONS>1`, Plant `RayIoPort` builds a directory CID of `part-XXXXX.car` files (each body is CARv1 of a shard). AddressStore verify/extract apply per part; Invoice still records the layout root CID only.
+
+Mesh reads do not require Bitswap swarm connect; Bitswap remains the T&D peer path and an optional fill when Kubo itself must fetch remote blocks. No `ipfs` CLI from ContentMesh. The CLI remains operator-only (manual `ipfs daemon` / `ipfs shutdown` / debugging).
 
 **Same API address for ensure/status:** `ContentStore.is_ready` / `ensure` probe
 `http://{IPFS_API_HOST}:{IPFS_API_PORT}/api/v0/id` (same env as `connect()`). Optional override:

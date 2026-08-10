@@ -28,8 +28,9 @@ A **single** host Kubo (default `127.0.0.1:5001`, one `IPFS_PATH`) carries two t
 | **Content-store** | Mesh / Control-Feedback CIDs (Order, Invoice, BOM, Function/Structure-as-Code) via ContentMesh | Long-lived; outlives Structure destroy and `node stop` |
 | **Bitswap peer of T&D** | Host is peered to Structure Docker Kubo peers so migrate/stage can resolve host-added CIDs | Peering is Structure-lifetime; the host daemon itself is not |
 
-**ContentMesh** (`cats.network.content_mesh`) owns content-store mesh I/O and Order compose/submit via `CatsIPFSClient` (Kubo RPC).
-Unsigned BOM packaging and Node `node_uri` live under `cats.network.feedback` / `identity` (W3C DID/VC later — not Plant). An `AddressStore` adapter seam is deferred.
+**ContentMesh** (`cats.network.content_mesh`) owns content-store mesh I/O and Order compose/submit. **Writes** (add / pin) go through `CatsIPFSClient` (Kubo RPC on `:5001`). **Reads** (`cat` / `catObj` / `get` / `getCar`) go through **`AddressStore`** (Phase 2a): when `IPFS_GATEWAY_URL` is set, prefer gateway fetch then verify; on miss/failure, fall back to Kubo RPC. Verify is pure-Python UnixFS (default single- and multi-block Files) first (Kubo `only-hash` fallback for exotic layouts). File `get` and CAR `dag_export` are gateway-first; directory `get` uses CAR + UnixFS extract (RPC fallback for HAMT/symlink/failure). CID remains the address of record; the gateway URL is a locator only. Bitswap/DHT are not required for mesh reads (optional fill when no gateway locator exists; T&D peering unchanged). Set `CATS_CID_VERIFY=1` to also verify RPC cats.
+JSON-LD + PROV-O BOM packaging (`build_execution_bom`) with Data Integrity signing (`sign_execution_bom`, `eddsa-jcs-2022`) and Node `node_did` key material live under `cats.network.feedback` / `identity` (Phase 1b — not Plant).
+The Phase 2a **control plane** (Node LDP cache + optional Solid pod dual-write / LDN) publishes signed envelopes at HTTP URIs; it does **not** replace CID + AddressStore for data blobs — see [`SOLID.md`](SOLID.md) and [`BOM.md`](BOM.md).
 Plant CoD transport (IPFS↔MinIO job orchestration) is separate —
 `cats.network.plant_transport.CoDTransport` (forthcoming; not ContentMesh).
 
@@ -69,7 +70,7 @@ Process transport callables depend on Function-owned **`TransportPort`**
 Peering **mutate** is TF `ipfs_transport_peering` every reconcile; Executor `apply`
 only **asserts** containers ready — not Process heal.
 
-Process tHOFs depend on Function-owned **`ComputePort`** (`run_transfer`); the Plant-owned
+Process hotFs depend on Function-owned **`ComputePort`** (`run_transfer`); the Plant-owned
 Ray job entrypoint (staged by **`RayPlantPort.submit_job`**) wires **`RayComputePort`**
 (no `import ray` in Process). Demo **batch ABI** is
 `Dict[str, np.ndarray] -> Dict[str, np.ndarray]` — the ComputePort adapter maps engine
@@ -110,7 +111,7 @@ content-addressed record after the run.
 
 ## How they connect in one CAT execution
 
-1. InfraFunction dispatches Process’s tHOF (`integrated_subproc`) onto Plant via **PlantPort**
+1. InfraFunction dispatches Process’s hotF (`integrated_subproc`) onto Plant via **PlantPort**
    (this demo: Ray Job on KubeRay).
 2. Plant stages entrypoint + **ComputePort** (`RayComputePort`) into the job working_dir;
    workers write CSV shards to MinIO (`cats-scratch/jobs/<uuid>/result/`) — genuinely distributed.

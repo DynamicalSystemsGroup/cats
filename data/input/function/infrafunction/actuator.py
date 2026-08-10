@@ -1,4 +1,4 @@
-"""InfraFunction [Actuator]: Plant-agnostic actuator for Process tHOFs.
+"""InfraFunction [Actuator]: Plant-agnostic actuator for Process hotFs.
 
 Receives Process [Composed Function] ``integrated_subproc`` and dispatches it onto
 Plant via Function-owned ``PlantPort`` (submit_job / wait). Scratch correlator
@@ -6,7 +6,7 @@ is InfraStructure ``ObjectStore.begin_job()`` → ``JobHandle``.
 
 No Ray Job Submission or Ray Data imports here — those live in Structure
 adapters (``RayPlantPort``, ``RayComputePort``). cloudpickle serializes the
-tHOF by value for the remote working_dir (cluster has no repo install).
+hotF by value for the remote working_dir (cluster has no repo install).
 
 Ingress / integration_cache / egress are transport callables and are not
 dispatched here.
@@ -57,7 +57,7 @@ def _resolve_plant_port(plant):
 def infrafunction_subproc(
     integrated_subproc, input, output, object_store, plant,
 ):
-    """Dispatch tHOF onto Plant; object_store supplies shared S3 scratch endpoints.
+    """Dispatch hotF onto Plant; object_store supplies shared S3 scratch endpoints.
 
     ``object_store`` must provide begin_job / write_job_scratch /
     download_job_result / result_uri. ``plant`` must implement PlantPort.

@@ -29,6 +29,11 @@ dependencies = [
     "flask>=3.0.0",
     "python-dotenv>=1.0.0",
     "cloudpickle>=3.0.0",
+    "cryptography>=42.0.0",
+    "rfc8785>=0.1.0",
+    "py-cid>=0.5.0",
+    "py-multihash>=3.0.0",
+    "cbor2>=5.4.0",
 ]
 
 [project.optional-dependencies]

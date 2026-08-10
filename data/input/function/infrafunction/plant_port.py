@@ -1,6 +1,6 @@
 """Function-owned plant port contract for InfraFunction [Actuator].
 
-InfraFunction dispatches the tHOF onto Plant via ``PlantPort`` only —
+InfraFunction dispatches the hotF onto Plant via ``PlantPort`` only —
 ``submit_job`` / ``wait``. It must not import Ray Job Submission clients.
 
 Order-submitted Plant adapters (e.g. ``RayPlantPort``) implement this

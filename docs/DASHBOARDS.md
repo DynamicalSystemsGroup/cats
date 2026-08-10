@@ -9,7 +9,7 @@ the Structure's lifetime.
 
 - **URL:** http://127.0.0.1:8265
 - Plant [SaaS] (`module.plant`) KubeRay UI — jobs, actors, resources, logs for Ray Jobs that
-  InfraFunction dispatches (`Processor.Integration()` → Job Submission API).
+  InfraFunction dispatches (`Processor.Integration()` — runtime of Process [Composed Function] → Job Submission API).
 - Live address is `Plant.snapshot()['ray_dashboard_address']`, threaded into
   `Function.execute(…, dashboard_address=…)`. It is **not** a Service field.
 - Static NodePort `30265` → host `8265` via kind `extraPortMappings`
@@ -53,3 +53,5 @@ Details: [`MinIO.md`](./MinIO.md), roles: [`STORAGE.md`](./STORAGE.md).
   Python talks to the same daemon via `cats/network/clients/ipfs_client.py` (Kubo HTTP RPC). See
   [`IPFS.md`](./IPFS.md) for how/when the daemon starts.
 - Gateway: `http://127.0.0.1:8080/ipfs/<cid>` for raw CID bytes without the WebUI.
+  ContentMesh Phase 2a reads use the same plane when `IPFS_GATEWAY_URL=http://127.0.0.1:8080`
+  (see [`IPFS.md`](./IPFS.md) / [`STORAGE.md`](./STORAGE.md)).

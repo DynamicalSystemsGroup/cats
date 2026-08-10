@@ -1,6 +1,8 @@
 """ContentMesh — content-store mesh API (Orders/BOMs/binds + Node submit).
 
-Plant CoD transport is ``cats.network.plant_transport.CoDTransport``, not this class.
+Reads (``cat`` / ``catObj``) use ``AddressStore`` (optional IPFS HTTP gateway +
+CID verify). Writes use ``CatsIPFSClient``. Plant CoD transport is
+``cats.network.plant_transport.CoDTransport``, not this class.
 """
 from __future__ import annotations
 
@@ -17,6 +19,7 @@ from pprint import pprint
 
 import requests
 
+from cats.network.address_store import AddressStore
 from cats.network.bootstrap import (
     _bootstrap_content_store_utils_path,
     _load_bootstrap_content_store_module,
@@ -36,7 +39,7 @@ from cats.network.packaging import (
 
 
 class ContentMesh(OrderOps):
-    def __init__(self, ipfsClient, CATS_HOME=None):
+    def __init__(self, ipfsClient, CATS_HOME=None, addressStore=None):
         self.CATS_HOME = None
         self.DATA_HOME = None
         self.JOB_HOME = None
@@ -63,6 +66,10 @@ class ContentMesh(OrderOps):
         self.CAT_HOME = None
         self.CAR_HOME = None
         self.ipfsClient = ipfsClient
+        # Reads (cat/catObj) go through AddressStore; writes stay on ipfsClient.
+        self.addressStore = addressStore if addressStore is not None else AddressStore(
+            ipfsClient
+        )
         self.ingress_job_id = None
         self.ingressed_data_cid = None
 
@@ -134,7 +141,8 @@ class ContentMesh(OrderOps):
         print(f'POST {endpoint} …', flush=True)
         t0 = time.perf_counter()
         with _activity_spinner(label='Waiting on Node'):
-            response = requests.post(endpoint, json=order_request, timeout=600)
+            # Cold Structure reconcile (kind + Helm) can exceed 10m on first apply.
+            response = requests.post(endpoint, json=order_request, timeout=1800)
         elapsed = time.perf_counter() - t0
         response.raise_for_status()
         print(
@@ -201,6 +209,8 @@ class ContentMesh(OrderOps):
         invoice['order'] = json.loads(
             self.cat(invoice['order_cid']),
         )
+        if invoice.get('seed_cid'):
+            invoice['seed'] = json.loads(self.cat(invoice['seed_cid']))
         invoice['order']['flat'] = {
             'function': json.loads(self.cat(invoice['order']["function_cid"])),
             'structure': json.loads(self.cat(invoice['order']["structure_cid"])),
@@ -309,21 +319,21 @@ class ContentMesh(OrderOps):
         if output is None:
             output = self.CATS_HOME
         dest = os.path.join(output, filepath)
-        self.ipfsClient.get(cid, dest)
+        self.addressStore.get(cid, dest)
         return filepath
 
     def testGet(self, cid: str, output: str):
         self.ensure_bootstrap_content_store()
-        self.ipfsClient.get(cid, output)
+        self.addressStore.get(cid, output)
         print(f'IPFS download of {output} completed successfully.')
 
     def cat(self, cid: str):
         self.ensure_bootstrap_content_store()
-        return self.ipfsClient.cat(cid)
+        return self.addressStore.cat(cid)
 
     def catObj(self, cid: str):
         self.ensure_bootstrap_content_store()
-        return self.ipfsClient.cat_bytes(cid)
+        return self.addressStore.cat_bytes(cid)
 
     def add_named_bind(self, source_cid: str, module: str, qualname: str) -> str:
         """CID a named-bind JSON leaf for an Order slot."""
@@ -371,7 +381,7 @@ class ContentMesh(OrderOps):
 
     def getCar(self, cid: str, filepath: str):
         self.ensure_bootstrap_content_store()
-        self.ipfsClient.dag_export(cid, filepath)
+        self.addressStore.dag_export(cid, filepath)
 
     def convertBOMtoCAR(self, bom_cid: str, filepath: str):
         self.getCar(bom_cid, filepath)

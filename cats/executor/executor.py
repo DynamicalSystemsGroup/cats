@@ -1,4 +1,5 @@
 import json
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -94,6 +95,22 @@ class Executor:
             structure_as_executed_cid
         )
         self.enhanced_bom['log_cid'] = ipfs.add_json(self.enhanced_bom['log'])
+
+        # Process replay dictionary (CFL §4B / #187). num_partitions is the
+        # observed I/O + hotF alignment `n` this run used (Processor's
+        # env-selected value today; Seed becomes the control-plane home once
+        # Executor reads `n` from it - see populate_invoice_seed_field plan).
+        # rng_seed: Process/NumPy-usable int (np.random.default_rng); also
+        # Ray Data seed=-acceptable via a Plant ComputePort adapter, should a
+        # stochastic step ever forward it - Process itself must not import Ray.
+        n = getattr(self.function.processor, 'num_partitions', 1)
+        seed_hex = uuid.uuid4().hex
+        seed = {
+            'seed': seed_hex,
+            'rng_seed': int(seed_hex[:8], 16) & 0x7FFFFFFF,
+            'num_partitions': int(n),
+        }
+        self.enhanced_bom['invoice']['seed_cid'] = ipfs.add_json(seed)
 
         # Invoice CID: produced here (by the Executor), not by
         # Runtime.execute() - so "Invoice CIDs are produced by the

@@ -9,6 +9,7 @@ from cats.utils import subproc_run
 
 DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE = "module.infrastructure.shell_script.docker_compose_ipfs_transport"
 APPLIED_STRUCTURE_MARKER = '.applied-structure.cid'
+TF_STATE_LOCK_INFO = '.terraform.tfstate.lock.info'
 
 
 def _load_transport_utils_module(structure_home):
@@ -207,6 +208,41 @@ def _docker_container_running(container):
         f"docker ps --format '{{{{.Names}}}}' | grep -qx '{container}'"
     )
     return proc.returncode == 0
+
+
+def _path_has_open_holders(path):
+    """True when ``lsof`` reports a live process holding ``path`` open."""
+    if not path or not os.path.exists(path):
+        return False
+    proc = subproc_run(f'lsof -t -- {path}')
+    if proc.returncode != 0:
+        return False
+    return bool(proc.stdout.strip())
+
+
+def heal_stale_terraform_state_lock(structure_home):
+    """Drop a local Terraform state lock left by an interrupted apply/destroy.
+
+    Ctrl-C during ``terraform apply`` often leaves
+    ``.terraform.tfstate.lock.info`` behind; the next ``destroy``/``apply``
+    then fails with "Error acquiring the state lock". When no process still
+    holds the lock info or ``terraform.tfstate`` open, the lock is stale and
+    safe to remove (same heal class as ContentStore stale ``repo.lock``).
+    """
+    lock_path = os.path.join(structure_home, TF_STATE_LOCK_INFO)
+    if not os.path.isfile(lock_path):
+        return
+    state_path = os.path.join(structure_home, 'terraform.tfstate')
+    if _path_has_open_holders(lock_path) or _path_has_open_holders(state_path):
+        return
+    try:
+        os.unlink(lock_path)
+    except OSError:
+        return
+    print(
+        f'Removed stale Terraform state lock at {lock_path} '
+        f'(no live holder for this Structure home).'
+    )
 
 
 def cleanup_stale_docker_compose_ipfs_transport_state(runtime, structure_home):
