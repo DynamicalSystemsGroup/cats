@@ -5,8 +5,10 @@ CAT Node process lifecycle: **ensure** host ContentStore, **start** / **stop** F
 CLI: `uv run python -m cats.node {start|stop|status|ensure}` (default: `start`).
 Make targets wrap the same commands.
 
-**Ownership rule:** Node is a client of InfraStructure’s long-lived **content-store facet** (host Kubo).
-`start` **asserts** readiness only; `ensure` **heals**/starts Kubo; `stop` kills Flask only — never host Kubo.
+**Ownership rule:** Node is a client of InfraStructure’s long-lived **content-store facet**.
+Host Kubo is the **legacy CID** reader / mid-migration ensure target; **new** content lives on
+Node **CAS-over-HTTP** (`GET /ldp/cas/<hex>`). `start` **asserts** Kubo readiness (legacy/T&D);
+`ensure` **heals**/starts Kubo; `stop` kills Flask only — never host Kubo.
 
 ## Quick reference
 
@@ -74,15 +76,17 @@ make node-start
 - Clears a prior `cats.node` listener on the Node port (does not kill unrelated processes, e.g. AirPlay on 5000).
 - Fails loud if the port is still held by a non-`cats.node` process — set `CAT_NODE_PORT` (e.g. `5002`) when macOS AirPlay owns `:5000`.
 - On SIGINT / SIGTERM, exits without stopping host Kubo.
-- Serves Order entry at `POST /cat/node/init` and Phase 2a LDP control plane
-  (local cache; Solid dual-write is separate — see [`SOLID.md`](SOLID.md);
-  registry contract: [`BomRegistry.md`](BomRegistry.md)):
+- Serves Order entry at `POST /cat/node/init`, Phase 2a LDP control plane, registry,
+  and CAS-over-HTTP data plane (Solid dual-write is separate — see [`SOLID.md`](SOLID.md);
+  registry: [`BomRegistry.md`](BomRegistry.md); storage: [`STORAGE.md`](STORAGE.md)):
   - `GET /ldp/boms/` — Basic Container listing published BOM URIs
   - `GET /ldp/boms/<bom_cid>` — signed ExecutionBom JSON-LD (publish via `Runtime.execute` only; HTTP PUT → 405)
   - `GET /ldp/registry/` — BOM registry container (Node-local index)
   - `GET /ldp/registry/boms/<bom_cid>` — registry record JSON; PUT → 405
   - `GET /ldp/registry/by-data/<data_cid>` — `{data_cid, bom_cids: [...]}`
   - `GET /ldp/registry/by-order/<order_cid>` — `{order_cid, bom_cids: [...]}`
+  - `GET /ldp/registry/by-content/<digest>` — CAS locator map `{ content_id, locators }`
+  - `GET /ldp/cas/<digest>` — raw CAS blob bytes (sha256 identity); PUT → 405
   - `POST /cat/node/init` — body may use `order_cid` (bootstrap), or `bom_cid` / unique `data_cid` via the registry (ambiguous `data_cid` → 409)
 ### Status
 

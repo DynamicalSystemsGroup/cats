@@ -6,9 +6,10 @@
 prior BOM (`bom_cid` → `order_cid`) and recovers *which* BOM produced a given
 output (`data_cid` → `[bom_cid, …]`) without a caller-held HTTP `cat_response`.
 
-CID remains the **address of record** for Invoice / Order / stage bytes
-([AddressStore](IPFS.md)). The registry is an append-only **projection** of those
-envelopes — not a second store of provenance payloads.
+CID **or** digest/`ni:` remains the **address of record** for Invoice / Order / stage bytes
+([AddressStore](IPFS.md) / [CAS-over-HTTP](STORAGE.md)). The registry is an append-only **projection** of those
+envelopes — not a second store of provenance payloads. `LocatorIndex` (`by-content/`) maps
+content ids to HTTP CAS locators.
 
 | This is | This is not |
 | --- | --- |
@@ -36,9 +37,9 @@ Without a registry:
   `cat_response` in the caller’s process.
 
 The registry closes those gaps **on one Node**. Remaining work is mesh
-federation of the index, `content_id` → HTTP locators
-(CAS-over-HTTP), Solid dual-write of registry records, and Phase 2b
-URI-as-address — not “no reverse lookup at all.” See [`W3C.md`](W3C.md).
+federation of the index, Solid dual-write of registry records, and Phase 2b
+URI-as-address — not “no reverse lookup at all.” `content_id` → HTTP locators
+is landed with CAS-over-HTTP. See [`W3C.md`](W3C.md).
 
 ```mermaid
 flowchart LR
@@ -86,15 +87,16 @@ leaves `function_cid` / `structure_cid` / `input_data_cid` unset.
 ## Disk layout
 
 JSON under `{CATS_HOME}/.cats/registry/` (mirrors `BomLdpStore`; no SQLite).
-Path segments are CID-safe (`validate_cid_segment` — same helper as LDP BOM
-paths). `put` is idempotent on `bom_cid`. Reverse-index files are
-append-if-absent lists, **newest first**.
+Path segments are CID- or digest-safe (`content_id_fs_key`). `put` is idempotent
+on `bom_cid`. Reverse-index files are append-if-absent lists, **newest first**.
+CAS locators live under `by-content/` (hex digest keys).
 
 ```text
 {CATS_HOME}/.cats/registry/
 ├── boms/<bom_cid>.json          # record (bom_cid → fields above)
 ├── by-data/<data_cid>.json      # [bom_cid, …]  (replay / re-execute)
-└── by-order/<order_cid>.json    # [bom_cid, …]  (many BOMs per Order)
+├── by-order/<order_cid>.json    # [bom_cid, …]  (many BOMs per Order)
+└── by-content/<digest>.json     # { content_id, locators: [{ uri, … }] }
 ```
 
 Python API (`cats.network.registry.BomRegistry`):
@@ -111,9 +113,9 @@ Python API (`cats.network.registry.BomRegistry`):
 
 ## Publish on execute
 
-`Runtime.execute` signs the BOM, mints `bom_cid`, writes `BomLdpStore`, then
-(when Solid is configured) dual-writes the envelope. **After locators are
-known**, it indexes:
+`Runtime.execute` signs the BOM, mints content id on **CAS** (`ni:`), writes
+`BomLdpStore`, then (when Solid is configured) dual-writes the envelope.
+**After locators are known**, it indexes:
 
 ```python
 BomRegistry(self.CATS_HOME).put(build_record(
@@ -138,6 +140,7 @@ Registered from [`cats/node/app.py`](../cats/node/app.py) next to LDP
 | `GET /ldp/registry/boms/<bom_cid>` | Registry record JSON; missing → 404; **PUT → 405** |
 | `GET /ldp/registry/by-data/<data_cid>` | `{data_cid, bom_cids: [...]}` (newest first) |
 | `GET /ldp/registry/by-order/<order_cid>` | `{order_cid, bom_cids: [...]}` |
+| `GET /ldp/registry/by-content/<digest>` | `{ content_id, locators: [...] }` (CAS locator index) |
 
 Invalid CID path segments → 400. `HEAD` / `OPTIONS` follow the LDP resource /
 container header pattern used by `/ldp/boms/`.
@@ -188,14 +191,13 @@ discoverable from the consuming CAT’s side, going forward — see
 
 ## Out of scope (later)
 
-Aligned with the path to CAS-over-HTTP / Phase 2b URI-as-address:
+Aligned with the path to Phase 2b URI-as-address:
 
 - Mesh federation of the index / Action Plane catalog filters
 - Solid PUT of registry records
-- `content_id` → HTTP locators (required later when Bitswap/gateway is gone)
+- Mesh-federated / Solid dual-write of CAS locator maps
 - SPARQL over the index
 - Consumer-side downstream edges
-- Changing Invoice/BOM CID fields or AddressStore
 - Plant / MinIO / Ray
 
 ## Tests
@@ -209,6 +211,7 @@ rejection, unsigned/tampered `build_record`, Invoice `data_cid` (not a lying
 hint), Flask GET / PUT 405, `init` `{bom_cid}` / `{data_cid}` / 409, and
 `linkProcess(bom_cid=…)` / `linkProcess(data_cid=…)`. Runtime execute
 indexing is asserted in [`tests/test_ldp_bom_control_plane.py`](../tests/test_ldp_bom_control_plane.py).
+CAS put/get/verify, manifests, and locators: [`tests/test_cas_http.py`](../tests/test_cas_http.py).
 
 See also [`TEST.md`](TEST.md).
 
@@ -219,6 +222,6 @@ See also [`TEST.md`](TEST.md).
 - [`LineageOfProvenance.md`](LineageOfProvenance.md) — `data_cid` reverse lookup; `link*`
 - [`NodeLifeCycle.md`](NodeLifeCycle.md) — Flask routes served by `node-start`
 - [`SOLID.md`](SOLID.md) — envelope locators vs this index
-- [`W3C.md`](W3C.md) — provenance discovery; remaining federation / 2b gaps
+- [`W3C.md`](W3C.md) — provenance discovery; CAS-over-HTTP landed; remaining federation / 2b gaps
 - [`DESIGN.md`](DESIGN.md) — next Order discovered via registry, not only `order_cid`
 - [`INTEROP.md`](INTEROP.md) — `link*` as Structure-lineage ops for second-Plant prove

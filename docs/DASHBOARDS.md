@@ -12,6 +12,7 @@ the Structure's lifetime.
   InfraFunction dispatches (`Processor.Integration()` — runtime of Process [Composed Function] → Job Submission API).
 - Live address is `Plant.snapshot()['ray_dashboard_address']`, threaded into
   `Function.execute(…, dashboard_address=…)`. It is **not** a Service field.
+- `RayPlantPort` connect wait is **180s** (kind/KubeRay cold start); failures mention dashboard readiness.
 - Static NodePort `30265` → host `8265` via kind `extraPortMappings`
   (`data/input/structure/plant/main.tf`).
 

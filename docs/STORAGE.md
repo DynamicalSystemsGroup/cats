@@ -15,7 +15,7 @@ contract; object-store config is **not** a Runtime field — see [`MinIO.md`](./
 
 | Facet | What | Lifetime |
 |-------|------|----------|
-| **Content store** | Host Kubo (`ContentStore` in `content_store_utils.py`) | Long-lived; repo file is SoT (ships in `infrastructure_cid`); **Node start** asserts bootstrap readiness; operator/`node ensure`/TF `host_ipfs_daemon` create mutate; Executor `apply` only **asserts** Order tree; **not** killed on Structure destroy or `node stop` |
+| **Content store** | Host Kubo (**legacy CID** reader / mid-migration ensure) + Node **CAS-over-HTTP** (`CasHttpStore` under `.cats/ldp/cas/`) for **new** digests | Long-lived; Kubo repo file still SoT for legacy; Node start asserts Kubo readiness for legacy/T&D; **new** mesh writes do not require Kubo add |
 | **T&D** | Docker Kubo transport peers (`TransportContext`) + MinIO **scratch** (`cats-scratch`) | Structure lifetime (ILM 7d + destroy `down -v`) |
 | **Durable Entity Relationship** | Second MinIO (`cats-durable`) via same `ObjectStore` façade | Node lifetime; no ILM; Structure destroy leaves volume; GC via `gc-er` only |
 
@@ -25,12 +25,12 @@ A **single** host Kubo (default `127.0.0.1:5001`, one `IPFS_PATH`) carries two t
 
 | Traffic class | Role | Lifetime |
 |---------------|------|----------|
-| **Content-store** | Mesh / Control-Feedback CIDs (Order, Invoice, BOM, Function/Structure-as-Code) via ContentMesh | Long-lived; outlives Structure destroy and `node stop` |
+| **Content-store** | Mesh / Control-Feedback content ids (Order, Invoice, BOM, Function/Structure-as-Code) via ContentMesh — **`ni:`** on CAS for new mints; legacy **CID** via Kubo | Long-lived; outlives Structure destroy and `node stop` |
 | **Bitswap peer of T&D** | Host is peered to Structure Docker Kubo peers so migrate/stage can resolve host-added CIDs | Peering is Structure-lifetime; the host daemon itself is not |
 
-**ContentMesh** (`cats.network.content_mesh`) owns content-store mesh I/O and Order compose/submit. **Writes** (add / pin) go through `CatsIPFSClient` (Kubo RPC on `:5001`). **Reads** (`cat` / `catObj` / `get` / `getCar`) go through **`AddressStore`** (Phase 2a): when `IPFS_GATEWAY_URL` is set, prefer gateway fetch then verify; on miss/failure, fall back to Kubo RPC. Verify is pure-Python UnixFS (default single- and multi-block Files) first (Kubo `only-hash` fallback for exotic layouts). File `get` and CAR `dag_export` are gateway-first; directory `get` uses CAR + UnixFS extract (RPC fallback for HAMT/symlink/failure). CID remains the address of record; the gateway URL is a locator only. Bitswap/DHT are not required for mesh reads (optional fill when no gateway locator exists; T&D peering unchanged). Set `CATS_CID_VERIFY=1` to also verify RPC cats.
+**ContentMesh** (`cats.network.content_mesh`) owns content-store mesh I/O and Order compose/submit. **New writes** (`put_bytes` / `put_json` / `put_tree` / `cidDir` when `CATS_HOME` is set) go to **CAS-over-HTTP** (`CasHttpStore` + `LocatorIndex`) and return `ni:` — no Kubo add. **Legacy CID reads** (`cat` / `catObj` / `get` / `getCar` for `Qm…` / `bafy…`) go through **`AddressStore`**: when `IPFS_GATEWAY_URL` is set, prefer gateway fetch then verify; on miss/failure, fall back to Kubo RPC. **`ni:` / hex** reads resolve via locator index → `GET /ldp/cas/<hex>` → sha256 verify (fail closed). Directory trees for new content use digest-keyed manifests (`CasDirectoryManifest`); legacy directory CIDs still use CAR + UnixFS extract. Bitswap/DHT are not required for new CAS content (optional fill for legacy CIDs; T&D peering unchanged). Set `CATS_CID_VERIFY=1` to also verify RPC cats of legacy CIDs.
 JSON-LD + PROV-O BOM packaging (`build_execution_bom`) with Data Integrity signing (`sign_execution_bom`, `eddsa-jcs-2022`) and Node `node_did` key material live under `cats.network.feedback` / `identity` (Phase 1b — not Plant).
-The Phase 2a **control plane** (Node LDP cache + optional Solid pod dual-write / LDN) publishes signed envelopes at HTTP URIs; it does **not** replace CID + AddressStore for data blobs — see [`SOLID.md`](SOLID.md) and [`BOM.md`](BOM.md). The Node-local **BOM registry** is a query index of those envelopes, not a store — [`BomRegistry.md`](BomRegistry.md).
+The Phase 2a **control plane** (Node LDP cache + optional Solid pod dual-write / LDN) publishes signed envelopes at HTTP URIs; the **data plane** for new runs is CAS (`ni:` + `/ldp/cas/`) — see [`SOLID.md`](SOLID.md), [`BOM.md`](BOM.md), and [`W3C.md`](W3C.md). The Node-local **BOM registry** is a query index of those envelopes (plus `by-content` locators) — [`BomRegistry.md`](BomRegistry.md).
 Plant CoD transport (IPFS↔MinIO job orchestration) is separate —
 `cats.network.plant_transport.CoDTransport` (forthcoming; not ContentMesh).
 
@@ -39,7 +39,7 @@ That soft plane is intentional (Big Data–friendly Bitswap without a second swa
 Content-store is **two-phase** across **two on-disk copies** of the same helper (see [`IPFS.md`](./IPFS.md)):
 
 - **Bootstrap (repo default):** `{CATS_HOME}/data/input/structure/.../content_store_utils.py` — Node `start` asserts `is_ready`; ContentMesh soft-warns if not ready (no auto-ensure); operator heal via `make content-store-ensure` / `node ensure`.
-- **Order-submitted:** `{INPUT_STRUCTURE_HOME}/.../content_store_utils.py` — TF `shell_script.host_ipfs_daemon` create is the sole **automatic** ensure; `InfraStructure.apply` only asserts.
+- **Order-submitted:** `{INPUT_STRUCTURE_HOME}/.../content_store_utils.py` — TF `shell_script.host_ipfs_daemon` ensure on **create**; `InfraStructure.apply` asserts and soft-heals once if needed.
 
 **Republish lag:** repo edits do not affect live Orders until Structure is re-CID’d. Keep `ContentStore.ensure` thin (probe + heal + start). Node never owns shutdown.
 
@@ -58,7 +58,7 @@ the wrapper is Make-only; `python -m cats.node start` remains assert-only.
 **Why keep them separate under the hood**
 
 - **AQ ownership:** InfraStructure / the operator heal the content-store facet; the Node client only asserts readiness before binding Flask. Putting ensure inside `node start` would blur that boundary.
-- **Two trees:** Bootstrap heal uses the **repo** `content_store_utils.py`. The sole **automatic** Order-submitted ensure is TF `shell_script.host_ipfs_daemon` create (Order tree). Executor `apply` only asserts Order-tree readiness.
+- **Two trees:** Bootstrap heal uses the **repo** `content_store_utils.py`. Order-submitted ensure is TF `shell_script.host_ipfs_daemon` on **create** (Order tree); `InfraStructure.apply` asserts and soft-heals once if the API is down.
 - **Ops flexibility:** Use the split targets when Kubo is already up (skip ensure), or when debugging ensure vs Flask bind independently. Use `node-up` for the common “bring the node online” path.
 
 **Republish lag** still applies: repo ensure heals the host daemon against repo-tree code; live Orders only see Order-tree changes after Structure is re-CID’d.
@@ -67,8 +67,15 @@ the wrapper is Make-only; `python -m cats.node start` remains assert-only.
 Process transport callables depend on Function-owned **`TransportPort`**
 (`migrate` / `stage_for_plant` only); the Executor passes
 `as_transport_port(transport_context())` so Process never sees peering/assert APIs.
-Peering **mutate** is TF `ipfs_transport_peering` every reconcile; Executor `apply`
-only **asserts** containers ready — not Process heal.
+
+**Dual-path content ids:** when the stage id is `ni:` / hex, `migrate` and `stage_for_plant`
+materialize via **CAS** (`materialize_tree` / `put_tree`) — no Docker Bitswap and no
+unquoted `ipfs get ni:///…;…` shell split. Legacy CIDs still use Docker peer
+`ipfs get`→re-add (quoted). Peering **mutate** is TF `ipfs_transport_peering` every
+reconcile; Executor `apply` only **asserts** containers ready — not Process heal.
+Host Kubo TF ensure is **create-once** (`host_ipfs_daemon`); `InfraStructure.apply`
+soft-heals ContentStore once if the API is down after terraform (no `triggers.always`
+on the host daemon — that killed live Kubo).
 
 Process hotFs depend on Function-owned **`ComputePort`** (`run_transfer`); the Plant-owned
 Ray job entrypoint (staged by **`RayPlantPort.submit_job`**) wires **`RayComputePort`**
@@ -90,7 +97,7 @@ T&D scratch, and durable Entity Relationship are lifetime facets inside InfraStr
 
 | Store | Component (Architectural Quantum) | Role name in CATs docs |
 |-------|-----------------------------------|------------------------|
-| **IPFS** | InfraStructure [IaaS] | **Content-addressed storage** (CID / Data Provenance Records) — content-store facet (host Kubo); transport peers are T&D |
+| **IPFS** | InfraStructure [IaaS] | **Legacy CID** content-store + T&D transport peers; **new** digests on Node CAS (`ni:` / `/ldp/cas/`) |
 | **MinIO scratch** | InfraStructure [IaaS] | **S3-compatible scratch** (`cats-scratch`) — T&D / job landing → IPFS |
 | **MinIO durable** | InfraStructure [IaaS] | **S3-compatible Entity Relationship store** (`cats-durable`) — structure NS + `er/current` index |
 

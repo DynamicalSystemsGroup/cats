@@ -80,6 +80,9 @@
   # Contract: docs/BomRegistry.md
   uv run pytest -s tests/test_bom_registry.py
 
+  # CAS-over-HTTP — CasHttpStore, ni:/digest, manifests, locators, AddressStore
+  uv run pytest -s tests/test_cas_http.py
+
   # ContentMesh Kubo RPC + CAT_NODE_* endpoints (no ipfs CLI)
   uv run pytest -s tests/test_meshclient_rpc_surface.py
 
