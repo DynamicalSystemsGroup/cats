@@ -116,6 +116,35 @@ def test_migrate_parses_cid(monkeypatch, tmp_path):
     assert name == 'data_1700000000'
 
 
+def test_migrate_cas_skips_docker(monkeypatch, tmp_path):
+    """migrate on ni: materializes via CAS without Docker assert_ready."""
+    cats_home = tmp_path / 'cats_home'
+    cats_home.mkdir()
+    monkeypatch.setenv('CATS_HOME', str(cats_home))
+    monkeypatch.setattr(tu.time, 'time', lambda: 99)
+
+    from cats.network.cas import CasHttpStore, put_tree
+
+    src = tmp_path / 'src'
+    src.mkdir()
+    (src / 'f.csv').write_text('a\n', encoding='utf-8')
+    store = CasHttpStore(str(cats_home))
+    content_id = put_tree(store, str(src))
+
+    runs = []
+    monkeypatch.setattr(
+        tu, '_run', lambda *a, **k: runs.append(a) or _FakeCompleted(1)
+    )
+    monkeypatch.setattr(tu, '_container_running', lambda *_: False)
+
+    ctx = tu.TransportContext.default(structure_home=str(tmp_path / 'structure'))
+    (tmp_path / 'structure').mkdir()
+    out_id, name = ctx.migrate(content_id)
+    assert out_id.startswith('ni:///sha-256;')
+    assert name == 'data_99'
+    assert runs == []
+
+
 def test_stage_for_plant_returns_host_path(monkeypatch, tmp_path):
     """stage_for_plant returns the host-side staged data cache path."""
     monkeypatch.setattr(tu, '_container_running', lambda *_: True)
@@ -132,6 +161,33 @@ def test_stage_for_plant_returns_host_path(monkeypatch, tmp_path):
         'QmIn', cwd=str(tmp_path), data_cache=str(data_cache)
     )
     assert path == str(staged)
+
+
+def test_stage_for_plant_cas_materializes_host(monkeypatch, tmp_path):
+    """stage_for_plant on ni: writes the tree under data_cache without Docker."""
+    cats_home = tmp_path / 'cats_home'
+    cats_home.mkdir()
+    monkeypatch.setenv('CATS_HOME', str(cats_home))
+    monkeypatch.setattr(tu.time, 'time', lambda: 7)
+
+    from cats.network.cas import CasHttpStore, put_tree
+
+    src = tmp_path / 'src'
+    src.mkdir()
+    (src / 'x.csv').write_text('b\n', encoding='utf-8')
+    content_id = put_tree(CasHttpStore(str(cats_home)), str(src))
+
+    data_cache = tmp_path / 'outputs'
+    data_cache.mkdir()
+    monkeypatch.setattr(tu, '_container_running', lambda *_: False)
+
+    ctx = tu.TransportContext.default(structure_home=str(tmp_path / 'structure'))
+    (tmp_path / 'structure').mkdir()
+    path = ctx.stage_for_plant(
+        content_id, cwd=str(tmp_path), data_cache=str(data_cache)
+    )
+    assert path.endswith('staged_7')
+    assert (Path(path) / 'x.csv').read_text(encoding='utf-8') == 'b\n'
 
 
 def test_cli_status_ready(monkeypatch):
