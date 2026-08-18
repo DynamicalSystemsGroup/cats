@@ -7,15 +7,73 @@ import shutil
 import tempfile
 from copy import deepcopy
 
+from cats.network.ldp import BomLdpStore, fetch_bom_envelope
 from cats.network.node_http import _node_init_endpoint
 from cats.network.packaging import (
     resolve_function_package_dirs,
     stage_function_package,
 )
+from cats.network.registry import AmbiguousBomError, BomRegistry, RegistryError
 
 
 class OrderOps:
     """Mixin for ContentMesh: create_order_request + linkProcess/Structure/Order."""
+
+    def _response_from_registry(
+            self,
+            *,
+            bom_cid: str | None = None,
+            data_cid: str | None = None,
+    ):
+        """Load a BOM response shell from the Node-local registry + LDP cache."""
+        if bom_cid is None and data_cid is None:
+            raise RuntimeError('bom_cid or data_cid required when cat_response is omitted')
+        if bom_cid is not None and data_cid is not None:
+            # Explicit bom_cid always wins (same as init preference when both set
+            # after order_cid); ignore data_cid for resolution.
+            data_cid = None
+
+        registry = BomRegistry(self.CATS_HOME)
+        if bom_cid is None:
+            try:
+                bom_cid = registry.resolve_unique_bom(data_cid)
+            except AmbiguousBomError:
+                raise
+            except RegistryError as exc:
+                raise RuntimeError(str(exc)) from exc
+
+        record = registry.get(bom_cid)
+        if record is None:
+            raise RuntimeError(f'no registry record for bom_cid={bom_cid!r}')
+
+        bom = BomLdpStore(self.CATS_HOME).get(bom_cid)
+        if bom is None:
+            locators = record.get('locators') or {}
+            uri = locators.get('bom_ldp_uri') or locators.get('bom_solid_uri')
+            if not uri:
+                raise RuntimeError(
+                    f'BOM envelope not in local LDP store and no locator for '
+                    f'bom_cid={bom_cid!r}'
+                )
+            bom = fetch_bom_envelope(uri)
+
+        return {
+            'bom': bom,
+            'bom_cid': bom_cid,
+            'bom_ldp_uri': (record.get('locators') or {}).get('bom_ldp_uri'),
+            'bom_solid_uri': (record.get('locators') or {}).get('bom_solid_uri'),
+        }
+
+    def _cat_response_for_link(
+            self,
+            cat_response=None,
+            *,
+            bom_cid: str | None = None,
+            data_cid: str | None = None,
+    ):
+        if cat_response is not None:
+            return cat_response
+        return self._response_from_registry(bom_cid=bom_cid, data_cid=data_cid)
 
     def _rebuild_function_cid(
             self,
@@ -160,14 +218,20 @@ class OrderOps:
 
     def linkProcess(
             self,
-            cat_response,
+            cat_response=None,
             ingress_subproc=None,
             integrated_subproc=None,
             egress_subproc=None,
             integration_cache_subproc=None,
-            infrafunction_subproc=None
+            infrafunction_subproc=None,
+            *,
+            bom_cid=None,
+            data_cid=None,
     ):
         """Rebuild Order function_cid; carry structure_cid and Invoice data_cid."""
+        cat_response = self._cat_response_for_link(
+            cat_response, bom_cid=bom_cid, data_cid=data_cid
+        )
         flattened_bom = self.flatten_bom(cat_response)
         flat_bom = deepcopy(flattened_bom['flat_bom'])
         invoice = flat_bom['invoice']
@@ -190,13 +254,15 @@ class OrderOps:
 
     def linkStructure(
             self,
-            cat_response,
+            cat_response=None,
             *,
             structure_filepath=None,
             root_cid=None,
             plant_cid=None,
             infrastructure_cid=None,
             structure_filepath_name=None,
+            bom_cid=None,
+            data_cid=None,
     ):
         """Rebuild Order structure_cid; carry function_cid and Invoice data_cid.
 
@@ -204,6 +270,9 @@ class OrderOps:
         re-CID root/plant/infra from disk, and/or override individual nested
         CIDs. Fails if the resulting pairing is unchanged.
         """
+        cat_response = self._cat_response_for_link(
+            cat_response, bom_cid=bom_cid, data_cid=data_cid
+        )
         flattened_bom = self.flatten_bom(cat_response)
         flat_bom = deepcopy(flattened_bom['flat_bom'])
         invoice = flat_bom['invoice']
@@ -236,7 +305,7 @@ class OrderOps:
 
     def linkOrder(
             self,
-            cat_response,
+            cat_response=None,
             *,
             ingress_subproc=None,
             integrated_subproc=None,
@@ -248,6 +317,8 @@ class OrderOps:
             plant_cid=None,
             infrastructure_cid=None,
             structure_filepath_name=None,
+            bom_cid=None,
+            data_cid=None,
     ):
         """Rebuild Function and/or Structure in one lineage step.
 
@@ -274,6 +345,9 @@ class OrderOps:
                 'mutation (structure_filepath or nested CID override)'
             )
 
+        cat_response = self._cat_response_for_link(
+            cat_response, bom_cid=bom_cid, data_cid=data_cid
+        )
         flattened_bom = self.flatten_bom(cat_response)
         flat_bom = deepcopy(flattened_bom['flat_bom'])
         invoice = flat_bom['invoice']

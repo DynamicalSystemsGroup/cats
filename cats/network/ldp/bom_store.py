@@ -2,13 +2,10 @@
 from __future__ import annotations
 
 import json
-import os
-import re
 from pathlib import Path
 from typing import Any
 
-# CIDv0 (Qm…) or CIDv1 (bafy… / similar base32) — path segment only.
-_CID_SEGMENT = re.compile(r'^[A-Za-z0-9]+$')
+from cats.network.cid_segment import validate_cid_segment
 
 
 def bom_ldp_path(bom_cid: str) -> str:
@@ -26,12 +23,7 @@ def bom_ldp_uri(bom_cid: str, *, base_url: str | None = None) -> str:
 
 
 def _validate_bom_cid(bom_cid: str) -> str:
-    cid = (bom_cid or '').strip()
-    if not cid or '/' in cid or '\\' in cid or '..' in cid:
-        raise ValueError(f'invalid bom_cid path segment: {bom_cid!r}')
-    if not _CID_SEGMENT.match(cid):
-        raise ValueError(f'invalid bom_cid path segment: {bom_cid!r}')
-    return cid
+    return validate_cid_segment(bom_cid, label='bom_cid')
 
 
 class BomLdpStore:

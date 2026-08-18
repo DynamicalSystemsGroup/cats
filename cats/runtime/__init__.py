@@ -9,6 +9,7 @@ from cats.network.identity import node_did as resolve_node_did
 from cats.network.ldp import BomLdpStore, bom_ldp_uri
 from cats.network.ldp.ldn import announce_bom
 from cats.network.ldp.solid_client import SolidBomPublisher, solid_configured
+from cats.network.registry import BomRegistry, build_record
 from cats.utils import subproc_run, executeCMD
 
 logger = logging.getLogger(__name__)
@@ -162,4 +163,16 @@ class Runtime:
                     bom_cid,
                     exc,
                 )
+        # Control-Feedback registry index (before 2b): fail closed on put error.
+        BomRegistry(self.CATS_HOME).put(
+            build_record(
+                bom,
+                bom_cid,
+                content_mesh=self.contentMesh,
+                locators={
+                    'bom_ldp_uri': bom_response['bom_ldp_uri'],
+                    'bom_solid_uri': bom_response['bom_solid_uri'],
+                },
+            )
+        )
         return bom_response
