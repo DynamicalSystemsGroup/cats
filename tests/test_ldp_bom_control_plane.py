@@ -1,5 +1,6 @@
 """Phase 2a Node-hosted LDP BOM control plane."""
 from unittest.mock import MagicMock
+import json
 
 import pytest
 from flask import Flask
@@ -146,6 +147,7 @@ def test_flask_ldp_routes(monkeypatch, tmp_path):
 def test_runtime_execute_publishes_ldp(monkeypatch, tmp_path):
     """Runtime.execute stores BOM in BomLdpStore and returns bom_ldp_uri."""
     from cats.runtime import Runtime
+    from cats.network.registry import BomRegistry
 
     monkeypatch.delenv('CAT_NODE_DID', raising=False)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
@@ -154,6 +156,18 @@ def test_runtime_execute_publishes_ldp(monkeypatch, tmp_path):
 
     mesh = MagicMock()
     mesh.ipfsClient.add_str.return_value = 'QmRuntimeBom'
+    mesh.cat.side_effect = lambda cid: {
+        'QmInvoice': json.dumps({
+            'order_cid': 'QmOrder',
+            'data_cid': 'QmDataOut',
+        }),
+        'QmOrder': json.dumps({
+            'function_cid': 'QmFn',
+            'structure_cid': 'QmStruct',
+            'invoice_cid': 'QmInvIn',
+        }),
+        'QmInvIn': json.dumps({'data_cid': 'QmDataIn'}),
+    }[cid]
     # Runtime.__init__ assigns paths onto contentMesh
     runtime = Runtime(contentMesh=mesh, CATS_HOME=str(tmp_path))
 
@@ -173,3 +187,8 @@ def test_runtime_execute_publishes_ldp(monkeypatch, tmp_path):
     assert stored is not None
     assert stored['invoice_cid'] == 'QmInvoice'
     assert 'proof' in stored
+    record = BomRegistry(str(tmp_path)).get('QmRuntimeBom')
+    assert record is not None
+    assert record['order_cid'] == 'QmOrder'
+    assert record['data_cid'] == 'QmDataOut'
+    assert BomRegistry(str(tmp_path)).lookup_bom('QmDataOut') == ['QmRuntimeBom']

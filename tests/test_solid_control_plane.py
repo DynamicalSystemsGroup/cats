@@ -1,5 +1,6 @@
 """Phase 2a Solid pod + WAC + LDN control plane."""
 from unittest.mock import MagicMock, patch
+import json
 
 import pytest
 
@@ -23,6 +24,22 @@ from cats.network.ldp import (
 )
 from cats.network.ldp.ldn import ldn_inbox_urls
 from cats.network.ldp.wac import build_bom_container_acl
+
+
+def _mesh_cat_for_runtime_invoice(cid):
+    """AddressStore-shaped cats for Runtime.execute → build_record."""
+    return {
+        'QmInvoice': json.dumps({
+            'order_cid': 'QmOrder',
+            'data_cid': 'QmDataOut',
+        }),
+        'QmOrder': json.dumps({
+            'function_cid': 'QmFn',
+            'structure_cid': 'QmStruct',
+            'invoice_cid': 'QmInvIn',
+        }),
+        'QmInvIn': json.dumps({'data_cid': 'QmDataIn'}),
+    }[cid]
 
 
 def _signed_bom(monkeypatch, tmp_path):
@@ -300,6 +317,7 @@ def test_runtime_execute_dual_publish(monkeypatch, tmp_path):
 
     mesh = MagicMock()
     mesh.ipfsClient.add_str.return_value = 'QmRuntimeBom'
+    mesh.cat.side_effect = _mesh_cat_for_runtime_invoice
     runtime = Runtime(contentMesh=mesh, CATS_HOME=str(tmp_path))
 
     factory = MagicMock()
@@ -342,6 +360,7 @@ def test_runtime_execute_solid_failure_raises(monkeypatch, tmp_path):
 
     mesh = MagicMock()
     mesh.ipfsClient.add_str.return_value = 'QmFail'
+    mesh.cat.side_effect = _mesh_cat_for_runtime_invoice
     runtime = Runtime(contentMesh=mesh, CATS_HOME=str(tmp_path))
     factory = MagicMock()
     executor = MagicMock()
@@ -375,6 +394,7 @@ def test_runtime_execute_solid_unset_identical(monkeypatch, tmp_path):
 
     mesh = MagicMock()
     mesh.ipfsClient.add_str.return_value = 'QmLocal'
+    mesh.cat.side_effect = _mesh_cat_for_runtime_invoice
     runtime = Runtime(contentMesh=mesh, CATS_HOME=str(tmp_path))
     factory = MagicMock()
     executor = MagicMock()
