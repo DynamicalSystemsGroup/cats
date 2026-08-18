@@ -4,7 +4,7 @@ Scope: **how provenance is modeled, attributed, signed, published, and discovere
 
 ## One-line verdict (provenance)
 * `dev:` provenance is mostly **implicit** [CID](https://docs.ipfs.tech/concepts/content-addressing/) **threading**.
-* `w3c:` lineage is an **explicit,** [DID](https://www.w3.org/TR/did-core/)**-attributed**, [Data Integrity](https://www.w3.org/TR/vc-data-integrity/)**-signed** [JSON-LD](https://www.w3.org/TR/json-ld11/)/[PROV-O](https://www.w3.org/TR/prov-o/) **envelope**, published at [LDP](https://www.w3.org/TR/ldp/)/[Solid](https://solidproject.org/) **HTTP locators** peers can fetch and verify — while **CID remains the address of *provenance* record** for referenced stage products. Node-local **BOM registry** reverse lookup (`data_cid` → BOM) is landed; remaining gaps are mesh federation / locator indexes (CAS-over-HTTP) and Phase 2b URI-as-address, not signing.
+* `w3c:` lineage is an **explicit,** [DID](https://www.w3.org/TR/did-core/)**-attributed**, [Data Integrity](https://www.w3.org/TR/vc-data-integrity/)**-signed** [JSON-LD](https://www.w3.org/TR/json-ld11/)/[PROV-O](https://www.w3.org/TR/prov-o/) **envelope**, published at [LDP](https://www.w3.org/TR/ldp/)/[Solid](https://solidproject.org/) **HTTP locators** peers can fetch and verify — while **CID remains the address of *provenance* record** for referenced stage products. Node-local **BOM registry** reverse lookup (`data_cid` → BOM) is landed ([`BomRegistry.md`](BomRegistry.md)); remaining gaps are mesh federation / locator indexes (CAS-over-HTTP) and Phase 2b URI-as-address, not signing.
 ## Envelope vs stage payloads (unchanged discipline)
 Provenance package stays cheap:
 * **In envelope:** Invoice/log CIDs, `node_did`, [PROV-O](https://www.w3.org/TR/prov-o/) edges, [Data Integrity](https://www.w3.org/TR/vc-data-integrity/) proof
@@ -37,7 +37,7 @@ Stage products (`ingress_data_cid`, `integration_data_cid`, `data_cid`, `structu
 | **Peer verify path** | Trust fetch + CID | `fetch_bom_envelope` → **`verify_execution_bom`** (Node or Solid URL) |
 | **Announce to mesh** | — | Best-effort [LDN](https://www.w3.org/TR/ldn/) Announce (`bom_cid`, `bom_solid_uri`) when Solid configured |
 | **ACL on write** | N/A (no Solid) | Solid [WAC](https://solid.github.io/web-access-control-spec/) (Node Write; readers / public Read); Node LDP PUT stays **405** |
-| **Backward “which BOM made this `data_cid`?”** | Gap ([`LineageOfProvenance.md`](docs/LineageOfProvenance.md)) | **Node-local registry** (`BomRegistry` / `GET /ldp/registry/by-data/…`); mesh federation still deferred (intra-run `wasDerivedFrom` also landed) |
+| **Backward “which BOM made this `data_cid`?”** | Gap ([`LineageOfProvenance.md`](docs/LineageOfProvenance.md)) | **Node-local registry** ([`BomRegistry.md`](BomRegistry.md) / `GET /ldp/registry/by-data/…`); mesh federation still deferred (intra-run `wasDerivedFrom` also landed) |
 | **Stage feedback** | Invoice stage CIDs | Same CID addresses on Invoice; signed BOM also carries `stageLineage` PROV entities (reachable after envelope verify via [AddressStore](docs/IPFS.md)) |
 | **Large payloads** | [MinIO](https://min.io/) + IPFS CIDs | Same discipline — envelope never embeds stage bytes ([`STORAGE.md`](docs/STORAGE.md)) |
 
@@ -75,7 +75,7 @@ Stage products (`ingress_data_cid`, `integration_data_cid`, `data_cid`, `structu
 | **Kubo** | [Kubo](https://docs.ipfs.tech/install/command-line/) | Writes + RPC fallback; only-hash verify oracle for exotic layouts |
 | **Multibase** | [multibase](https://github.com/multiformats/multibase) | `did:key` / proofValue encoding helpers |
 
-Product docs: [`SOLID.md`](docs/SOLID.md), [`IPFS.md`](docs/IPFS.md), [`STORAGE.md`](docs/STORAGE.md).
+Product docs: [`SOLID.md`](SOLID.md), [`BomRegistry.md`](BomRegistry.md), [`IPFS.md`](IPFS.md), [`STORAGE.md`](STORAGE.md).
 
 ---
 
@@ -100,7 +100,7 @@ Product docs: [`SOLID.md`](docs/SOLID.md), [`IPFS.md`](docs/IPFS.md), [`STORAGE.
 | Agent keys | `cats/network/identity/node_did.py` | [did:key](https://w3c-ccg.github.io/did-method-key/) keyfile |
 | WebID bridge | `cats/network/identity/webid.py` | [WebID](https://www.w3.org/2005/Incubator/webid/spec/) ↔ same VM |
 | Local publish | `ldp/bom_store.py` + routes | [LDP](https://www.w3.org/TR/ldp/) persist + GET cache |
-| BOM registry | `cats/network/registry/` | Node-local index (`data_cid`→BOM / BOM→Order); `GET /ldp/registry/…` |
+| BOM registry | `cats/network/registry/` | Node-local index (`data_cid`→BOM / BOM→Order); `GET /ldp/registry/…` — [`BomRegistry.md`](BomRegistry.md) |
 | Fetch + verify | `ldp/client.py` | Fail-closed DI verify |
 | Solid publish / ACL / LDN | `solid_client.py`, `wac.py`, `ldn.py` | [Solid](https://solidproject.org/) + [WAC](https://solid.github.io/web-access-control-spec/) + [LDN](https://www.w3.org/TR/ldn/) |
 | Wire-up | `Runtime.execute` | Sign → `bom_cid` → LDP → optional Solid → **registry put** → LDN |

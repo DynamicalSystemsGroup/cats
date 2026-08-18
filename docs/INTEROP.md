@@ -111,7 +111,7 @@ adapter modules).
    apply-complete `structure_cid`; **`linkOrder()`** mutates Function and/or Structure in one
    lineage step (single Invoice `data_cid` chain). Each accepts `cat_response` **or**
    `bom_cid=` / `data_cid=` via the Node-local BOM registry
-   ([`ControlFeedbackLoop.md`](./ControlFeedbackLoop.md)). A-la-carte helpers remain
+   ([`BomRegistry.md`](./BomRegistry.md)). A-la-carte helpers remain
    (see [`LineageOfProvenance.md`](./LineageOfProvenance.md)). Available as Order ops for proving
    2f; second Plant adapters still required for a full interop prove.
 7. **Executor / Factory adapter-blind CI:** Function modules are grep-guarded against Ray /
@@ -181,6 +181,7 @@ Treat remaining soft edges (`job_endpoint` shape) as cleanup with the first non-
 - [`PLANTs.md`](./PLANTs.md) — Plant analogies and generation vs T&D
 - [`STORAGE.md`](./STORAGE.md) — content-store vs T&D facets; TransportPort / ComputePort / PlantPort / JobHandle
 - [`BOM.md`](./BOM.md) — Order Function/Structure CIDs; named Process imports
+- [`BomRegistry.md`](./BomRegistry.md) — Node-local BOM index; `link*` without a caller-held `cat_response`
 - [`LineageOfProvenance.md`](./LineageOfProvenance.md) — `linkProcess` / `linkStructure` / `linkOrder` Order lineage; **2f** still needs second Plant adapters
 - [`IPFS.md`](./IPFS.md) — host Kubo content-store; transport peering
 - [`MinIO.md`](./MinIO.md) — dual MinIO (scratch + durable Entity Relationship) / JobHandle / `gc-er`

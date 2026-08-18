@@ -1,7 +1,7 @@
 # CAT Node Archtectural Components:
 
 * the Runtime:
-    * Process-lifetime Node ambient (`cats/runtime`, singleton `RUNTIME`): host layout, ContentMesh, Order entry (`initFactory` / `initBOMcar`) and BOM envelope wrap (`execute`). Not the peer edge (`cats.node`), not Factory, not the per-Order Executor.
+    * Process-lifetime Node ambient (`cats/runtime`, singleton `RUNTIME`): host layout, ContentMesh, Order entry (`initFactory` / `initBOMcar`) and BOM envelope wrap (`execute`). Not the peer edge (`cats.node`), not Factory, not the per-Order Executor. After execute, a Node-local **BOM registry** (`BomRegistry`) indexes the verified envelope so the next Order is discovered via `bom_cid` / `data_cid` — [`BomRegistry.md`](BomRegistry.md).
 * the Factory:
     * Software Diambiguation: https://en.wikipedia.org/wiki/Software_factory 
     * Manafacturing Diambiguation: https://en.wikipedia.org/wiki/Factory 

@@ -75,7 +75,8 @@ make node-start
 - Fails loud if the port is still held by a non-`cats.node` process — set `CAT_NODE_PORT` (e.g. `5002`) when macOS AirPlay owns `:5000`.
 - On SIGINT / SIGTERM, exits without stopping host Kubo.
 - Serves Order entry at `POST /cat/node/init` and Phase 2a LDP control plane
-  (local cache; Solid dual-write is separate — see [`SOLID.md`](SOLID.md)):
+  (local cache; Solid dual-write is separate — see [`SOLID.md`](SOLID.md);
+  registry contract: [`BomRegistry.md`](BomRegistry.md)):
   - `GET /ldp/boms/` — Basic Container listing published BOM URIs
   - `GET /ldp/boms/<bom_cid>` — signed ExecutionBom JSON-LD (publish via `Runtime.execute` only; HTTP PUT → 405)
   - `GET /ldp/registry/` — BOM registry container (Node-local index)
@@ -128,6 +129,7 @@ Make-only convenience: runs `node-stop`, then `ipfs shutdown`. Does **not** live
 - [`INSTALL.md`](./INSTALL.md) / [`ENV.md`](./ENV.md) — clone, `uv sync`, environment
 - [`DEMO.md`](./DEMO.md) — mesh demo after the Node is up
 - [`TEST.md`](./TEST.md) — integration tests that need a live Node
+- [`BomRegistry.md`](./BomRegistry.md) — Node-local BOM query index (`GET /ldp/registry/…`)
 - [`STORAGE.md`](./STORAGE.md) — content-store vs scratch ownership; why ensure ≠ start
 - [`IPFS.md`](./IPFS.md) — host Kubo facet, two-phase ensure, peering
 - [`DASHBOARDS.md`](./DASHBOARDS.md) — Ray / MinIO / IPFS WebUI once Structure is deployed

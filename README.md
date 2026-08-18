@@ -21,7 +21,7 @@
       * **a.** *executes* the *AQ components* as **Function [FaaS]** on **Structure [PaaS]**
       * **b.** **Invoices** the *execution of data prcessing* as staged output **Content-Addresses**
   * **B: Content-Addressed Bills-of-Materials (BOMs)** - *BOMs* employ **Content Identifiers (CIDs)** as *Content-Addesable Storage* of CATs to provide a means of [Data Verification](https://en.wikipedia.org/wiki/Data_verification) & location-agnostic **data transportation / retrieval** via a unique identification of CAT content. CATs' use of this content-addressing mechanism establishes a self-service Data Mesh as a heterogeneously scalable Compute Platform deployable on [Kubernetes](https://kubernetes.io/) as CAT Node's execution paradigm (Structure [PaaS]). 
-    * **3.** the *Node's* **Runtime** *emits* a **BOM** as the *Mesh-transportable Data Provenance record* to be *shared* & *re-executed* between Node; a Node-local **BOM registry** indexes verified envelopes so the next Order can be discovered via `bom_cid` / `data_cid` (not only out-of-band `order_cid`) — see [`docs/ControlFeedbackLoop.md`](./docs/ControlFeedbackLoop.md)
+    * **3.** the *Node's* **Runtime** *emits* a **BOM** as the *Mesh-transportable Data Provenance record* to be *shared* & *re-executed* between Node; a Node-local **BOM registry** indexes verified envelopes so the next Order can be discovered via `bom_cid` / `data_cid` (not only out-of-band `order_cid`) — see [`docs/BomRegistry.md`](./docs/BomRegistry.md) / [`docs/ControlFeedbackLoop.md`](./docs/ControlFeedbackLoop.md)
 
 ### The sustainment of *Data Initiatives* & *Product Collaboration* on a Data Mesh's Architectural Planes via CATs' *Architectural Quantum*:
 ![CATs BOM Activity](images/CATs_bom_activity_ag.jpeg)

@@ -24,7 +24,7 @@ WAC.
 3. If `SOLID_POD_BASE_URL` is set: PUT to `{base}/boms/{bom_cid}` → `bom_solid_uri`.
    - **Fails** `Runtime.execute` when Solid is configured and PUT fails (dual-write consistency).
 4. Indexes a Node-local **BOM registry** record (`BomRegistry.put` after locators are known; fail closed).
-   This is **not** a Solid dual-write — see [`ControlFeedbackLoop.md`](ControlFeedbackLoop.md) / [`NodeLifeCycle.md`](NodeLifeCycle.md) for `GET /ldp/registry/…`.
+   This is **not** a Solid dual-write — see [`BomRegistry.md`](BomRegistry.md).
 5. After successful Solid PUT: best-effort LDN announce to `SOLID_LDN_INBOX_URLS`
    (Inbox down does **not** fail execute).
 6. Peers: `fetch_bom_envelope(bom_solid_uri)` → verify proof → CID refs via AddressStore.
@@ -70,6 +70,7 @@ This repo does **not** host a Solid server — run [Community Solid Server](http
 ## See also
 
 - [`BOM.md`](BOM.md) — HTTP response fields `bom_cid`, `bom_ldp_uri`, `bom_solid_uri`
+- [`BomRegistry.md`](BomRegistry.md) — Node-local query index (not the envelope store)
 - [`NodeLifeCycle.md`](NodeLifeCycle.md) — Node LDP cache + registry query routes
 - [`STORAGE.md`](STORAGE.md) — ContentStore / MinIO (data plane; unchanged by Solid)
 - [`ControlFeedbackLoop.md`](ControlFeedbackLoop.md) — Control-Feedback Loop + registry intake
