@@ -66,9 +66,10 @@ class ContentMesh(OrderOps):
         self.CAT_HOME = None
         self.CAR_HOME = None
         self.ipfsClient = ipfsClient
-        # Reads (cat/catObj) go through AddressStore; writes stay on ipfsClient.
+        # Reads via AddressStore (CAS ni: or legacy CID); new writes prefer CAS.
         self.addressStore = addressStore if addressStore is not None else AddressStore(
-            ipfsClient
+            ipfsClient,
+            cats_home=CATS_HOME,
         )
         self.ingress_job_id = None
         self.ingressed_data_cid = None
@@ -121,6 +122,8 @@ class ContentMesh(OrderOps):
         self.CATS_HOME = CATS_HOME
         self.DATA_HOME = self.CATS_HOME + '/data'
         self.JOB_HOME = self.DATA_HOME + '/jobs'
+        if getattr(self, 'addressStore', None) is not None:
+            self.addressStore.cats_home = CATS_HOME
 
     def catSubmit(self, order_request):
         print("Order:")
@@ -153,24 +156,61 @@ class ContentMesh(OrderOps):
         output_bom = response.json()
         output_bom['POST'] = curl_cmd
         return output_bom
+    def put_bytes(self, data: bytes, *, media_type: str | None = None) -> str:
+        """CAS-only put; return ``ni:`` and register Node locator."""
+        if self.CATS_HOME is None:
+            raise RuntimeError('ContentMesh.CATS_HOME required for CAS put_bytes')
+        from cats.network.cas import CasHttpStore, LocatorIndex
+
+        content_id = CasHttpStore(self.CATS_HOME).put(bytes(data))
+        LocatorIndex(self.CATS_HOME).put_cas_node_locator(
+            content_id, media_type=media_type
+        )
+        return content_id
+
+    def put_json(self, obj, *, media_type: str = 'application/json') -> str:
+        """CAS-only JSON put; return ``ni:``."""
+        return self.put_bytes(
+            (json.dumps(obj) + '\n').encode('utf-8'),
+            media_type=media_type,
+        )
+
+    def put_tree(self, directory: str) -> str:
+        """CAS directory manifest put; return ``ni:`` of the manifest."""
+        if self.CATS_HOME is None:
+            raise RuntimeError('ContentMesh.CATS_HOME required for CAS put_tree')
+        from cats.network.cas import CasHttpStore, LocatorIndex, put_tree
+
+        store = CasHttpStore(self.CATS_HOME)
+        content_id = put_tree(store, directory)
+        LocatorIndex(self.CATS_HOME).put_cas_node_locator(
+            content_id, media_type='application/json'
+        )
+        return content_id
+
     def cidDir(self, filepath: str):
         self.ensure_bootstrap_content_store()
-        # print(filepath)
         name = filepath.split('/')[-1]
+        if self.CATS_HOME is not None:
+            dir_cid = self.put_tree(filepath)
+            return dir_cid, name
         dir = self.ipfsClient.add(filepath, recursive=True)
         if type(dir) is list:
-            # dir_json = list(filter(lambda x: x['Name'] == 'outputs', dir))[-1]
             dir_json = list(filter(lambda x: x['Name'] == name, dir))[-1]
             dir_cid = dir_json['Hash']
             dir_name = dir_json['Name']
             return dir_cid, dir_name
         else:
             dir_cid = dir['Hash']
-            # dir_name = dir['Name']
             return dir_cid
 
     def cidFile(self, filepath):
         self.ensure_bootstrap_content_store()
+        file_name = os.path.basename(filepath)
+        if self.CATS_HOME is not None:
+            with open(filepath, 'rb') as handle:
+                file_cid = self.put_bytes(handle.read())
+            return file_cid, file_name
         file_json = self.ipfsClient.add(filepath)
         file_cid = file_json['Hash']
         file_name = file_json['Name']
@@ -263,24 +303,24 @@ class ContentMesh(OrderOps):
             # No real Order to reference yet (initBOMjson without order_cid)
             # — mint a standalone placeholder.
             placeholder_invoice = {'order_cid': None, 'seed_cid': seed_cid}
-            placeholder_invoice_cid = self.ipfsClient.add_json(placeholder_invoice)
+            placeholder_invoice_cid = self.put_json(placeholder_invoice)
             placeholder_order = {
                 'invoice_cid': placeholder_invoice_cid,
                 'function_cid': function_cid,
                 'structure_cid': structure_cid,
                 'structure_filepath': structure_filepath
             }
-            resolved_order_cid = self.ipfsClient.add_json(placeholder_order)
+            resolved_order_cid = self.put_json(placeholder_order)
 
         invoice = {'order_cid': resolved_order_cid, 'seed_cid': seed_cid}
-        invoice_cid = self.ipfsClient.add_json(invoice)
+        invoice_cid = self.put_json(invoice)
 
         init_bom = {
             'invoice_cid': invoice_cid,
             'log_cid': None,
             'init_data_cid': init_data_cid
         }
-        init_bom_json_cid = self.ipfsClient.add_json(init_bom)
+        init_bom_json_cid = self.put_json(init_bom)
         return init_bom_json_cid
 
     def initBOMcar(self,
@@ -295,15 +335,31 @@ class ContentMesh(OrderOps):
         return car_bom_cid, init_bom_json_cid
 
     def linkData(self, cid, subdir='outputs'):
-        """Return Hash of the UnixFS link matching ``subdir`` (name fragment).
+        """Return content id of the link matching ``subdir`` (name fragment).
 
-        Legacy CLI filter strings like ``' - outputs/'`` are normalized to
-        ``outputs``.
+        Legacy UnixFS ``ls`` for CIDs; CAS directory manifests match entry
+        prefixes / path fragments.
         """
+        from cats.network.cas.digest import is_ni_or_digest
+        from cats.network.cas.manifest import is_directory_manifest
+
         self.ensure_bootstrap_content_store()
         needle = subdir.strip(' -/')
         if not needle:
             needle = 'outputs'
+        if is_ni_or_digest(cid):
+            obj = json.loads(self.cat(cid))
+            if not is_directory_manifest(obj):
+                raise RuntimeError(
+                    f'CAS content {cid!r} is not a directory manifest'
+                )
+            for path, file_id in obj['entries'].items():
+                if needle in path or path.startswith(needle):
+                    return file_id
+            raise RuntimeError(
+                f'No manifest entry matching {needle!r} under {cid!r}; '
+                f'paths={list(obj["entries"])}'
+            )
         links = self.ipfsClient.ls(cid)
         for link in links:
             name = link.get('Name') or ''
@@ -336,17 +392,15 @@ class ContentMesh(OrderOps):
         return self.addressStore.cat_bytes(cid)
 
     def add_named_bind(self, source_cid: str, module: str, qualname: str) -> str:
-        """CID a named-bind JSON leaf for an Order slot."""
-        return self.ipfsClient.add_str(
-            json.dumps(named_bind_payload(source_cid, module, qualname))
-        )
+        """Content-address a named-bind JSON leaf for an Order slot."""
+        return self.put_json(named_bind_payload(source_cid, module, qualname))
 
     def bind_subproc(self, obj, source_cid: str) -> str:
-        """CID a stock named bind or pickle leaf for ``obj``."""
+        """Content-address a stock named bind or pickle leaf for ``obj``."""
         self.ensure_bootstrap_content_store()
         if is_stock_function_callable(obj):
             return self.add_named_bind(source_cid, obj.__module__, obj.__qualname__)
-        return self.ipfsClient.add_pyobj(obj)
+        return self.put_bytes(pickle.dumps(obj))
 
     def resolve_subproc(self, slot_cid: str, *, expected_source_cid: str):
         """Load a slot leaf: named-bind JSON import, else pickle."""
@@ -384,6 +438,17 @@ class ContentMesh(OrderOps):
         self.addressStore.dag_export(cid, filepath)
 
     def convertBOMtoCAR(self, bom_cid: str, filepath: str):
+        from cats.network.cas.digest import is_ni_or_digest
+
+        if is_ni_or_digest(bom_cid):
+            # CAS blobs are already the address of record; no Kubo CAR re-add.
+            raw = self.catObj(bom_cid)
+            parent = os.path.dirname(filepath)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            with open(filepath, 'wb') as handle:
+                handle.write(raw)
+            return bom_cid, bom_cid
         self.getCar(bom_cid, filepath)
         car_bom_cid = None
         try:

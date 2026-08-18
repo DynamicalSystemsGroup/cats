@@ -90,3 +90,24 @@ def register_registry_routes(app: Flask, *, cats_home: str) -> None:
         resp = jsonify({'order_cid': order_cid, 'bom_cids': bom_cids})
         apply_resource_headers(resp)
         return resp
+
+    @app.route(
+        '/ldp/registry/by-content/<digest>',
+        methods=['GET', 'HEAD', 'OPTIONS'],
+    )
+    def registry_by_content(digest: str):
+        if request.method == 'OPTIONS':
+            resp = Response(status=204)
+            apply_resource_headers(resp)
+            return resp
+        from cats.network.cas import LocatorIndex
+
+        try:
+            doc = LocatorIndex(cats_home).get(digest)
+        except ValueError:
+            return jsonify({'error': 'invalid content_id'}), 400
+        if doc is None:
+            return jsonify({'error': 'not found', 'content_id': digest}), 404
+        resp = jsonify(doc)
+        apply_resource_headers(resp)
+        return resp

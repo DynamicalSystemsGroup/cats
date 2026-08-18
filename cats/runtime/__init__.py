@@ -141,7 +141,8 @@ class Runtime:
             structure_as_executed_cid=invoice.get('structure_as_executed_cid'),
         )
         bom = sign_execution_bom(bom, cats_home=self.CATS_HOME)
-        bom_cid = self.contentMesh.ipfsClient.add_str(json.dumps(bom))
+        # CAS-over-HTTP: mint signed BOM bytes as ni: (Kubo write not used).
+        bom_cid = self.contentMesh.put_json(bom)
         # Phase 2a control plane: local Node LDP cache + optional Solid dual-write.
         BomLdpStore(self.CATS_HOME).put(bom_cid, bom)
         bom_response = {
@@ -164,6 +165,27 @@ class Runtime:
                     exc,
                 )
         # Control-Feedback registry index (before 2b): fail closed on put error.
+        from cats.network.cas import LocatorIndex
+
+        loc_index = LocatorIndex(self.CATS_HOME)
+        for stage_id in (
+            invoice_cid,
+            order_cid,
+            invoice.get('data_cid'),
+            invoice.get('ingress_data_cid'),
+            invoice.get('integration_data_cid'),
+            invoice.get('seed_cid'),
+            invoice.get('structure_as_executed_cid'),
+            enhanced_bom.get('log_cid'),
+            bom_cid,
+        ):
+            if not stage_id:
+                continue
+            from cats.network.cas.digest import is_ni_or_digest
+
+            if is_ni_or_digest(stage_id):
+                loc_index.put_cas_node_locator(stage_id)
+
         BomRegistry(self.CATS_HOME).put(
             build_record(
                 bom,

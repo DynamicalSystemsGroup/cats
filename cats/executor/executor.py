@@ -62,15 +62,15 @@ class Executor:
         # the Invoice records what Plant / InfraStructure actually ran.
         self.enhanced_bom['function'] = json.loads(self.runtime.contentMesh.cat(self.enhanced_bom['order']['function_cid']))
         self.enhanced_bom['structure'] = json.loads(self.runtime.contentMesh.cat(self.enhanced_bom['order']['structure_cid']))
-        ipfs = self.runtime.contentMesh.ipfsClient
-        object_store_as_executed_cid = ipfs.add_json(object_store.snapshot())
-        infrastructure_as_executed_cid = ipfs.add_json(
+        mesh = self.runtime.contentMesh
+        object_store_as_executed_cid = mesh.put_json(object_store.snapshot())
+        infrastructure_as_executed_cid = mesh.put_json(
             self.structure.infraStructure.snapshot(
                 object_store_as_executed_cid=object_store_as_executed_cid,
             )
         )
-        plant_as_executed_cid = ipfs.add_json(plant_snapshot)
-        structure_as_executed_cid = ipfs.add_json({
+        plant_as_executed_cid = mesh.put_json(plant_snapshot)
+        structure_as_executed_cid = mesh.put_json({
             'plant_as_executed_cid': plant_as_executed_cid,
             'infrastructure_as_executed_cid': infrastructure_as_executed_cid,
         })
@@ -94,7 +94,7 @@ class Executor:
         self.enhanced_bom['invoice']['structure_as_executed_cid'] = (
             structure_as_executed_cid
         )
-        self.enhanced_bom['log_cid'] = ipfs.add_json(self.enhanced_bom['log'])
+        self.enhanced_bom['log_cid'] = mesh.put_json(self.enhanced_bom['log'])
 
         # Process replay dictionary (CFL §4B / #187). num_partitions is the
         # observed I/O + hotF alignment `n` this run used (Processor's
@@ -110,7 +110,7 @@ class Executor:
             'rng_seed': int(seed_hex[:8], 16) & 0x7FFFFFFF,
             'num_partitions': int(n),
         }
-        self.enhanced_bom['invoice']['seed_cid'] = ipfs.add_json(seed)
+        self.enhanced_bom['invoice']['seed_cid'] = mesh.put_json(seed)
 
         # Invoice CID: produced here (by the Executor), not by
         # Runtime.execute() - so "Invoice CIDs are produced by the
@@ -125,7 +125,7 @@ class Executor:
         # and this final Invoice's order_cid are the exact same CID for
         # every execution, not just a re-hash that happens to match it.
         self.enhanced_bom['invoice']['order_cid'] = order_request['order_cid']
-        invoice_cid = ipfs.add_str(json.dumps(self.enhanced_bom['invoice']))
+        invoice_cid = mesh.put_json(self.enhanced_bom['invoice'])
 
         del self.enhanced_bom['bom_json_cid']
         del self.enhanced_bom['init_data_cid']

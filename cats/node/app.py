@@ -9,6 +9,7 @@ import traceback
 from flask import Flask, request, jsonify
 
 from cats import CATS_HOME, RUNTIME
+from cats.network.cas import register_cas_routes
 from cats.network.ldp import register_ldp_routes
 from cats.network.registry import (
     AmbiguousBomError,
@@ -31,6 +32,8 @@ logger = logging.getLogger(__name__)
 register_ldp_routes(catNode, cats_home=CATS_HOME)
 # Before 2b: BOM registry index (BOM→Order, data_cid→BOM).
 register_registry_routes(catNode, cats_home=CATS_HOME)
+# CAS-over-HTTP: digest-keyed blob GETs (publish via ContentMesh / Runtime).
+register_cas_routes(catNode, cats_home=CATS_HOME)
 
 
 def _resolve_order_cid_from_request(body: dict) -> tuple[str | None, tuple | None]:

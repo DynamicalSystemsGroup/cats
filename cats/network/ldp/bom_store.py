@@ -5,12 +5,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-from cats.network.cid_segment import validate_cid_segment
+from cats.network.cas.digest import content_id_fs_key
 
 
 def bom_ldp_path(bom_cid: str) -> str:
     """Path under the Node base URL for a BOM LDP resource."""
-    return f'/ldp/boms/{bom_cid}'
+    key = content_id_fs_key(bom_cid, label='bom_cid')
+    return f'/ldp/boms/{key}'
 
 
 def bom_ldp_uri(bom_cid: str, *, base_url: str | None = None) -> str:
@@ -23,11 +24,14 @@ def bom_ldp_uri(bom_cid: str, *, base_url: str | None = None) -> str:
 
 
 def _validate_bom_cid(bom_cid: str) -> str:
-    return validate_cid_segment(bom_cid, label='bom_cid')
+    return content_id_fs_key(bom_cid, label='bom_cid')
 
 
 class BomLdpStore:
-    """Persist signed BOMs under ``{CATS_HOME}/.cats/ldp/boms/<bom_cid>.json``."""
+    """Persist signed BOMs under ``{CATS_HOME}/.cats/ldp/boms/<key>.json``.
+
+    ``bom_cid`` may be a legacy CID or a CAS ``ni:`` / hex digest (stored as hex).
+    """
 
     def __init__(self, cats_home: str):
         self.cats_home = cats_home
@@ -52,7 +56,7 @@ class BomLdpStore:
         return json.loads(path.read_text(encoding='utf-8'))
 
     def list(self) -> list[str]:
-        """Return bom_cid keys sorted by mtime descending (newest first)."""
+        """Return bom file stems sorted by mtime descending (newest first)."""
         entries: list[tuple[float, str]] = []
         for path in self.root.glob('*.json'):
             entries.append((path.stat().st_mtime, path.stem))

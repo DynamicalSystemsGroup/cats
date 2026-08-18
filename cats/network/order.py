@@ -135,12 +135,12 @@ class OrderOps:
                 'infrafunction_subproc_cid'
             ]
 
-        return self.ipfsClient.add_str(json.dumps({
-            'process_cid': self.ipfsClient.add_str(json.dumps(process)),
-            'infrafunction_cid': self.ipfsClient.add_str(json.dumps(infrafunction)),
+        return self.put_json({
+            'process_cid': self.put_json(process),
+            'infrafunction_cid': self.put_json(infrafunction),
             'process_source_cid': process_source_cid,
             'infrafunction_source_cid': infrafunction_source_cid,
-        }))
+        })
 
     def _resolve_structure_pairing(
             self,
@@ -205,7 +205,7 @@ class OrderOps:
     ):
         """Mint Invoice + order_request from a prior Order shell."""
         input_invoice = {'data_cid': data_cid}
-        prev_invoice_cid = self.ipfsClient.add_str(json.dumps(input_invoice))
+        prev_invoice_cid = self.put_json(input_invoice)
         order = deepcopy(order)
         order.pop('flat', None)
         order['function_cid'] = function_cid
@@ -214,7 +214,7 @@ class OrderOps:
         if structure_filepath is not None:
             order['structure_filepath'] = structure_filepath
         order['endpoint'] = _node_init_endpoint()
-        return {'order_cid': self.ipfsClient.add_str(json.dumps(order))}
+        return {'order_cid': self.put_json(order)}
 
     def linkProcess(
             self,
@@ -286,7 +286,7 @@ class OrderOps:
             infrastructure_cid=infrastructure_cid,
             require_change_request=True,
         )
-        new_structure_cid = self.ipfsClient.add_str(json.dumps(pairing))
+        new_structure_cid = self.put_json(pairing)
 
         if structure_filepath_name is not None:
             structure_name = structure_filepath_name
@@ -370,7 +370,7 @@ class OrderOps:
                 infrastructure_cid=infrastructure_cid,
                 require_change_request=True,
             )
-            structure_cid = self.ipfsClient.add_str(json.dumps(pairing))
+            structure_cid = self.put_json(pairing)
             if structure_filepath_name is not None:
                 structure_name = structure_filepath_name
             elif structure_filepath is not None:
@@ -402,7 +402,7 @@ class OrderOps:
         self.ensure_bootstrap_content_store()
         structure_name = os.path.basename(structure_filepath.rstrip('/'))
         pairing = self.cid_structure_pairing(structure_filepath)
-        structure_cid = self.ipfsClient.add_str(json.dumps(pairing))
+        structure_cid = self.put_json(pairing)
         data_cid, dir_name = self.cidDir(data_dirpath)
         # Function source packages (directory CIDs) — sibling of structure/
         # under input/function/{process,infrafunction}. Stock callables bind
@@ -451,8 +451,8 @@ class OrderOps:
             ),
         }
         function = {
-            'process_cid': self.ipfsClient.add_str(json.dumps(process)),
-            'infrafunction_cid': self.ipfsClient.add_str(json.dumps(infrafunction)),
+            'process_cid': self.put_json(process),
+            'infrafunction_cid': self.put_json(infrafunction),
             'process_source_cid': process_source_cid,
             'infrafunction_source_cid': infrafunction_source_cid,
         }
@@ -460,14 +460,14 @@ class OrderOps:
             "data_cid": data_cid
         }
         order = {
-            "function_cid": self.ipfsClient.add_str(json.dumps(function)),
+            "function_cid": self.put_json(function),
             "structure_cid": structure_cid,
-            "invoice_cid": self.ipfsClient.add_str(json.dumps(invoice)),
+            "invoice_cid": self.put_json(invoice),
             "structure_filepath": structure_name,
             "JOB_HOME": self.JOB_HOME,
             "endpoint": endpoint
         }
         order_request = {
-            'order_cid': self.ipfsClient.add_str(json.dumps(order))
+            'order_cid': self.put_json(order)
         }
         return order_request

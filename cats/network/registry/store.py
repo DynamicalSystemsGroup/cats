@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from cats.network.cid_segment import validate_cid_segment
+from cats.network.cas.digest import content_id_fs_key, is_ni_or_digest, to_ni, from_ni
 from cats.network.feedback import verify_execution_bom
 
 
@@ -24,6 +24,14 @@ class AmbiguousBomError(RegistryError):
         )
 
 
+def _normalize_content_id(value: str, *, label: str) -> str:
+    """Return canonical id (ni: for digests, CID otherwise) and validate fs key."""
+    content_id_fs_key(value, label=label)
+    if is_ni_or_digest(value):
+        return to_ni(from_ni(value))
+    return value.strip()
+
+
 def build_record(
     bom: dict[str, Any],
     bom_cid: str,
@@ -35,7 +43,7 @@ def build_record(
 
     Does not trust client-supplied index fields beyond optional locators.
     """
-    bom_cid = validate_cid_segment(bom_cid, label='bom_cid')
+    bom_cid = _normalize_content_id(bom_cid, label='bom_cid')
     try:
         verify_execution_bom(bom)
     except Exception as exc:
@@ -59,8 +67,9 @@ def build_record(
     if not data_cid:
         raise RegistryError('Invoice missing data_cid')
 
-    order_cid = validate_cid_segment(order_cid, label='order_cid')
-    data_cid = validate_cid_segment(data_cid, label='data_cid')
+    order_cid = _normalize_content_id(order_cid, label='order_cid')
+    data_cid = _normalize_content_id(data_cid, label='data_cid')
+    invoice_cid = _normalize_content_id(invoice_cid, label='invoice_cid')
 
     function_cid = None
     structure_cid = None
@@ -110,10 +119,12 @@ class BomRegistry:
             path.mkdir(parents=True, exist_ok=True)
 
     def _bom_path(self, bom_cid: str) -> Path:
-        return self.boms_dir / f'{validate_cid_segment(bom_cid, label="bom_cid")}.json'
+        key = content_id_fs_key(bom_cid, label='bom_cid')
+        return self.boms_dir / f'{key}.json'
 
     def _index_path(self, directory: Path, cid: str, *, label: str) -> Path:
-        return directory / f'{validate_cid_segment(cid, label=label)}.json'
+        key = content_id_fs_key(cid, label=label)
+        return directory / f'{key}.json'
 
     def _read_list(self, path: Path) -> list[str]:
         if not path.is_file():
@@ -136,13 +147,17 @@ class BomRegistry:
 
     def put(self, record: dict[str, Any]) -> Path:
         """Idempotent on ``bom_cid``; append reverse indexes if absent."""
-        bom_cid = validate_cid_segment(record['bom_cid'], label='bom_cid')
-        order_cid = validate_cid_segment(record['order_cid'], label='order_cid')
-        data_cid = validate_cid_segment(record['data_cid'], label='data_cid')
+        bom_cid = _normalize_content_id(record['bom_cid'], label='bom_cid')
+        order_cid = _normalize_content_id(record['order_cid'], label='order_cid')
+        data_cid = _normalize_content_id(record['data_cid'], label='data_cid')
 
         path = self._bom_path(bom_cid)
+        stored = dict(record)
+        stored['bom_cid'] = bom_cid
+        stored['order_cid'] = order_cid
+        stored['data_cid'] = data_cid
         path.write_text(
-            json.dumps(record, indent=2, sort_keys=True) + '\n',
+            json.dumps(stored, indent=2, sort_keys=True) + '\n',
             encoding='utf-8',
         )
         self._append_index(
@@ -181,7 +196,14 @@ class BomRegistry:
         for path in self.boms_dir.glob('*.json'):
             entries.append((path.stat().st_mtime, path.stem))
         entries.sort(key=lambda item: item[0], reverse=True)
-        return [cid for _mtime, cid in entries]
+        # Prefer content_id from record when present (ni: vs hex stem).
+        out: list[str] = []
+        for _mtime, stem in entries:
+            record = json.loads(
+                (self.boms_dir / f'{stem}.json').read_text(encoding='utf-8')
+            )
+            out.append(record.get('bom_cid') or stem)
+        return out
 
     def resolve_unique_bom(self, data_cid: str) -> str:
         """Return the sole bom_cid for ``data_cid`` or raise AmbiguousBomError / RegistryError."""
@@ -198,9 +220,10 @@ class BomRegistry:
 
             base_url = _node_base_url()
         base = base_url.rstrip('/')
-        contains = [
-            f'{base}/ldp/registry/boms/{cid}' for cid in self.list_boms()
-        ]
+        contains = []
+        for cid in self.list_boms():
+            key = content_id_fs_key(cid, label='bom_cid')
+            contains.append(f'{base}/ldp/registry/boms/{key}')
         return {
             '@context': {
                 'ldp': 'http://www.w3.org/ns/ldp#',
