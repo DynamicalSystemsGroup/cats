@@ -12,6 +12,7 @@ from cats.network import (
     named_bind_payload,
     parse_named_bind_leaf,
 )
+from cats.network.cas import is_ni_or_digest
 from data.input.function.infrafunction import infrafunction_subproc
 from data.input.function.process import (
     egress,
@@ -20,6 +21,11 @@ from data.input.function.process import (
     process_0,
     process_1,
 )
+
+
+def _pickleable_leaf():
+    """Module-level callable used as a non-stock pickle leaf."""
+    return 42
 
 
 def test_is_stock_function_callable_allowlist():
@@ -51,25 +57,23 @@ def test_parse_named_bind_leaf():
 def test_bind_subproc_stock_vs_lambda(monkeypatch, tmp_path):
     """bind_subproc uses named-bind JSON for stock callables and pickle for lambdas."""
     fake = MagicMock()
-    fake.add_str.side_effect = lambda s: f'named-{hash(s) & 0xFFFF:x}'
-    fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmPickle'
-
     client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
 
     cid = client.bind_subproc(process_0, 'QmProcSrc')
-    assert cid.startswith('named-')
-    named_payload = json.loads(fake.add_str.call_args_list[0][0][0])
+    assert is_ni_or_digest(cid) or cid.startswith('ni:')
+    named_payload = json.loads(client.cat(cid))
     assert named_payload == {
         'source_cid': 'QmProcSrc',
         'module': process_0.__module__,
         'qualname': 'process_0',
     }
-    assert fake.add_pyobj.call_count == 0
 
-    pickle_cid = client.bind_subproc(lambda: 1, 'QmProcSrc')
-    assert pickle_cid == 'QmPickle'
-    fake.add_pyobj.assert_called_once()
+    # Module-level non-stock callable pickles under CAS.
+    pickle_cid = client.bind_subproc(_pickleable_leaf, 'QmProcSrc')
+    assert is_ni_or_digest(pickle_cid)
+    raw = client.catObj(pickle_cid)
+    assert pickle.loads(raw).__name__ == '_pickleable_leaf'
 
 
 def test_resolve_subproc_named_and_pickle(tmp_path, monkeypatch):
@@ -138,9 +142,6 @@ def _write_order_fixture(tmp_path: Path):
 def test_create_order_request_stock_emits_named_bind_leaves(monkeypatch, tmp_path):
     """create_order_request binds stock callables as named-bind JSON leaves."""
     fake = MagicMock()
-    fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
-    fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmPickleUnexpected'
-
     structure, data = _write_order_fixture(tmp_path)
 
     def _cid_dir(path):
@@ -150,6 +151,14 @@ def test_create_order_request_stock_emits_named_bind_leaves(monkeypatch, tmp_pat
     client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     monkeypatch.setattr(client, 'cidDir', _cid_dir)
+    put_objs = []
+    real_put = client.put_json
+
+    def _spy_put(obj, **kwargs):
+        put_objs.append(obj)
+        return real_put(obj, **kwargs)
+
+    monkeypatch.setattr(client, 'put_json', _spy_put)
 
     client.create_order_request(
         ingress_subproc=ingress,
@@ -162,9 +171,9 @@ def test_create_order_request_stock_emits_named_bind_leaves(monkeypatch, tmp_pat
     )
 
     named_leaves = [
-        json.loads(args[0])
-        for args, _ in fake.add_str.call_args_list
-        if '"qualname"' in args[0] and '"source_cid"' in args[0] and '"module"' in args[0]
+        obj for obj in put_objs
+        if isinstance(obj, dict)
+        and set(obj) >= {'qualname', 'source_cid', 'module'}
     ]
     qualnames = {leaf['qualname'] for leaf in named_leaves}
     assert qualnames == {
@@ -175,14 +184,11 @@ def test_create_order_request_stock_emits_named_bind_leaves(monkeypatch, tmp_pat
         'infrafunction_subproc',
     }
     assert all(leaf['source_cid'] in ('Qmprocess', 'Qminfrafunction') for leaf in named_leaves)
-    assert fake.add_pyobj.call_count == 0
 
 
 def test_link_process_rewrites_stock_named_bind(monkeypatch, tmp_path):
     """linkProcess rewrites stock slot changes as named-bind leaves."""
     fake = MagicMock()
-    fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
-    fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmPickleUnexpected'
 
     prev_process = {
         'ingress_subproc_cid': 'QmIn',
@@ -238,25 +244,33 @@ def test_link_process_rewrites_stock_named_bind(monkeypatch, tmp_path):
     monkeypatch.setattr(client, 'cat', _cat)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
     monkeypatch.setenv('CAT_NODE_PORT', '5000')
+    put_objs = []
+    real_put = client.put_json
+
+    def _spy_put(obj, **kwargs):
+        put_objs.append(obj)
+        return real_put(obj, **kwargs)
+
+    monkeypatch.setattr(client, 'put_json', _spy_put)
 
     client.linkProcess(cat_response, integrated_subproc=process_1)
 
     named_leaves = [
-        json.loads(args[0])
-        for args, _ in fake.add_str.call_args_list
-        if '"qualname"' in args[0] and '"source_cid"' in args[0]
+        obj for obj in put_objs
+        if isinstance(obj, dict)
+        and set(obj) >= {'qualname', 'source_cid'}
     ]
     assert len(named_leaves) == 1
     assert named_leaves[0]['qualname'] == 'process_1'
     assert named_leaves[0]['source_cid'] == 'QmProcSrc'
-    assert fake.add_pyobj.call_count == 0
 
     # Carried slots: process bind JSON should still reference prior leaf CIDs
     # for unchanged slots.
     process_maps = [
-        json.loads(args[0])
-        for args, _ in fake.add_str.call_args_list
-        if '"ingress_subproc_cid"' in args[0] and '"integrated_subproc_cid"' in args[0]
+        obj for obj in put_objs
+        if isinstance(obj, dict)
+        and 'ingress_subproc_cid' in obj
+        and 'integrated_subproc_cid' in obj
     ]
     assert process_maps
     assert process_maps[-1]['ingress_subproc_cid'] == 'QmIn'

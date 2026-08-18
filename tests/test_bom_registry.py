@@ -308,17 +308,17 @@ def test_link_process_via_bom_cid(monkeypatch, tmp_path):
     BomRegistry(str(tmp_path)).put(record)
     BomLdpStore(str(tmp_path)).put('QmLinkBom', signed)
 
+    from data.input.function.process import process_0, process_1
+
     fake = MagicMock()
-    fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
-    fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmNewPy'
     client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     monkeypatch.setattr(client, 'cat', _cat)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
     monkeypatch.setenv('CAT_NODE_PORT', '5000')
 
-    order_req = client.linkProcess(bom_cid='QmLinkBom', integrated_subproc=lambda: 'new')
+    order_req = client.linkProcess(bom_cid='QmLinkBom', integrated_subproc=process_1)
     assert order_req['order_cid']
 
-    order_req2 = client.linkProcess(data_cid='QmDataOut', integrated_subproc=lambda: 'newer')
+    order_req2 = client.linkProcess(data_cid='QmDataOut', integrated_subproc=process_0)
     assert order_req2['order_cid']

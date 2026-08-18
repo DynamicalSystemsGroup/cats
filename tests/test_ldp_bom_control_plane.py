@@ -155,7 +155,7 @@ def test_runtime_execute_publishes_ldp(monkeypatch, tmp_path):
     node_did(cats_home=str(tmp_path))
 
     mesh = MagicMock()
-    mesh.ipfsClient.add_str.return_value = 'QmRuntimeBom'
+    mesh.put_json.return_value = 'QmRuntimeBom'
     mesh.cat.side_effect = lambda cid: {
         'QmInvoice': json.dumps({
             'order_cid': 'QmOrder',

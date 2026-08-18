@@ -316,7 +316,7 @@ def test_runtime_execute_dual_publish(monkeypatch, tmp_path):
     node_did(cats_home=str(tmp_path))
 
     mesh = MagicMock()
-    mesh.ipfsClient.add_str.return_value = 'QmRuntimeBom'
+    mesh.put_json.return_value = 'QmRuntimeBom'
     mesh.cat.side_effect = _mesh_cat_for_runtime_invoice
     runtime = Runtime(contentMesh=mesh, CATS_HOME=str(tmp_path))
 
@@ -359,7 +359,7 @@ def test_runtime_execute_solid_failure_raises(monkeypatch, tmp_path):
     node_did(cats_home=str(tmp_path))
 
     mesh = MagicMock()
-    mesh.ipfsClient.add_str.return_value = 'QmFail'
+    mesh.put_json.return_value = 'QmFail'
     mesh.cat.side_effect = _mesh_cat_for_runtime_invoice
     runtime = Runtime(contentMesh=mesh, CATS_HOME=str(tmp_path))
     factory = MagicMock()
@@ -393,7 +393,7 @@ def test_runtime_execute_solid_unset_identical(monkeypatch, tmp_path):
     node_did(cats_home=str(tmp_path))
 
     mesh = MagicMock()
-    mesh.ipfsClient.add_str.return_value = 'QmLocal'
+    mesh.put_json.return_value = 'QmLocal'
     mesh.cat.side_effect = _mesh_cat_for_runtime_invoice
     runtime = Runtime(contentMesh=mesh, CATS_HOME=str(tmp_path))
     factory = MagicMock()
