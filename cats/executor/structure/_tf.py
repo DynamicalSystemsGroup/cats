@@ -89,7 +89,9 @@ def ensure_provider_binaries_executable(tf_data_dir):
 
 def configure_terraform_data_dir(structure_home):
     # TF_DATA_DIR must not equal the module root; that breaks backend state loading.
-    tf_data_dir = os.path.join(structure_home, '.terraform-data')
+    # Always absolute: terraform resolves relative TF_DATA_DIR against its cwd
+    # (structure_home), while this helper may run with a different process cwd.
+    tf_data_dir = os.path.abspath(os.path.join(structure_home, '.terraform-data'))
     os.makedirs(tf_data_dir, exist_ok=True)
     os.environ['TF_DATA_DIR'] = tf_data_dir
     ensure_provider_binaries_executable(tf_data_dir)
