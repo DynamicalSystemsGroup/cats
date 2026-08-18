@@ -2,6 +2,8 @@
 import importlib.util
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PLANT_UTILS = (
@@ -26,6 +28,14 @@ def _load_plant_utils():
 
 
 plant_utils = _load_plant_utils()
+
+
+def _ok(stdout='', stderr=''):
+    return SimpleNamespace(returncode=0, stdout=stdout, stderr=stderr)
+
+
+def _fail(stderr='boom'):
+    return SimpleNamespace(returncode=1, stdout='', stderr=stderr)
 
 
 def test_plant_context_from_terraform_outputs():
@@ -112,3 +122,89 @@ def test_write_job_landing_helpers_copy_from_plant(tmp_path):
     assert compute.read_text(encoding='utf-8') == (
         plant_dir / 'ray_compute_utils.py'
     ).read_text(encoding='utf-8')
+
+
+def test_kind_control_plane_running_requires_true():
+    with patch.object(
+        plant_utils,
+        '_subproc_run',
+        return_value=_ok(stdout='true\n'),
+    ):
+        assert plant_utils._kind_control_plane_running('cats') is True
+    with patch.object(
+        plant_utils,
+        '_subproc_run',
+        return_value=_ok(stdout='false\n'),
+    ):
+        assert plant_utils._kind_control_plane_running('cats') is False
+    with patch.object(plant_utils, '_subproc_run', return_value=_fail()):
+        assert plant_utils._kind_control_plane_running('cats') is False
+
+
+def test_cleanup_stale_kind_cluster_state_heals_stopped_control_plane(tmp_path):
+    """Listed-but-stopped kind must be deleted and TF Plant state removed."""
+    calls = []
+
+    def fake_run(cmd, cwd=None):
+        calls.append(cmd)
+        if cmd == 'kind get clusters':
+            return _ok(stdout='cats\n')
+        if 'docker inspect' in cmd and 'cats-control-plane' in cmd:
+            return _ok(stdout='false\n')
+        if cmd.startswith('kind delete cluster'):
+            return _ok(stdout='Deleted cluster\n')
+        if cmd.endswith('state list'):
+            return _ok(
+                stdout=(
+                    'module.plant.kind_cluster.default\n'
+                    'module.plant.helm_release.ray-cluster\n'
+                )
+            )
+        if 'state rm' in cmd:
+            return _ok(stdout='Removed\n')
+        return _fail(f'unexpected: {cmd}')
+
+    with patch.object(plant_utils, '_subproc_run', side_effect=fake_run):
+        plant_utils.cleanup_stale_kind_cluster_state(str(tmp_path), 'terraform')
+
+    assert any(c.startswith('kind delete cluster --name cats') for c in calls)
+    assert any('state rm' in c and 'module.plant.kind_cluster.default' in c for c in calls)
+
+
+def test_cleanup_stale_kind_cluster_state_skips_usable_cluster(tmp_path):
+    """Healthy listed kind leaves Terraform state alone."""
+    calls = []
+
+    def fake_run(cmd, cwd=None):
+        calls.append(cmd)
+        if cmd == 'kind get clusters':
+            return _ok(stdout='cats\n')
+        if 'docker inspect' in cmd:
+            return _ok(stdout='true\n')
+        if cmd.endswith('state list'):
+            return _ok(stdout='module.plant.kind_cluster.default\n')
+        return _fail(f'unexpected: {cmd}')
+
+    with patch.object(plant_utils, '_subproc_run', side_effect=fake_run):
+        plant_utils.cleanup_stale_kind_cluster_state(str(tmp_path), 'terraform')
+
+    assert not any('kind delete' in c for c in calls)
+    assert not any('state rm' in c for c in calls)
+
+
+def test_cleanup_orphan_kind_cluster_ignores_stopped_listing(tmp_path):
+    """Stopped control-plane is not an orphan to keep; stale heal owns it."""
+    calls = []
+
+    def fake_run(cmd, cwd=None):
+        calls.append(cmd)
+        if cmd == 'kind get clusters':
+            return _ok(stdout='cats\n')
+        if 'docker inspect' in cmd:
+            return _ok(stdout='false\n')
+        return _fail(f'unexpected: {cmd}')
+
+    with patch.object(plant_utils, '_subproc_run', side_effect=fake_run):
+        plant_utils.cleanup_orphan_kind_cluster(str(tmp_path), 'terraform')
+
+    assert not any('kind delete' in c for c in calls)

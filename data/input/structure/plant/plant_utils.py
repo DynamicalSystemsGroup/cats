@@ -225,6 +225,41 @@ def _kind_cluster_names() -> set:
     return {line.strip() for line in proc.stdout.splitlines() if line.strip()}
 
 
+def _kind_control_plane_running(cluster_name: str) -> bool:
+    """True when the kind control-plane container exists and is running.
+
+    ``kind get clusters`` still lists a name after Docker stops/kills the
+    control-plane (e.g. Exited 137). Terraform refresh then fails on
+    ``docker exec … cat /etc/kubernetes/admin.conf``.
+    """
+    container = f'{cluster_name}-control-plane'
+    proc = _subproc_run(
+        f'docker inspect -f "{{{{.State.Running}}}}" {container}'
+    )
+    if proc.returncode != 0:
+        return False
+    return proc.stdout.strip().lower() == 'true'
+
+
+def _kind_cluster_usable(cluster_name: str) -> bool:
+    """True when kind lists the cluster and its control-plane is running."""
+    return (
+        cluster_name in _kind_cluster_names()
+        and _kind_control_plane_running(cluster_name)
+    )
+
+
+def _delete_kind_cluster(cluster_name: str) -> None:
+    proc = _subproc_run(f'kind delete cluster --name {cluster_name}')
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f'Failed to delete kind cluster "{cluster_name}": '
+            f'{proc.stderr.strip()}'
+        )
+    if proc.stdout.strip():
+        print(proc.stdout.strip())
+
+
 def _terraform_state_resources(terraform_bin: str, structure_home: str) -> set:
     proc = _subproc_run(f'{terraform_bin} state list', cwd=structure_home)
     if proc.returncode != 0:
@@ -242,8 +277,7 @@ def cleanup_orphan_kind_cluster(
     if configure_tf_data_dir is not None:
         configure_tf_data_dir(structure_home)
 
-    clusters = _kind_cluster_names()
-    if _KIND_CLUSTER_NAME not in clusters:
+    if not _kind_cluster_usable(_KIND_CLUSTER_NAME):
         return
 
     state = _terraform_state_resources(terraform_bin, structure_home)
@@ -254,14 +288,7 @@ def cleanup_orphan_kind_cluster(
         f'Removing orphan kind cluster "{_KIND_CLUSTER_NAME}" '
         f'({_KIND_CLUSTER_RESOURCE} is not in Terraform state)'
     )
-    proc = _subproc_run(f'kind delete cluster --name {_KIND_CLUSTER_NAME}')
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f'Failed to delete orphan kind cluster "{_KIND_CLUSTER_NAME}": '
-            f'{proc.stderr.strip()}'
-        )
-    if proc.stdout.strip():
-        print(proc.stdout.strip())
+    _delete_kind_cluster(_KIND_CLUSTER_NAME)
 
 
 def cleanup_stale_kind_cluster_state(
@@ -271,7 +298,8 @@ def cleanup_stale_kind_cluster_state(
     configure_tf_data_dir=None,
 ):
     """Remove state for the kind cluster and Plant dependents when the host
-    has no kind cluster (e.g. Docker Desktop wiped containers under Terraform).
+    has no usable kind cluster (missing, or control-plane stopped under
+    Terraform — e.g. Docker Desktop OOM-killed the node).
 
     Left alone, the next apply fails during refresh before it can recreate
     the Plant."""
@@ -280,8 +308,18 @@ def cleanup_stale_kind_cluster_state(
 
     state = _terraform_state_resources(terraform_bin, structure_home)
     clusters = _kind_cluster_names()
-    if _KIND_CLUSTER_NAME in clusters:
+    listed = _KIND_CLUSTER_NAME in clusters
+    usable = listed and _kind_control_plane_running(_KIND_CLUSTER_NAME)
+    if usable:
         return
+
+    if listed and not usable:
+        print(
+            f'Kind cluster "{_KIND_CLUSTER_NAME}" is listed but its '
+            f'control-plane is not running; deleting it before clearing '
+            f'stale Terraform Plant state'
+        )
+        _delete_kind_cluster(_KIND_CLUSTER_NAME)
 
     stale_resources = [
         resource
@@ -291,9 +329,14 @@ def cleanup_stale_kind_cluster_state(
     if not stale_resources:
         return
 
+    reason = (
+        f'Kind cluster "{_KIND_CLUSTER_NAME}" is not usable on the host'
+        if listed
+        else f'No kind cluster named "{_KIND_CLUSTER_NAME}" on the host'
+    )
     print(
-        f'No kind cluster named "{_KIND_CLUSTER_NAME}" on the host; removing '
-        f'stale Terraform Plant state for: {", ".join(stale_resources)}'
+        f'{reason}; removing stale Terraform Plant state for: '
+        f'{", ".join(stale_resources)}'
     )
     proc = _subproc_run(
         f'{terraform_bin} state rm {" ".join(stale_resources)}',
