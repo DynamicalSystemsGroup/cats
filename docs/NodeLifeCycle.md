@@ -78,7 +78,11 @@ make node-start
   (local cache; Solid dual-write is separate — see [`SOLID.md`](SOLID.md)):
   - `GET /ldp/boms/` — Basic Container listing published BOM URIs
   - `GET /ldp/boms/<bom_cid>` — signed ExecutionBom JSON-LD (publish via `Runtime.execute` only; HTTP PUT → 405)
-
+  - `GET /ldp/registry/` — BOM registry container (Node-local index)
+  - `GET /ldp/registry/boms/<bom_cid>` — registry record JSON; PUT → 405
+  - `GET /ldp/registry/by-data/<data_cid>` — `{data_cid, bom_cids: [...]}`
+  - `GET /ldp/registry/by-order/<order_cid>` — `{order_cid, bom_cids: [...]}`
+  - `POST /cat/node/init` — body may use `order_cid` (bootstrap), or `bom_cid` / unique `data_cid` via the registry (ambiguous `data_cid` → 409)
 ### Status
 
 ```bash

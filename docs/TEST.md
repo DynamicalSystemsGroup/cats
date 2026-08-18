@@ -76,6 +76,9 @@
   # ContentMesh.linkStructure — Structure lineage twin of linkProcess
   uv run pytest -s tests/test_link_structure.py
 
+  # BOM registry (before 2b) — Node-local data_cid→BOM / init / link*
+  uv run pytest -s tests/test_bom_registry.py
+
   # ContentMesh Kubo RPC + CAT_NODE_* endpoints (no ipfs CLI)
   uv run pytest -s tests/test_meshclient_rpc_surface.py
 

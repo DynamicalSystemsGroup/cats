@@ -109,7 +109,9 @@ adapter modules).
 5. Docs: which Plants are supported; BOM snapshot fields may differ per Plant.
 6. **Structure lineage tooling:** `linkProcess()` mutates Function; **`linkStructure()`** mutates
    apply-complete `structure_cid`; **`linkOrder()`** mutates Function and/or Structure in one
-   lineage step (single Invoice `data_cid` chain). A-la-carte helpers remain
+   lineage step (single Invoice `data_cid` chain). Each accepts `cat_response` **or**
+   `bom_cid=` / `data_cid=` via the Node-local BOM registry
+   ([`ControlFeedbackLoop.md`](./ControlFeedbackLoop.md)). A-la-carte helpers remain
    (see [`LineageOfProvenance.md`](./LineageOfProvenance.md)). Available as Order ops for proving
    2f; second Plant adapters still required for a full interop prove.
 7. **Executor / Factory adapter-blind CI:** Function modules are grep-guarded against Ray /

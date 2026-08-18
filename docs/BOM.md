@@ -112,7 +112,17 @@ Concretely, `InfraFunction` (`infrafunction_subproc`) dispatches `integrated_sub
 
 Neither as-executed CID is re-consumed downstream to drive further behavior — their purpose is the permanent content-addressed record. `flatten_bom()` expands `invoice.structure_as_executed_cid` into `flat_bom['structure_as_executed']`, `flat_bom['plant']`, `flat_bom['infrastructure_as_executed']`, and `flat_bom['object_store_as_executed']` for inspection.
 
-Lineage helpers (all chain Invoice `data_cid` from a prior BOM response): `linkProcess()` rebuilds `function_cid` and carries `structure_cid`; `linkStructure()` rebuilds apply-complete `structure_cid` and carries `function_cid`; `linkOrder()` mutates Function and/or Structure in one lineage step (single Invoice chain).
+Lineage helpers (all chain Invoice `data_cid` from a prior BOM): `linkProcess()` rebuilds `function_cid` and carries `structure_cid`; `linkStructure()` rebuilds apply-complete `structure_cid` and carries `function_cid`; `linkOrder()` mutates Function and/or Structure in one lineage step (single Invoice chain). Each accepts a prior HTTP `cat_response` **or** `bom_cid=` / `data_cid=` resolved through the Node-local `BomRegistry` (indexed on `Runtime.execute`; see [`ControlFeedbackLoop.md`](ControlFeedbackLoop.md)).
+
+### Node-local BOM registry
+
+`BomRegistry` (`cats/network/registry/`) is an append-only **query index** of verified ExecutionBoms — not the envelope store (`BomLdpStore` / Solid) and not LDN. Records live under `{CATS_HOME}/.cats/registry/` (`boms/<bom_cid>.json`, reverse lists `by-data/` and `by-order/`). `Runtime.execute` writes after LDP/Solid locators are known (fail closed). Query routes:
+
+- `GET /ldp/registry/boms/<bom_cid>` — registry record JSON; PUT → 405
+- `GET /ldp/registry/by-data/<data_cid>` — `{data_cid, bom_cids: [...]}` (newest first; ambiguous intake → 409)
+- `GET /ldp/registry/by-order/<order_cid>` — `{order_cid, bom_cids: [...]}`
+
+`POST /cat/node/init` accepts `order_cid` (bootstrap), or `bom_cid` / unique `data_cid` via the index. Remaining gaps: mesh federation, `content_id`→locators (CAS-over-HTTP), Solid dual-write of registry records.
 
 ### Invoice stage CIDs + Seed
 
