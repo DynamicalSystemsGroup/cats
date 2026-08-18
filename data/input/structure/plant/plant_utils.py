@@ -79,7 +79,7 @@ class PlantContext:
 class RayPlantPort:
     """PlantPort adapter: Ray Job Submission against KubeRay dashboard URL."""
 
-    def __init__(self, job_endpoint: str, *, connect_timeout: int = 60, poll_interval: float = 1):
+    def __init__(self, job_endpoint: str, *, connect_timeout: int = 180, poll_interval: float = 1):
         if not job_endpoint:
             raise RuntimeError('RayPlantPort requires a non-empty job_endpoint')
         self.job_endpoint = job_endpoint
@@ -91,12 +91,17 @@ class RayPlantPort:
         from ray.job_submission import JobSubmissionClient
 
         deadline = time.time() + self.connect_timeout
+        last_exc: Exception | None = None
         while True:
             try:
                 return JobSubmissionClient(self.job_endpoint)
-            except Exception:
+            except Exception as exc:
+                last_exc = exc
                 if time.time() >= deadline:
-                    raise
+                    raise RuntimeError(
+                        f'Failed to connect to Ray at address: {self.job_endpoint} '
+                        f'after {self.connect_timeout}s'
+                    ) from last_exc
                 time.sleep(self.poll_interval)
 
     @property
