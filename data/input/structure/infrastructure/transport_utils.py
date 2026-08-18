@@ -3,7 +3,8 @@
 Ships inside `infrastructure/` so it is part of `infrastructure_cid`
 (directory model). Owns the T&D facet: peer container identity, swarm peering,
 CID migrate (get→re-add), and Plant-facing staging. Structure lifetime — torn
-down with Compose peers; distinct from the long-lived ContentStore (host Kubo).
+down with Compose peers; distinct from the long-lived ContentStore (host Kubo)
+and from Node CAS-over-HTTP digests (``ni:``).
 
 Process [Composed Function] transport callables are clients of Function-owned
 ``TransportPort`` (migrate / stage_for_plant only). The Executor narrows this
@@ -12,14 +13,21 @@ Peering mutate is Structure-owned Option B: TF
 `shell_script.ipfs_transport_peering` calls `ensure_peered` every apply;
 `InfraStructure.apply` only `assert_ready`. Process must not heal peers.
 
+**CAS ``ni:`` / hex digests:** migrate and stage_for_plant materialize via
+Node ``CasHttpStore`` (no Bitswap / ``ipfs get``). Legacy CIDs still use
+Docker Kubo get→re-add.
+
 See docs/STORAGE.md and docs/IPFS.md.
 """
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import shlex
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 
@@ -41,6 +49,69 @@ def _run(cmd, **kwargs):
     kwargs.setdefault('capture_output', True)
     kwargs.setdefault('text', True)
     return subprocess.run(cmd, **kwargs)
+
+
+def _is_cas_content_id(content_id: str) -> bool:
+    """True for RFC 6920 ``ni:`` or lowercase hex sha256 digests."""
+    if not isinstance(content_id, str) or not content_id:
+        return False
+    if content_id.startswith('ni:'):
+        return True
+    if len(content_id) == 64 and all(
+        c in '0123456789abcdef' for c in content_id.lower()
+    ):
+        return True
+    return False
+
+
+def _resolve_cats_home(structure_home: str) -> str:
+    env = os.environ.get('CATS_HOME')
+    if env:
+        return os.path.abspath(env)
+    # INPUT_STRUCTURE_HOME = {CATS_HOME}/data/input/structure
+    return os.path.abspath(os.path.join(structure_home, '..', '..', '..'))
+
+
+def _cas_materialize(content_id: str, dest_dir: str, *, cats_home: str) -> str:
+    """Expand a CAS directory manifest (or write a single blob) under dest_dir."""
+    from cats.network.cas import (
+        CasHttpStore,
+        is_directory_manifest,
+        materialize_tree,
+    )
+
+    store = CasHttpStore(cats_home)
+
+    def fetch(cid: str) -> bytes:
+        data = store.get(cid)
+        if data is None:
+            raise FileNotFoundError(f'CAS content not found: {cid}')
+        return data
+
+    raw = fetch(content_id)
+    try:
+        obj = json.loads(raw.decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        obj = None
+    if is_directory_manifest(obj):
+        return materialize_tree(fetch, content_id, dest_dir)
+    os.makedirs(dest_dir, exist_ok=True)
+    # Single-file blob: write as opaque payload.bin (rare for Process data dirs).
+    out = os.path.join(dest_dir, 'payload.bin')
+    with open(out, 'wb') as handle:
+        handle.write(raw)
+    return dest_dir
+
+
+def _cas_put_tree(directory: str, *, cats_home: str) -> str:
+    from cats.network.cas import CasHttpStore, LocatorIndex, put_tree
+
+    store = CasHttpStore(cats_home)
+    content_id = put_tree(store, directory)
+    LocatorIndex(cats_home).put_cas_node_locator(
+        content_id, media_type='application/json'
+    )
+    return content_id
 
 
 def _container_running(container):
@@ -79,14 +150,16 @@ def _swarm_connect(container, multiaddr):
 
 
 def _docker_ipfs_migrate_cmd(container, input_dir_cid, output_dir):
-    return (
-        f"docker exec {container} sh -c '"
-        f'ipfs get {input_dir_cid} -o {output_dir} && '
-        f'cd {output_dir} && '
-        f"rm -f api config datastore_spec gateway repo.lock version && "
-        f"ipfs add -r ."
-        f"'"
+    # Quote CID — unquoted ``ni:///sha-256;…`` is split by shell on ``;``.
+    cid_q = shlex.quote(input_dir_cid)
+    out_q = shlex.quote(output_dir)
+    inner = (
+        f'ipfs get {cid_q} -o {out_q} && '
+        f'cd {out_q} && '
+        f'rm -f api config datastore_spec gateway repo.lock version && '
+        f'ipfs add -r .'
     )
+    return f'docker exec {container} sh -c {shlex.quote(inner)}'
 
 
 @dataclass(frozen=True)
@@ -169,10 +242,23 @@ class TransportContext:
             )
 
     def migrate(self, input_dir_cid):
-        """Docker IPFS get→re-add on the migration peer.
+        """Fetch content id → remint for the next Process stage.
+
+        * ``ni:`` / hex — CAS materialize + ``put_tree`` (no Docker Bitswap).
+        * Legacy CID — Docker IPFS get→re-add on the migration peer.
 
         Returns (cid, data_dir_name). Raises RuntimeError on failure.
         """
+        if _is_cas_content_id(input_dir_cid):
+            cats_home = _resolve_cats_home(self.structure_home)
+            unix_ts = int(time.time())
+            data_name = f'data_{unix_ts}'
+            with tempfile.TemporaryDirectory(prefix='cats-cas-migrate-') as tmp:
+                dest = os.path.join(tmp, data_name)
+                _cas_materialize(input_dir_cid, dest, cats_home=cats_home)
+                content_id = _cas_put_tree(dest, cats_home=cats_home)
+            return content_id, data_name
+
         self.assert_ready()
         unix_ts = int(time.time())
         output_dir = f'/outputs/data_{unix_ts}'
@@ -203,25 +289,43 @@ class TransportContext:
         raise RuntimeError('CID not found in the output.')
 
     def stage_for_plant(self, input_dir_cid, *, cwd, data_cache=None):
-        """Stage ingress CID onto the Plant-facing integration cache mount.
+        """Stage ingress content onto the Plant-facing integration cache mount.
 
         `cwd` is INTEGRATION_INPUT_CACHE; the Docker volume bind is
         INTEGRATION_INPUT_DATA_CACHE → /outputs. Returns host path for Ray.
+
+        CAS ``ni:`` / hex digests materialize on the host path directly (no
+        ``ipfs get`` in the integration peer).
         """
-        self.assert_ready()
         if data_cache is None:
             data_cache = os.path.join(cwd, 'outputs')
         unix_ts = int(time.time())
         stage_name = f'staged_{unix_ts}'
-        container_out = f'/outputs/{stage_name}'
         host_path = os.path.join(data_cache, stage_name)
         print('Integration Cache:')
+
+        if _is_cas_content_id(input_dir_cid):
+            cats_home = _resolve_cats_home(self.structure_home)
+            _cas_materialize(input_dir_cid, host_path, cats_home=cats_home)
+            if not os.path.isdir(host_path):
+                raise RuntimeError(
+                    f'CAS staging failed; host path missing: {host_path}'
+                )
+            return host_path
+
+        self.assert_ready()
+        container_out = f'/outputs/{stage_name}'
+        cid_q = shlex.quote(input_dir_cid)
+        out_q = shlex.quote(container_out)
+        inner = (
+            f'ipfs get {cid_q} -o {out_q} && '
+            f'cd {out_q} && '
+            f'rm -f api config datastore_spec gateway repo.lock version && '
+            f'chmod -R 777 .'
+        )
         exec_cmd = (
             f'docker exec {self.integration_container} '
-            f"sh -c 'ipfs get {input_dir_cid} -o {container_out} && "
-            f'cd {container_out} && '
-            f'rm -f api config datastore_spec gateway repo.lock version && '
-            f"chmod -R 777 .'"
+            f'sh -c {shlex.quote(inner)}'
         )
         print(exec_cmd)
         try:
