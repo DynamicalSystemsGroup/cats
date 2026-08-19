@@ -82,3 +82,20 @@ class LocatorIndex:
         if doc is None:
             return []
         return [str(loc['uri']) for loc in doc.get('locators') or [] if loc.get('uri')]
+
+    def find_content_id_for_uri(self, uri: str) -> str | None:
+        """Reverse-lookup ``content_id`` for an exact locator ``uri`` (Node-local scan)."""
+        target = (uri or '').strip()
+        if not target:
+            return None
+        for path in self.root.glob('*.json'):
+            try:
+                doc = json.loads(path.read_text(encoding='utf-8'))
+            except (OSError, json.JSONDecodeError):
+                continue
+            for loc in doc.get('locators') or []:
+                if loc.get('uri') == target:
+                    content_id = doc.get('content_id')
+                    if isinstance(content_id, str) and content_id.strip():
+                        return self._canonical_id(content_id)
+        return None
