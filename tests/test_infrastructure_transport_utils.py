@@ -40,11 +40,11 @@ class _FakeCompleted:
 
 
 class _FakeTransport:
-    def migrate(self, input_dir_cid):
-        return (f'cid-for-{input_dir_cid}', 'data_1')
+    def migrate(self, input_dir_id):
+        return (f'cid-for-{input_dir_id}', 'data_1')
 
-    def stage_for_plant(self, input_dir_cid, *, cwd, data_cache=None):
-        return f'{cwd}/staged/{input_dir_cid}'
+    def stage_for_plant(self, input_dir_id, *, cwd, data_cache=None):
+        return f'{cwd}/staged/{input_dir_id}'
 
 
 def test_assert_ready_fails_when_containers_missing(monkeypatch):
