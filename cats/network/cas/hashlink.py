@@ -1,4 +1,4 @@
-"""Optional ``hl:`` emit for handoff / LDN (Phase 2b slice 6; not required to verify)."""
+"""``hl:`` hashlink emit + parse (RFC/draft-shaped; §6f resolve + handoff)."""
 from __future__ import annotations
 
 import base64
@@ -6,10 +6,17 @@ import re
 
 from cats.network.cas.digest import from_ni, is_ni_or_digest, to_ni
 
-# Minimal hashlink: hl:<base64url-sha256>:<url> (draft-shaped; emit-only).
+# Minimal hashlink: hl:<base64url-sha256>:<url> (draft-shaped).
 _HL_SHA256 = re.compile(
     r'^hl:([A-Za-z0-9_-]+)(?::(.+))?$'
 )
+
+
+def is_hl(value: str) -> bool:
+    """True when ``value`` looks like an ``hl:`` hashlink."""
+    if not isinstance(value, str):
+        return False
+    return value.strip().lower().startswith('hl:')
 
 
 def to_hl(content_id: str, *uris: str) -> str:
