@@ -7,7 +7,7 @@
 ##### 1. IPFS content store + Node lifecycle: see [`NodeLifeCycle.md`](./NodeLifeCycle.md) (host Kubo detail: [`IPFS.md`](./IPFS.md))
 
 Host Kubo is InfraStructure’s long-lived **content-store facet**. **Before** `make node-start`, ensure
-the ContentStore API is up (Node start **asserts** only — it does not heal). See [`NodeLifeCycle.md`](./NodeLifeCycle.md).
+the ContentStore API is up when legacy CID / T&D need Kubo (Node start **soft-probes** — it does not heal or hard-require Kubo for CAS-only §6r). See [`NodeLifeCycle.md`](./NodeLifeCycle.md).
 
 ##### 2. [Create the environment](./docs/ENV.md) and install dependencies *in Terminal C*:
 

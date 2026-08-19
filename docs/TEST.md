@@ -23,17 +23,24 @@
   [`tests/test_infrastructure_transport_utils.py`](../tests/test_infrastructure_transport_utils.py) /
   [`tests/test_infrastructure_obj_store_utils.py`](../tests/test_infrastructure_obj_store_utils.py) /
   [`tests/test_ray_io_partitions.py`](../tests/test_ray_io_partitions.py).
+  §6p CAS-native opaque `part-*` partition I/O (no Kubo CAR mint):
+  [`tests/test_ray_io_partitions.py`](../tests/test_ray_io_partitions.py).
+  §6q legacy CID transport gate (historical; remint retired in §6s):
+  [`tests/test_infrastructure_transport_utils.py`](../tests/test_infrastructure_transport_utils.py).
+  §6s retire legacy CID read + Docker T&D (fail closed; CAS-only transport):
+  [`tests/test_infrastructure_transport_utils.py`](../tests/test_infrastructure_transport_utils.py) /
+  [`tests/test_address_store_cas_only.py`](../tests/test_address_store_cas_only.py) /
+  [`tests/test_content_store_ensure_binding.py`](../tests/test_content_store_ensure_binding.py).
   §6k dual-mode `cat(content_id=)` / drop `cidDir` aliases:
   [`tests/test_cas_http.py`](../tests/test_cas_http.py) /
-  [`tests/test_address_store_gateway.py`](../tests/test_address_store_gateway.py) /
   [`tests/test_meshclient_rpc_surface.py`](../tests/test_meshclient_rpc_surface.py) /
   [`tests/test_function_source_id.py`](../tests/test_function_source_id.py).
   For mesh-reachable LDP hints in `hl:`, set `CAT_NODE_HOST` to an address peers can open
   (loopback only warns).
 
 1. **[Install CATs](https://github.com/DynamicalSystemsGroup/cats/tree/cats2?tab=readme-ov-file#get-started)** (`uv sync --extra ops --group dev` for mesh demos and tests; `dev` provides `pytest`)
-  - **Root Dependency**: see [`NodeLifeCycle.md`](./NodeLifeCycle.md) — run `make content-store-ensure` before
-  `make node-start` (start asserts only). Host Kubo detail: [`IPFS.md`](./IPFS.md).
+  - **Root Dependency**: see [`NodeLifeCycle.md`](./NodeLifeCycle.md) — `make node-start` soft-probes
+  ContentStore (Kubo optional §6r/§6s). Host Kubo detail: [`IPFS.md`](./IPFS.md).
 2. **Session 1**
   a. *[Create the environment](./ENV.md)*
   ```bash
@@ -41,9 +48,9 @@
   uv sync --extra ops --group dev
   ```
     - `uv run` (below) uses this `.venv` automatically — no manual activation needed.
-  b. **Ensure ContentStore, then start CAT Node** — follow [`NodeLifeCycle.md`](./NodeLifeCycle.md).
+  b. **Start CAT Node** — follow [`NodeLifeCycle.md`](./NodeLifeCycle.md).
   ```bash
-  make content-store-ensure
+  make content-store-ensure   # optional operator tooling
   make node-start
   ```
 3. **Session 2:**

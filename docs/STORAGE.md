@@ -15,67 +15,37 @@ contract; object-store config is **not** a Runtime field — see [`MinIO.md`](./
 
 | Facet | What | Lifetime |
 |-------|------|----------|
-| **Content store** | Host Kubo (**legacy CID** reader / mid-migration ensure) + Node **CAS-over-HTTP** (`CasHttpStore` under `.cats/ldp/cas/`) for **new** digests | Long-lived; Kubo repo file still SoT for legacy; Node start asserts Kubo readiness for legacy/T&D; **new** mesh writes do not require Kubo add |
-| **T&D** | Docker Kubo transport peers (`TransportContext`) + MinIO **scratch** (`cats-scratch`) | Structure lifetime (ILM 7d + destroy `down -v`) |
+| **Content store** | Node **CAS-over-HTTP** (`CasHttpStore` under `.cats/ldp/cas/`) — address of record for live Orders; optional host Kubo for operator tooling only (§6s) | Long-lived CAS; Kubo optional |
+| **T&D** | MinIO **scratch** (`cats-scratch`) for Plant parallel writes (Docker Kubo peers retired §6s) | Structure lifetime (ILM 7d + destroy `down -v`) |
 | **Durable Entity Relationship** | Second MinIO (`cats-durable`) via same `ObjectStore` façade | Node lifetime; no ILM; Structure destroy leaves volume; GC via `gc-er` only |
 
-### One daemon, two traffic classes
+### ContentMesh + Process transport
 
-A **single** host Kubo (default `127.0.0.1:5001`, one `IPFS_PATH`) carries two traffic classes — not two Quantum components and not two daemons:
+**ContentMesh** (`cats.network.content_mesh`) owns content-store mesh I/O and Order compose/submit. Writes (`put_bytes` / `put_json` / `put_tree` / `put_dir` / `put_file`) require **`CATS_HOME`** and go to **CAS-over-HTTP** (`CasHttpStore` + `LocatorIndex`) → `ni:` (§6r). Reads resolve `ni:` / hex / `hl:` / `http(s)` via AddressStore (sha256 verify; fail closed). **Legacy CIDs fail closed** (§6s).
 
-| Traffic class | Role | Lifetime |
-|---------------|------|----------|
-| **Content-store** | Mesh / Control-Feedback content ids (Order, Invoice, BOM, Function/Structure-as-Code) via ContentMesh — **`ni:`** on CAS for new mints; legacy **CID** via Kubo | Long-lived; outlives Structure destroy and `node stop` |
-| **Bitswap peer of T&D** | Host is peered to Structure Docker Kubo peers so migrate/stage can resolve host-added CIDs | Peering is Structure-lifetime; the host daemon itself is not |
-
-**ContentMesh** (`cats.network.content_mesh`) owns content-store mesh I/O and Order compose/submit. **New writes** (`put_bytes` / `put_json` / `put_tree` / `put_dir` when `CATS_HOME` is set) go to **CAS-over-HTTP** (`CasHttpStore` + `LocatorIndex`) and return `ni:` — no Kubo add. Phase 2b dual-field: companion `*_uri` (Node `/ldp/cas/`, `/ldp/invoices/`, `/ldp/orders/`) is the **fetch address of record**; `*_cid` (`ni:`) remains the **equality / lineage** key. **Legacy CID reads** go through **`AddressStore`**. **`ni:` / hex / `hl:` / `http(s)`** reads resolve via `cat(content_id=)` / `get(content_id=)` → locators / local LDP → sha256 verify when digest known (fail closed).
 JSON-LD + PROV-O BOM packaging (`build_execution_bom`) with Data Integrity signing (`sign_execution_bom`, `eddsa-jcs-2022`) and Node `node_did` key material live under `cats.network.feedback` / `identity` (Phase 1b — not Plant).
-The Phase 2a **control plane** (Node LDP cache + optional Solid pod dual-write / LDN) publishes signed envelopes at HTTP URIs; the **data plane** for new runs is CAS (`ni:` + `/ldp/cas/`) — see [`SOLID.md`](SOLID.md), [`BOM.md`](BOM.md), and [`W3C.md`](W3C.md). The Node-local **BOM registry** is a query index of those envelopes (plus `by-content` locators) — [`BomRegistry.md`](BomRegistry.md).
-Plant CoD transport (IPFS↔MinIO job orchestration) is separate —
-`cats.network.plant_transport.CoDTransport` (forthcoming; not ContentMesh).
+The Phase 2a **control plane** (Node LDP cache + optional Solid pod dual-write / LDN) publishes signed envelopes at HTTP URIs; the **data plane** is CAS (`ni:` + `/ldp/cas/`) — see [`SOLID.md`](SOLID.md), [`BOM.md`](BOM.md), and [`W3C.md`](W3C.md). The Node-local **BOM registry** is a query index of those envelopes (plus `by-content` locators) — [`BomRegistry.md`](BomRegistry.md).
 
-That soft plane is intentional (Big Data–friendly Bitswap without a second swarm). Structure destroy and Node stop tear down T&D peers / Flask only — they **never** shut down host Kubo. A hard split into two Kubo swarms (isolation / firewall) is optional and out of scope unless isolation demand is concrete; see [`IPFS.md`](./IPFS.md).
-
-Content-store is **two-phase** across **two on-disk copies** of the same helper (see [`IPFS.md`](./IPFS.md)):
-
-- **Bootstrap (repo default):** `{CATS_HOME}/data/input/structure/.../content_store_utils.py` — Node `start` asserts `is_ready`; ContentMesh soft-warns if not ready (no auto-ensure); operator heal via `make content-store-ensure` / `node ensure`.
-- **Order-submitted:** `{INPUT_STRUCTURE_HOME}/.../content_store_utils.py` — TF `shell_script.host_ipfs_daemon` ensure on **create**; `InfraStructure.apply` asserts and soft-heals once if needed.
-
-**Republish lag:** repo edits do not affect live Orders until Structure is re-CID’d. Keep `ContentStore.ensure` thin (probe + heal + start). Node never owns shutdown.
+Optional Kubo: Node `start` / Structure `apply` soft-probe ContentStore; operator heal via `make content-store-ensure` / `node ensure` ([`IPFS.md`](./IPFS.md)).
 
 ### node-up vs content-store-ensure and node-start
 
 Get Started uses [`make node-up`](../Makefile) as a **convenience wrapper** that runs
 `content-store-ensure` then `node-start`. That does **not** mean the Node owns Kubo lifecycle —
-the wrapper is Make-only; `python -m cats.node start` remains assert-only.
+the wrapper is Make-only; `python -m cats.node start` soft-probes and does not hard-require Kubo (§6r/§6s).
 
 | Target / CLI | Role |
 |--------------|------|
-| `make content-store-ensure` / `uv run python -m cats.node ensure` | Operator **mutate**: repo-tree `ContentStore.ensure` (heal/start host Kubo) |
-| `make node-start` / `uv run python -m cats.node start` | Client **assert**: bind Flask only if ContentStore API is already ready; does **not** heal Kubo |
+| `make content-store-ensure` / `uv run python -m cats.node ensure` | Optional operator **mutate**: repo-tree `ContentStore.ensure` |
+| `make node-start` / `uv run python -m cats.node start` | Soft probe + bind Flask; Kubo not required |
 | `make node-up` | Convenience: ensure, then start |
 
-**Why keep them separate under the hood**
+`TransportContext` owns CAS `migrate` / `stage_for_plant` only (§6s — no Docker peers).
+Process transport callables depend on Function-owned **`TransportPort`**; the Executor passes
+`as_transport_port(transport_context())`.
 
-- **AQ ownership:** InfraStructure / the operator heal the content-store facet; the Node client only asserts readiness before binding Flask. Putting ensure inside `node start` would blur that boundary.
-- **Two trees:** Bootstrap heal uses the **repo** `content_store_utils.py`. Order-submitted ensure is TF `shell_script.host_ipfs_daemon` on **create** (Order tree); `InfraStructure.apply` asserts and soft-heals once if the API is down.
-- **Ops flexibility:** Use the split targets when Kubo is already up (skip ensure), or when debugging ensure vs Flask bind independently. Use `node-up` for the common “bring the node online” path.
-
-**Republish lag** still applies: repo ensure heals the host daemon against repo-tree code; live Orders only see Order-tree changes after Structure is re-CID’d.
-
-`TransportContext` owns peer identity, `ensure_peered`, migrate, and stage-for-plant.
-Process transport callables depend on Function-owned **`TransportPort`**
-(`migrate` / `stage_for_plant` only); the Executor passes
-`as_transport_port(transport_context())` so Process never sees peering/assert APIs.
-
-**Dual-path content ids:** when the stage id is `ni:` / hex, `migrate` and `stage_for_plant`
-materialize via **CAS** (`materialize_tree` / `put_tree`) — no Docker Bitswap and no
-unquoted `ipfs get ni:///…;…` shell split. Legacy CIDs still use Docker peer
-`ipfs get`→re-add (quoted). Peering **mutate** is TF `ipfs_transport_peering` every
-reconcile; Executor `apply` only **asserts** containers ready — not Process heal.
-Host Kubo TF ensure is **create-once** (`host_ipfs_daemon`); `InfraStructure.apply`
-soft-heals ContentStore once if the API is down after terraform (no `triggers.always`
-on the host daemon — that killed live Kubo).
+**CAS-only content ids:** `migrate` and `stage_for_plant` accept `ni:` / hex / HTTP only.
+Legacy CIDs fail closed (§6s).
 
 Process hotFs depend on Function-owned **`ComputePort`** (`run_transfer`); the Plant-owned
 Ray job entrypoint (staged by **`RayPlantPort.submit_job`**) wires **`RayComputePort`**

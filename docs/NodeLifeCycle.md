@@ -6,9 +6,10 @@ CLI: `uv run python -m cats.node {start|stop|status|ensure}` (default: `start`).
 Make targets wrap the same commands.
 
 **Ownership rule:** Node is a client of InfraStructure’s long-lived **content-store facet**.
-Host Kubo is the **legacy CID** reader / mid-migration ensure target; **new** content lives on
-Node **CAS-over-HTTP** (`GET /ldp/cas/<hex>`). `start` **asserts** Kubo readiness (legacy/T&D);
-`ensure` **heals**/starts Kubo; `stop` kills Flask only — never host Kubo.
+Host Kubo is **optional** operator tooling (`ContentStore.ensure`); **new** content lives on
+Node **CAS-over-HTTP** (`GET /ldp/cas/<hex>`). `start` **soft-probes** ContentStore (§6r/§6s —
+Kubo optional for CAS-only Orders); `ensure` **heals**/starts Kubo if you want it; `stop` kills
+Flask only — never host Kubo.
 
 ## Quick reference
 
@@ -17,7 +18,7 @@ Node **CAS-over-HTTP** (`GET /ldp/cas/<hex>`). `start` **asserts** Kubo readines
 | Bring node online (common path) | `make node-up` | ensure, then start |
 | Tear down Flask + host Kubo | `make node-down` | stop, then `ipfs shutdown` (Make-only) |
 | Heal / start host Kubo only | `make content-store-ensure` | `uv run python -m cats.node ensure` |
-| Bind Flask (ContentStore must already be ready) | `make node-start` | `uv run python -m cats.node start` |
+| Bind Flask (soft ContentStore probe; Kubo optional) | `make node-start` | `uv run python -m cats.node start` |
 | Flask listen + ContentStore ready | `make node-status` | `uv run python -m cats.node status` |
 | Stop Flask only | `make node-stop` | `uv run python -m cats.node stop` |
 
@@ -32,19 +33,19 @@ make node-down               # node-stop then ipfs shutdown (full local teardown
 ## Why ensure and start are separate
 
 `make node-up` is a **Make-only** convenience that runs `content-store-ensure` then `node-start`.
-`python -m cats.node start` remains assert-only.
+`python -m cats.node start` soft-probes ContentStore and binds Flask even when Kubo is down (§6r).
 
 | Target / CLI | Role |
 |--------------|------|
 | `make content-store-ensure` / `uv run python -m cats.node ensure` | Operator **mutate**: repo-tree `ContentStore.ensure` (heal/start host Kubo) |
-| `make node-start` / `uv run python -m cats.node start` | Client **assert**: bind Flask only if ContentStore API is already ready; does **not** heal Kubo |
+| `make node-start` / `uv run python -m cats.node start` | Client **soft probe**: bind Flask; warn if ContentStore API is down; does **not** heal Kubo |
 | `make node-up` | Convenience: ensure, then start |
 | `make node-down` | Convenience: `node-stop` then `ipfs shutdown` (Make-only; not in `cats.node`) |
 
 **Why keep them separate**
 
-- **AQ ownership:** InfraStructure / the operator heal the content-store facet; the Node client only asserts readiness before binding Flask.
-- **Ops flexibility:** Skip ensure when Kubo is already up, or debug ensure vs Flask bind independently. Use `node-up` for the common “bring the node online” path. Use `node-stop` when Kubo should keep serving CIDs; use `node-down` for full local teardown.
+- **AQ ownership:** InfraStructure / the operator heal the content-store facet; the Node client soft-probes and does not own Kubo lifecycle.
+- **Ops flexibility:** Skip ensure for CAS-only Orders, or ensure when legacy CID read / T&D need Kubo. Use `node-up` for the common “bring the node online” path. Use `node-stop` when Kubo should keep serving CIDs; use `node-down` for full local teardown.
 
 Details: [`STORAGE.md`](./STORAGE.md#node-up-vs-content-store-ensure-and-node-start). Content-store phases and heal behavior: [`IPFS.md`](./IPFS.md).
 
@@ -52,8 +53,9 @@ Details: [`STORAGE.md`](./STORAGE.md#node-up-vs-content-store-ensure-and-node-st
 
 ### Ensure ContentStore (host Kubo)
 
-Required **before** `node-start` if the ContentStore HTTP API (`:5001` by default) is down.
-Start fails loud if Kubo is not ready.
+Optional for CAS-only Orders (§6r). Run **before** legacy CID read / T&D if the ContentStore
+HTTP API (`:5001` by default) is down. `node-start` soft-warns when Kubo is not ready; it does
+not fail.
 
 ```bash
 make content-store-ensure
@@ -72,7 +74,7 @@ make node-start
 # or: uv run python -m cats.node start
 ```
 
-- Strict bootstrap `ContentStore.is_ready` before Flask binds.
+- Soft-probes bootstrap ContentStore, then binds Flask (does not hard-require Kubo).
 - Clears a prior `cats.node` listener on the Node port (does not kill unrelated processes, e.g. AirPlay on 5000).
 - Fails loud if the port is still held by a non-`cats.node` process — set `CAT_NODE_PORT` (e.g. `5002`) when macOS AirPlay owns `:5000`.
 - On SIGINT / SIGTERM, exits without stopping host Kubo.
