@@ -10,13 +10,14 @@ MinIO (T&D), and the Node CAS store.
 The Python side talks to that daemon with a thin sync Kubo HTTP RPC client
 (`cats/network/clients/ipfs_client.py` → `http://{IPFS_API_HOST}:{IPFS_API_PORT}/api/v0/*`,
 defaults `127.0.0.1:5001`, via `requests`), not `ipfshttpclient`. **ContentMesh** uses that client
-for **legacy** `ls` / RPC paths and mid-migration tools. **New writes** use `put_bytes` / `put_json` / `put_tree`
-(CAS). **`cat` / `catObj` / `get` / `getCar`** go through
+for **legacy** `ls` / RPC paths and mid-migration tools. **New writes** use `put_bytes` / `put_json` / `put_tree` /
+`put_dir` (CAS). **`cat(content_id=)` / `catObj` / `get(content_id=)` / `getCar(cid=)`** go through
 `cats.network.address_store.AddressStore`:
 
 | Id form | Read path |
 |---------|-----------|
 | `ni:` / hex digest | Locator index → `GET /ldp/cas/<hex>` → sha256 verify |
+| `hl:` | Hint HTTP URIs then bare `ni:` fallback → sha256 verify |
 | `http(s)://…` URI | Local LDP / HTTP GET → sha256 verify when digest known (Phase 2b) |
 | Legacy CID (`Qm…` / `bafy…`) | Gateway (`IPFS_GATEWAY_URL`) then Kubo RPC; UnixFS / `only-hash` verify |
 

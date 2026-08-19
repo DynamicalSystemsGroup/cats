@@ -2,7 +2,7 @@
 
 Scope: **how provenance is modeled, attributed, signed, published, and discovered** — not Plant/MinIO/transport rewrites.
 
-Phases **1 / 1b / 2a** (signed JSON-LD/PROV envelope, AddressStore gateway, Node LDP, optional Solid dual-write), the **Node-local BOM registry**, **CAS-over-HTTP**, **Phase 2b MVP** (URI address + `ni:` proof), **§6d hard-drop of `*_cid` field names** (URI-only new mints), **§6e–§6j naming hygiene** (control-plane / observation / Process–Plant–Ray `*_id` ABI), and **§6f `hl:` handoff** (resolve + emit + intake) are **on mainline**. The `w3c` vs `dev` columns below are a **historical** comparison of pre-merge `dev` (implicit CID threading) against that stack — branches are now tip-aligned. Remaining gaps are dual-mode `cat(content_id=)` (§6k) and mesh federation of the index (§6g–§6h) — not signing, and not “no reverse lookup at all.”
+Phases **1 / 1b / 2a** (signed JSON-LD/PROV envelope, AddressStore gateway, Node LDP, optional Solid dual-write), the **Node-local BOM registry**, **CAS-over-HTTP**, **Phase 2b MVP** (URI address + `ni:` proof), **§6d hard-drop of `*_cid` field names** (URI-only new mints), **§6e–§6k naming hygiene** (control-plane / observation / Process–Plant–Ray `*_id` ABI; `cat(content_id=)`; no `cidDir` aliases), and **§6f `hl:` handoff** (resolve + emit + intake) are **on mainline**. The `w3c` vs `dev` columns below are a **historical** comparison of pre-merge `dev` (implicit CID threading) against that stack — branches are now tip-aligned. Remaining gaps are mesh federation of the index (§6g–§6h) — not signing, and not “no reverse lookup at all.”
 
 ## One-line verdict (provenance)
 

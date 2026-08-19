@@ -16,13 +16,18 @@
   Control-plane Python (§6e) uses `*_id` / `put_dir`; minted JSON stays `*_uri` / `contentId` (§6d).
   §6f `hl:` resolve/emit/intake: [`tests/test_hl_resolve.py`](../tests/test_hl_resolve.py).
   §6i Structure marker `.applied-structure.id` (+ plant `applied_structure_id`):
-  [`tests/test_structure_root_cid.py`](../tests/test_structure_root_cid.py) /
+  [`tests/test_structure_root_id.py`](../tests/test_structure_root_id.py) /
   [`tests/test_plant_utils.py`](../tests/test_plant_utils.py).
   §6j Process/Plant/Ray Order ABI (`input_dir_id`, Ray `input_id`/`layout_id`,
   obj_store `structure_id`): [`tests/test_transport_port.py`](../tests/test_transport_port.py) /
   [`tests/test_infrastructure_transport_utils.py`](../tests/test_infrastructure_transport_utils.py) /
   [`tests/test_infrastructure_obj_store_utils.py`](../tests/test_infrastructure_obj_store_utils.py) /
   [`tests/test_ray_io_partitions.py`](../tests/test_ray_io_partitions.py).
+  §6k dual-mode `cat(content_id=)` / drop `cidDir` aliases:
+  [`tests/test_cas_http.py`](../tests/test_cas_http.py) /
+  [`tests/test_address_store_gateway.py`](../tests/test_address_store_gateway.py) /
+  [`tests/test_meshclient_rpc_surface.py`](../tests/test_meshclient_rpc_surface.py) /
+  [`tests/test_function_source_id.py`](../tests/test_function_source_id.py).
   For mesh-reachable LDP hints in `hl:`, set `CAT_NODE_HOST` to an address peers can open
   (loopback only warns).
 
@@ -68,8 +73,8 @@
   # Order-submitted vs ContentMesh bootstrap ContentStore binding
   uv run pytest -s tests/test_content_store_ensure_binding.py
 
-  # Function source directory CIDs + pickle/named-bind hybrid on function_cid
-  uv run pytest -s tests/test_function_source_cid.py
+  # Function source directory ids + pickle/named-bind hybrid on function_id
+  uv run pytest -s tests/test_function_source_id.py
 
   # InfraStructure content_store_utils / ContentStore
   uv run pytest -s tests/test_infrastructure_content_store_utils.py
@@ -117,8 +122,8 @@
   # Terraform module-cache readiness (InfraStructure.initialize)
   uv run pytest -s tests/test_structure_modules_installed.py
 
-  # Structure root_cid staging + getEnhancedBom materialize
-  uv run pytest -s tests/test_structure_root_cid.py
+  # Structure root_id staging + getEnhancedBom materialize (+ §6i marker)
+  uv run pytest -s tests/test_structure_root_id.py
 
   # TransportPort Protocol + as_transport_port facade
   uv run pytest -s tests/test_transport_port.py

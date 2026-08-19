@@ -28,7 +28,7 @@ A **single** host Kubo (default `127.0.0.1:5001`, one `IPFS_PATH`) carries two t
 | **Content-store** | Mesh / Control-Feedback content ids (Order, Invoice, BOM, Function/Structure-as-Code) via ContentMesh — **`ni:`** on CAS for new mints; legacy **CID** via Kubo | Long-lived; outlives Structure destroy and `node stop` |
 | **Bitswap peer of T&D** | Host is peered to Structure Docker Kubo peers so migrate/stage can resolve host-added CIDs | Peering is Structure-lifetime; the host daemon itself is not |
 
-**ContentMesh** (`cats.network.content_mesh`) owns content-store mesh I/O and Order compose/submit. **New writes** (`put_bytes` / `put_json` / `put_tree` / `cidDir` when `CATS_HOME` is set) go to **CAS-over-HTTP** (`CasHttpStore` + `LocatorIndex`) and return `ni:` — no Kubo add. Phase 2b dual-field: companion `*_uri` (Node `/ldp/cas/`, `/ldp/invoices/`, `/ldp/orders/`) is the **fetch address of record**; `*_cid` (`ni:`) remains the **equality / lineage** key. **Legacy CID reads** go through **`AddressStore`**. **`ni:` / hex / `http(s)`** reads resolve via locators / local LDP → sha256 verify when digest known (fail closed).
+**ContentMesh** (`cats.network.content_mesh`) owns content-store mesh I/O and Order compose/submit. **New writes** (`put_bytes` / `put_json` / `put_tree` / `put_dir` when `CATS_HOME` is set) go to **CAS-over-HTTP** (`CasHttpStore` + `LocatorIndex`) and return `ni:` — no Kubo add. Phase 2b dual-field: companion `*_uri` (Node `/ldp/cas/`, `/ldp/invoices/`, `/ldp/orders/`) is the **fetch address of record**; `*_cid` (`ni:`) remains the **equality / lineage** key. **Legacy CID reads** go through **`AddressStore`**. **`ni:` / hex / `hl:` / `http(s)`** reads resolve via `cat(content_id=)` / `get(content_id=)` → locators / local LDP → sha256 verify when digest known (fail closed).
 JSON-LD + PROV-O BOM packaging (`build_execution_bom`) with Data Integrity signing (`sign_execution_bom`, `eddsa-jcs-2022`) and Node `node_did` key material live under `cats.network.feedback` / `identity` (Phase 1b — not Plant).
 The Phase 2a **control plane** (Node LDP cache + optional Solid pod dual-write / LDN) publishes signed envelopes at HTTP URIs; the **data plane** for new runs is CAS (`ni:` + `/ldp/cas/`) — see [`SOLID.md`](SOLID.md), [`BOM.md`](BOM.md), and [`W3C.md`](W3C.md). The Node-local **BOM registry** is a query index of those envelopes (plus `by-content` locators) — [`BomRegistry.md`](BomRegistry.md).
 Plant CoD transport (IPFS↔MinIO job orchestration) is separate —
@@ -112,7 +112,7 @@ T&D scratch, and durable Entity Relationship are lifetime facets inside InfraStr
 | **What lands there** | `cats-scratch/jobs/<uuid>/result/` | `cats-durable/structures/<cid>/er/<name>/` + `er/current/<name>` | Order, Invoice, BOM, stage CIDs |
 | **Addressing** | Bucket + key (`s3://…`) | Bucket + key (`s3://…`) | Content hash (CID) |
 | **Lifetime** | ILM 7d + Structure destroy `down -v` | No ILM; survives destroy; `gc-er` only | Host Kubo outlives Structure destroy |
-| **Who writes** | Ray workers (distributed) | Host/`ObjectStore` (promote explicit) | Host after stages (`cidDir` / `add_json`) |
+| **Who writes** | Ray workers (distributed) | Host/`ObjectStore` (promote explicit) | Host after stages (`put_dir` / `put_json`) |
 
 **One line:** scratch MinIO is temporary S3 disk for parallel Ray writes before IPFS; durable
 MinIO is the Node Entity Relationship corpus (structure-scoped + pointer index); IPFS is the
@@ -125,7 +125,7 @@ content-addressed record after the run.
 2. Plant stages entrypoint + **ComputePort** (`RayComputePort`) into the job working_dir;
    workers write CSV shards to MinIO (`cats-scratch/jobs/<uuid>/result/`) — genuinely distributed.
 3. The host downloads that **JobHandle** prefix into `…/integration/outputs/`.
-4. `cidDir` / `put_tree` addresses that directory → `invoice.data_uri` (and the BOM `log` mirror).
+4. `put_dir` / `put_tree` addresses that directory → `invoice.data_uri` (and the BOM `log` mirror).
 
 Post-run retrieval of integration outputs is via **IPFS** and that CID — not by reading scratch
 MinIO. `ObjectStore.snapshot()` records credential-free scratch **and** durable endpoints/buckets
