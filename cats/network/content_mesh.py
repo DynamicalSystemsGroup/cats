@@ -112,9 +112,9 @@ class ContentMesh(OrderOps):
             )
         self._bootstrap_content_store_ensured = True
 
-    def fetch_ipfs_object(self, cid):
+    def fetch_ipfs_object(self, content_id):
         try:
-            binary_content = self.catObj(cid)
+            binary_content = self.catObj(content_id)
             return pickle.loads(binary_content)
         except Exception as e:
             print(f"An error occurred while fetching the object from IPFS: {e}")
@@ -263,8 +263,6 @@ class ContentMesh(OrderOps):
             dir_id = dir['Hash']
             return dir_id
 
-    cidDir = put_dir
-
     def put_file(self, filepath):
         self.ensure_bootstrap_content_store()
         file_name = os.path.basename(filepath)
@@ -276,8 +274,6 @@ class ContentMesh(OrderOps):
         file_id = file_json['Hash']
         file_name = file_json['Name']
         return file_id, file_name
-
-    cidFile = put_file
 
     def structure_pairing(self, structure_filepath) -> dict:
         """Apply-complete Structure pairing from a Structure home path.
@@ -306,8 +302,6 @@ class ContentMesh(OrderOps):
         set_ref(pairing, 'plant', plant_id)
         set_ref(pairing, 'infrastructure', infrastructure_id)
         return pairing
-
-    cid_structure_pairing = structure_pairing
 
     def _fetch_ref(self, obj, stem):
         """Load JSON for ``stem`` via ``*_uri`` or legacy ``*_cid`` / equality id."""
@@ -409,7 +403,7 @@ class ContentMesh(OrderOps):
         car_bom_id, init_bom_json_id = self.convertBOMtoCAR(init_bom_json_id, init_bom_filename)
         return car_bom_id, init_bom_json_id
 
-    def linkData(self, cid, subdir='outputs'):
+    def linkData(self, content_id, subdir='outputs'):
         """Return content id of the link matching ``subdir`` (name fragment).
 
         Legacy UnixFS ``ls`` for CIDs; CAS directory manifests match entry
@@ -422,49 +416,49 @@ class ContentMesh(OrderOps):
         needle = subdir.strip(' -/')
         if not needle:
             needle = 'outputs'
-        if is_ni_or_digest(cid):
-            obj = json.loads(self.cat(cid))
+        if is_ni_or_digest(content_id):
+            obj = json.loads(self.cat(content_id))
             if not is_directory_manifest(obj):
                 raise RuntimeError(
-                    f'CAS content {cid!r} is not a directory manifest'
+                    f'CAS content {content_id!r} is not a directory manifest'
                 )
             for path, file_id in obj['entries'].items():
                 if needle in path or path.startswith(needle):
                     return file_id
             raise RuntimeError(
-                f'No manifest entry matching {needle!r} under {cid!r}; '
+                f'No manifest entry matching {needle!r} under {content_id!r}; '
                 f'paths={list(obj["entries"])}'
             )
-        links = self.ipfsClient.ls(cid)
+        links = self.ipfsClient.ls(content_id)
         for link in links:
             name = link.get('Name') or ''
             if needle in name:
                 return link['Hash']
         raise RuntimeError(
-            f'No ls link matching {needle!r} under {cid!r}; '
+            f'No ls link matching {needle!r} under {content_id!r}; '
             f'names={[link.get("Name") for link in links]}'
         )
 
-    def get(self, cid: str, filepath: str, output: str = None):
+    def get(self, content_id: str, filepath: str, output: str = None):
         self.ensure_bootstrap_content_store()
         if output is None:
             output = self.CATS_HOME
         dest = os.path.join(output, filepath)
-        self.addressStore.get(cid, dest)
+        self.addressStore.get(content_id, dest)
         return filepath
 
-    def testGet(self, cid: str, output: str):
+    def testGet(self, content_id: str, output: str):
         self.ensure_bootstrap_content_store()
-        self.addressStore.get(cid, output)
+        self.addressStore.get(content_id, output)
         print(f'IPFS download of {output} completed successfully.')
 
-    def cat(self, cid: str):
+    def cat(self, content_id: str):
         self.ensure_bootstrap_content_store()
-        return self.addressStore.cat(cid)
+        return self.addressStore.cat(content_id)
 
-    def catObj(self, cid: str):
+    def catObj(self, content_id: str):
         self.ensure_bootstrap_content_store()
-        return self.addressStore.cat_bytes(cid)
+        return self.addressStore.cat_bytes(content_id)
 
     def add_named_bind(self, source_id: str, module: str, qualname: str) -> str:
         """Content-address a named-bind JSON leaf for an Order slot."""
@@ -543,7 +537,7 @@ class ContentMesh(OrderOps):
         if OUTPUT_HOME is None:
             OUTPUT_HOME = self.OUTPUT_HOME
         self.CAR_HOME = OUTPUT_HOME + '/bom.car'
-        self.get(cid=bom_json_id, output=OUTPUT_HOME, filepath='bom.json')
+        self.get(content_id=bom_json_id, output=OUTPUT_HOME, filepath='bom.json')
         bom = json.loads(open(f'{OUTPUT_HOME}/bom.json', 'r').read())
         enhanced_bom = deepcopy(bom)
         enhanced_bom['bom_json_id'] = bom_json_id
@@ -553,7 +547,7 @@ class ContentMesh(OrderOps):
         )
         if not invoice_locator:
             raise RuntimeError('BOM missing invoice_uri / invoice_cid')
-        self.get(cid=invoice_locator, output=OUTPUT_HOME, filepath='invoice.json')
+        self.get(content_id=invoice_locator, output=OUTPUT_HOME, filepath='invoice.json')
         enhanced_bom['invoice'] = json.loads(
             open(f'{OUTPUT_HOME}/invoice.json', 'r').read()
         )
@@ -563,7 +557,7 @@ class ContentMesh(OrderOps):
         )
         if not order_locator:
             raise RuntimeError('Invoice missing order_uri / order_cid')
-        self.get(cid=order_locator, output=INPUT_HOME, filepath='order.json')
+        self.get(content_id=order_locator, output=INPUT_HOME, filepath='order.json')
         enhanced_bom['order'] = json.loads(open(f'{INPUT_HOME}/order.json', 'r').read())
 
         # Structure pairing nests root / plant / infrastructure (uri or legacy
@@ -598,14 +592,14 @@ class ContentMesh(OrderOps):
         structure_home = os.path.join(INPUT_HOME, structure_filepath)
         with tempfile.TemporaryDirectory(prefix='cats-root-fetch-') as tmp:
             fetch_dir = os.path.join(tmp, STRUCTURE_ROOT_DIRNAME)
-            self.get(cid=root_locator, output=tmp, filepath=STRUCTURE_ROOT_DIRNAME)
+            self.get(content_id=root_locator, output=tmp, filepath=STRUCTURE_ROOT_DIRNAME)
             materialize_structure_root_files(fetch_dir, structure_home)
         self.get(
-            cid=plant_locator, output=INPUT_HOME,
+            content_id=plant_locator, output=INPUT_HOME,
             filepath=os.path.join(structure_filepath, 'plant')
         )
         self.get(
-            cid=infra_locator, output=INPUT_HOME,
+            content_id=infra_locator, output=INPUT_HOME,
             filepath=os.path.join(structure_filepath, 'infrastructure')
         )
 
@@ -637,11 +631,11 @@ class ContentMesh(OrderOps):
             ref_uri(function, 'infrafunction_source') or infrafunction_source_id
         )
         self.get(
-            cid=process_source_locator, output=INPUT_HOME,
+            content_id=process_source_locator, output=INPUT_HOME,
             filepath=os.path.join('function', 'process'),
         )
         self.get(
-            cid=infrafunction_source_locator, output=INPUT_HOME,
+            content_id=infrafunction_source_locator, output=INPUT_HOME,
             filepath=os.path.join('function', 'infrafunction'),
         )
         return deepcopy(enhanced_bom), bom

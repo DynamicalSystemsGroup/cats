@@ -173,9 +173,9 @@ class AddressStore:
                 return from_ni(content_id)
         return None
 
-    def cat_bytes(self, cid: str, *, expect_digest: str | None = None) -> bytes:
-        if is_hl(cid):
-            ni, uris = from_hl(cid.strip())
+    def cat_bytes(self, content_id: str, *, expect_digest: str | None = None) -> bytes:
+        if is_hl(content_id):
+            ni, uris = from_hl(content_id.strip())
             digest = from_ni(ni)
             for uri in uris:
                 if not is_http_uri(uri):
@@ -186,37 +186,39 @@ class AddressStore:
                     continue
                 if sha256_hex(data) != digest:
                     raise RuntimeError(
-                        f'hl: sha256 mismatch for {cid!r} via {uri}'
+                        f'hl: sha256 mismatch for {content_id!r} via {uri}'
                     )
                 return data
             # No usable hint (or all GETs failed) — same path as bare ni:.
-            cid = ni
+            content_id = ni
 
-        if is_http_uri(cid):
-            local = self._local_ldp_bytes(cid)
+        if is_http_uri(content_id):
+            local = self._local_ldp_bytes(content_id)
             if local is not None:
                 data, path_digest = local
             else:
-                data = self._http_get_bytes(cid)
+                data = self._http_get_bytes(content_id)
                 path_digest = None
-            digest = self._resolve_expect_digest(cid, expect_digest) or path_digest
+            digest = self._resolve_expect_digest(content_id, expect_digest) or path_digest
             if digest is not None and sha256_hex(data) != digest:
                 raise RuntimeError(
-                    f'URI sha256 mismatch for {cid!r} (expected {digest})'
+                    f'URI sha256 mismatch for {content_id!r} (expected {digest})'
                 )
             return data
 
-        if is_ni_or_digest(cid):
-            data = self._cas_local_bytes(cid)
+        if is_ni_or_digest(content_id):
+            data = self._cas_local_bytes(content_id)
             if data is None:
-                data = self._cas_locator_bytes(cid)
+                data = self._cas_locator_bytes(content_id)
             if data is None:
-                raise FileNotFoundError(f'CAS content not found: {cid}')
-            digest = from_ni(cid)
+                raise FileNotFoundError(f'CAS content not found: {content_id}')
+            digest = from_ni(content_id)
             if sha256_hex(data) != digest:
-                raise RuntimeError(f'CAS sha256 mismatch for {cid!r}')
+                raise RuntimeError(f'CAS sha256 mismatch for {content_id!r}')
             return data
 
+        # Legacy IPFS CID path.
+        cid = content_id
         data: bytes | None = None
         from_gateway = False
         if self.gateway is not None:
@@ -231,12 +233,12 @@ class AddressStore:
             verify_bytes_match_cid(self.ipfs, cid, data)
         return data
 
-    def cat(self, cid: str, *, expect_digest: str | None = None) -> str:
-        return self.cat_bytes(cid, expect_digest=expect_digest).decode('utf-8')
+    def cat(self, content_id: str, *, expect_digest: str | None = None) -> str:
+        return self.cat_bytes(content_id, expect_digest=expect_digest).decode('utf-8')
 
-    def cat_obj(self, cid: str, *, expect_digest: str | None = None) -> Any:
+    def cat_obj(self, content_id: str, *, expect_digest: str | None = None) -> Any:
         """JSON-decode ``cat`` bytes (helper; ContentMesh.catObj returns raw bytes)."""
-        return json.loads(self.cat(cid, expect_digest=expect_digest))
+        return json.loads(self.cat(content_id, expect_digest=expect_digest))
 
     def dag_export(self, cid: str, filepath: str) -> None:
         """Export DAG as CAR: gateway ``?format=car`` first, else Kubo RPC.
@@ -253,26 +255,26 @@ class AddressStore:
                 pass
         self.ipfs.dag_export(cid, filepath)
 
-    def get(self, cid: str, dest_path: str, *, expect_digest: str | None = None) -> str:
+    def get(self, content_id: str, dest_path: str, *, expect_digest: str | None = None) -> str:
         """Materialize content at ``dest_path``.
 
         CAS directory manifests expand to a tree; single CAS blobs write a file;
         HTTP URIs fetch then write/verify; legacy CIDs use gateway / Kubo.
         """
-        if is_http_uri(cid) or is_ni_or_digest(cid) or is_hl(cid):
-            raw = self.cat_bytes(cid, expect_digest=expect_digest)
+        if is_http_uri(content_id) or is_ni_or_digest(content_id) or is_hl(content_id):
+            raw = self.cat_bytes(content_id, expect_digest=expect_digest)
             try:
                 obj = json.loads(raw.decode('utf-8'))
             except (UnicodeDecodeError, json.JSONDecodeError):
                 obj = None
             if is_directory_manifest(obj):
-                manifest_id = expect_digest or cid
-                if is_hl(cid):
-                    manifest_id, _ = from_hl(cid.strip())
-                if is_http_uri(cid) and self.cats_home:
+                manifest_id = expect_digest or content_id
+                if is_hl(content_id):
+                    manifest_id, _ = from_hl(content_id.strip())
+                if is_http_uri(content_id) and self.cats_home:
                     from cats.network.cas import LocatorIndex
 
-                    found = LocatorIndex(self.cats_home).find_content_id_for_uri(cid)
+                    found = LocatorIndex(self.cats_home).find_content_id_for_uri(content_id)
                     if found:
                         manifest_id = found
                 os.makedirs(dest_path, exist_ok=True)
@@ -284,6 +286,8 @@ class AddressStore:
                 handle.write(raw)
             return dest_path
 
+        # Legacy IPFS CID path.
+        cid = content_id
         if self.gateway is not None:
             try:
                 return self.gateway.get_file(cid, dest_path)
