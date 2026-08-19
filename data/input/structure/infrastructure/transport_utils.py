@@ -87,11 +87,15 @@ def _cas_materialize(content_id: str, dest_dir: str, *, cats_home: str) -> str:
         from cats.network.address_store import AddressStore
 
         class _NoIpfs:
-            def cat_bytes(self, cid):
-                raise RuntimeError(f'legacy CID not available in CAS transport: {cid!r}')
+            def cat_bytes(self, content_id):
+                raise RuntimeError(
+                    f'legacy CID not available in CAS transport: {content_id!r}'
+                )
 
-            def get(self, cid, dest_path):
-                raise RuntimeError(f'legacy CID not available in CAS transport: {cid!r}')
+            def get(self, content_id, dest_path):
+                raise RuntimeError(
+                    f'legacy CID not available in CAS transport: {content_id!r}'
+                )
 
             def dag_export(self, cid, filepath):
                 raise RuntimeError(f'legacy CID not available in CAS transport: {cid!r}')

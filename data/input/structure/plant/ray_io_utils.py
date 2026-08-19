@@ -36,7 +36,7 @@ except ImportError:  # repo import when not in job working_dir
 
 
 def run_partition_ingress(mesh, input_dir_id: str, *, num_partitions: int) -> tuple[str, str]:
-    """Fetch ``input_dir_id``, split into ``n`` CAR parts, return layout cidDir."""
+    """Fetch ``input_dir_id``, split into ``n`` CAR parts, return layout via ``put_dir``."""
     if num_partitions < 2:
         raise ValueError('partition_ingress requires num_partitions >= 2')
 
@@ -45,7 +45,7 @@ def run_partition_ingress(mesh, input_dir_id: str, *, num_partitions: int) -> tu
         fetch_root = tmp_path / 'input'
         fetch_root.mkdir()
         # Materialize content id at fetch_root (file or directory).
-        mesh.get(cid=input_dir_id, filepath='input', output=str(tmp_path))
+        mesh.get(content_id=input_dir_id, filepath='input', output=str(tmp_path))
         source = fetch_root
         if not source.exists():
             # get may write to output/filepath as file without trailing dir
@@ -74,7 +74,7 @@ def run_partition_ingress(mesh, input_dir_id: str, *, num_partitions: int) -> tu
                 write_shard_tree(bag, bag_dir, source_root=root_for_rel)
                 _write_part_car(mesh, bag_dir, layout_dir / part_car_name(i))
 
-        result = mesh.cidDir(str(layout_dir))
+        result = mesh.put_dir(str(layout_dir))
         if isinstance(result, tuple):
             layout_id, layout_name = result
         else:
@@ -86,19 +86,19 @@ def run_partition_egress(mesh, input_dir_id: str, *, num_partitions: int) -> str
     """Materialize partition layout and publish partition-dir id for Invoice.
 
     Prefer an existing ``part-*.car`` layout. Else CAR-wrap ``part-*`` CSV/dir
-    shards 1:1. Else ``cidDir`` the whole tree (single root).
+    shards 1:1. Else ``put_dir`` the whole tree (single root).
     """
     if num_partitions < 2:
         raise ValueError('partition_egress requires num_partitions >= 2')
 
     with tempfile.TemporaryDirectory(prefix='cats-io-egress-') as tmp:
         tmp_path = Path(tmp)
-        mesh.get(cid=input_dir_id, filepath='input', output=str(tmp_path))
+        mesh.get(content_id=input_dir_id, filepath='input', output=str(tmp_path))
         source = tmp_path / 'input'
         if source.is_dir():
             cars = list_part_cars(source)
             if len(cars) == num_partitions:
-                result = mesh.cidDir(str(source))
+                result = mesh.put_dir(str(source))
             else:
                 shards = list_part_shards(source)
                 if len(shards) == num_partitions:
@@ -108,11 +108,11 @@ def run_partition_egress(mesh, input_dir_id: str, *, num_partitions: int) -> str
                         _write_part_car(
                             mesh, shard, layout_dir / part_car_name(i)
                         )
-                    result = mesh.cidDir(str(layout_dir))
+                    result = mesh.put_dir(str(layout_dir))
                 else:
-                    result = mesh.cidDir(str(source))
+                    result = mesh.put_dir(str(source))
         else:
-            result = mesh.cidDir(str(source.parent if source.is_file() else tmp_path))
+            result = mesh.put_dir(str(source.parent if source.is_file() else tmp_path))
         if isinstance(result, tuple):
             return result[0]
         return result

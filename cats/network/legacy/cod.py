@@ -13,17 +13,17 @@ from cats.utils import subproc_run
 
 
 class CoD:
-    def __init__(self, INTEGRATION_INPUT_CACHE, cidDir):
+    def __init__(self, INTEGRATION_INPUT_CACHE, put_dir):
         self.CAT_HOME = None
         self.INTEGRATION_INPUT_CACHE = INTEGRATION_INPUT_CACHE
         self.ingress_job_id = None
         self.ingressed_data_cid = None
-        self.cidDir = cidDir
+        self.put_dir = put_dir
 
     def contains_substring(self, substring):
         return lambda s: substring in s
 
-    def cidDirUponCompletion(self, directory_path, job_id, check_interval=1, timeout=None):
+    def put_dir_upon_completion(self, directory_path, job_id, check_interval=1, timeout=None):
         start_time = time.time()
         while self.checkStatusOfJob_printless(job_id=job_id) != "Completed":
             status = self.checkStatusOfJob(job_id=job_id)
@@ -36,9 +36,9 @@ class CoD:
                 exit()
             time.sleep(check_interval)
 
-        data_dir_cid = self.cidDir(directory_path)
-        print("job output CIDed: %s" % data_dir_cid)
-        return data_dir_cid
+        data_dir_id = self.put_dir(directory_path)
+        print("job output CIDed: %s" % data_dir_id)
+        return data_dir_id
 
     def describeJob(self, job_id):
         cmd = f"bacalhau job describe {job_id} --output json --pretty"
