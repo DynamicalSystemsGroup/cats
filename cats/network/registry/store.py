@@ -90,8 +90,11 @@ def build_record(
     return {
         'bom_cid': bom_cid,
         'invoice_cid': invoice_cid,
+        'invoice_uri': invoice.get('invoice_uri') or bom.get('invoice_uri'),
         'order_cid': order_cid,
+        'order_uri': invoice.get('order_uri') or (loc.get('order_uri')),
         'data_cid': data_cid,
+        'data_uri': invoice.get('data_uri'),
         'input_data_cid': input_data_cid,
         'node_did': bom.get('node_did'),
         'function_cid': function_cid,
@@ -99,10 +102,15 @@ def build_record(
         'locators': {
             'bom_ldp_uri': loc.get('bom_ldp_uri'),
             'bom_solid_uri': loc.get('bom_solid_uri'),
+            'invoice_uri': loc.get('invoice_uri') or invoice.get('invoice_uri'),
+            'order_uri': loc.get('order_uri'),
         },
         'ingress_data_cid': invoice.get('ingress_data_cid'),
+        'ingress_data_uri': invoice.get('ingress_data_uri'),
         'integration_data_cid': invoice.get('integration_data_cid'),
+        'integration_data_uri': invoice.get('integration_data_uri'),
         'seed_cid': invoice.get('seed_cid'),
+        'seed_uri': invoice.get('seed_uri'),
     }
 
 

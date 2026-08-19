@@ -37,7 +37,7 @@ register_cas_routes(catNode, cats_home=CATS_HOME)
 
 
 def _resolve_order_cid_from_request(body: dict) -> tuple[str | None, tuple | None]:
-    """Prefer ``order_cid``; else registry ``bom_cid`` / unique ``data_cid``.
+    """Prefer ``order_cid``; else registry ``bom_cid`` / unique ``data_cid`` / ``data_uri``.
 
     Returns ``(order_cid, error_response)`` — error_response is
     ``(jsonify(...), status)`` when resolution fails.
@@ -49,6 +49,7 @@ def _resolve_order_cid_from_request(body: dict) -> tuple[str | None, tuple | Non
     registry = BomRegistry(CATS_HOME)
     bom_cid = body.get('bom_cid')
     data_cid = body.get('data_cid')
+    data_uri = body.get('data_uri')
 
     if bom_cid:
         try:
@@ -58,6 +59,17 @@ def _resolve_order_cid_from_request(body: dict) -> tuple[str | None, tuple | Non
         if resolved is None:
             return None, (jsonify({'error': 'not found', 'bom_cid': bom_cid}), 404)
         return resolved, None
+
+    if data_uri and not data_cid:
+        from cats.network.cas import LocatorIndex
+        from cats.network.cas.content_ref import is_http_uri
+
+        if not is_http_uri(data_uri):
+            return None, (jsonify({'error': 'invalid data_uri'}), 400)
+        found = LocatorIndex(CATS_HOME).find_content_id_for_uri(data_uri)
+        if found is None:
+            return None, (jsonify({'error': 'not found', 'data_uri': data_uri}), 404)
+        data_cid = found
 
     if data_cid:
         try:
@@ -81,7 +93,7 @@ def _resolve_order_cid_from_request(body: dict) -> tuple[str | None, tuple | Non
         return resolved, None
 
     return None, (
-        jsonify({'error': 'order_cid, bom_cid, or data_cid required'}),
+        jsonify({'error': 'order_cid, bom_cid, data_cid, or data_uri required'}),
         400,
     )
 

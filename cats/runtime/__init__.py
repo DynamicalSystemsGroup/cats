@@ -139,17 +139,43 @@ class Runtime:
             integration_data_cid=invoice.get('integration_data_cid'),
             data_cid=invoice.get('data_cid'),
             structure_as_executed_cid=invoice.get('structure_as_executed_cid'),
+            invoice_uri=enhanced_bom.get('invoice_uri') or invoice.get('invoice_uri'),
+            log_uri=enhanced_bom.get('log_uri'),
+            order_uri=invoice.get('order_uri'),
+            ingress_data_uri=invoice.get('ingress_data_uri'),
+            integration_data_uri=invoice.get('integration_data_uri'),
+            data_uri=invoice.get('data_uri'),
+            structure_as_executed_uri=invoice.get('structure_as_executed_uri'),
         )
         bom = sign_execution_bom(bom, cats_home=self.CATS_HOME)
         # CAS-over-HTTP: mint signed BOM bytes as ni: (Kubo write not used).
         bom_cid = self.contentMesh.put_json(bom)
         # Phase 2a control plane: local Node LDP cache + optional Solid dual-write.
         BomLdpStore(self.CATS_HOME).put(bom_cid, bom)
+        # Phase 2b: ensure Order LDP resource exists for order_uri discovery.
+        if order_cid:
+            try:
+                order_obj = json.loads(self.contentMesh.cat(order_cid))
+                from cats.network.cas import LocatorIndex
+                from cats.network.ldp import OrderLdpStore, order_ldp_uri
+
+                OrderLdpStore(self.CATS_HOME).put(order_cid, order_obj)
+                order_uri = order_ldp_uri(order_cid)
+                LocatorIndex(self.CATS_HOME).put(
+                    order_cid, uri=order_uri, media_type='application/json'
+                )
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning('Order LDP publish skipped for %s: %s', order_cid, exc)
+                order_uri = None
+        else:
+            order_uri = None
         bom_response = {
             'bom': bom,
             'bom_cid': bom_cid,
             'bom_ldp_uri': bom_ldp_uri(bom_cid),
             'bom_solid_uri': None,
+            'invoice_uri': enhanced_bom.get('invoice_uri'),
+            'order_uri': order_uri,
         }
         if solid_configured():
             # Fail Runtime when Solid is configured and PUT fails (dual-write
@@ -194,6 +220,8 @@ class Runtime:
                 locators={
                     'bom_ldp_uri': bom_response['bom_ldp_uri'],
                     'bom_solid_uri': bom_response['bom_solid_uri'],
+                    'invoice_uri': bom_response.get('invoice_uri'),
+                    'order_uri': bom_response.get('order_uri'),
                 },
             )
         )

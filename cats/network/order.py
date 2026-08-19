@@ -24,14 +24,29 @@ class OrderOps:
             *,
             bom_cid: str | None = None,
             data_cid: str | None = None,
+            data_uri: str | None = None,
     ):
         """Load a BOM response shell from the Node-local registry + LDP cache."""
-        if bom_cid is None and data_cid is None:
-            raise RuntimeError('bom_cid or data_cid required when cat_response is omitted')
-        if bom_cid is not None and data_cid is not None:
+        if bom_cid is None and data_cid is None and data_uri is None:
+            raise RuntimeError(
+                'bom_cid, data_cid, or data_uri required when cat_response is omitted'
+            )
+        if bom_cid is not None and (data_cid is not None or data_uri is not None):
             # Explicit bom_cid always wins (same as init preference when both set
             # after order_cid); ignore data_cid for resolution.
             data_cid = None
+            data_uri = None
+
+        if data_uri and not data_cid:
+            from cats.network.cas import LocatorIndex
+            from cats.network.cas.content_ref import is_http_uri
+
+            if not is_http_uri(data_uri):
+                raise RuntimeError(f'invalid data_uri={data_uri!r}')
+            found = LocatorIndex(self.CATS_HOME).find_content_id_for_uri(data_uri)
+            if found is None:
+                raise RuntimeError(f'no content id for data_uri={data_uri!r}')
+            data_cid = found
 
         registry = BomRegistry(self.CATS_HOME)
         if bom_cid is None:
@@ -70,10 +85,13 @@ class OrderOps:
             *,
             bom_cid: str | None = None,
             data_cid: str | None = None,
+            data_uri: str | None = None,
     ):
         if cat_response is not None:
             return cat_response
-        return self._response_from_registry(bom_cid=bom_cid, data_cid=data_cid)
+        return self._response_from_registry(
+            bom_cid=bom_cid, data_cid=data_cid, data_uri=data_uri
+        )
 
     def _rebuild_function_cid(
             self,
@@ -227,10 +245,11 @@ class OrderOps:
             *,
             bom_cid=None,
             data_cid=None,
+            data_uri=None,
     ):
         """Rebuild Order function_cid; carry structure_cid and Invoice data_cid."""
         cat_response = self._cat_response_for_link(
-            cat_response, bom_cid=bom_cid, data_cid=data_cid
+            cat_response, bom_cid=bom_cid, data_cid=data_cid, data_uri=data_uri
         )
         flattened_bom = self.flatten_bom(cat_response)
         flat_bom = deepcopy(flattened_bom['flat_bom'])
@@ -263,6 +282,7 @@ class OrderOps:
             structure_filepath_name=None,
             bom_cid=None,
             data_cid=None,
+            data_uri=None,
     ):
         """Rebuild Order structure_cid; carry function_cid and Invoice data_cid.
 
@@ -271,7 +291,7 @@ class OrderOps:
         CIDs. Fails if the resulting pairing is unchanged.
         """
         cat_response = self._cat_response_for_link(
-            cat_response, bom_cid=bom_cid, data_cid=data_cid
+            cat_response, bom_cid=bom_cid, data_cid=data_cid, data_uri=data_uri
         )
         flattened_bom = self.flatten_bom(cat_response)
         flat_bom = deepcopy(flattened_bom['flat_bom'])
@@ -319,6 +339,7 @@ class OrderOps:
             structure_filepath_name=None,
             bom_cid=None,
             data_cid=None,
+            data_uri=None,
     ):
         """Rebuild Function and/or Structure in one lineage step.
 
@@ -346,7 +367,7 @@ class OrderOps:
             )
 
         cat_response = self._cat_response_for_link(
-            cat_response, bom_cid=bom_cid, data_cid=data_cid
+            cat_response, bom_cid=bom_cid, data_cid=data_cid, data_uri=data_uri
         )
         flattened_bom = self.flatten_bom(cat_response)
         flat_bom = deepcopy(flattened_bom['flat_bom'])
@@ -456,18 +477,51 @@ class OrderOps:
             'process_source_cid': process_source_cid,
             'infrafunction_source_cid': infrafunction_source_cid,
         }
-        invoice = {
-            "data_cid": data_cid
-        }
+        from cats.network.cas import LocatorIndex, set_cid_uri
+        from cats.network.ldp import (
+            InvoiceLdpStore,
+            OrderLdpStore,
+            invoice_ldp_uri,
+            order_ldp_uri,
+        )
+
+        set_cid_uri(function, 'process_cid', function['process_cid'])
+        set_cid_uri(function, 'infrafunction_cid', function['infrafunction_cid'])
+        set_cid_uri(function, 'process_source_cid', process_source_cid)
+        set_cid_uri(function, 'infrafunction_source_cid', infrafunction_source_cid)
+        function_cid = self.put_json(function)
+        invoice = {}
+        set_cid_uri(invoice, 'data_cid', data_cid)
+        invoice_cid = self.put_json(invoice)
         order = {
-            "function_cid": self.put_json(function),
-            "structure_cid": structure_cid,
-            "invoice_cid": self.put_json(invoice),
             "structure_filepath": structure_name,
             "JOB_HOME": self.JOB_HOME,
             "endpoint": endpoint
         }
+        set_cid_uri(order, 'function_cid', function_cid)
+        set_cid_uri(order, 'structure_cid', structure_cid)
+        set_cid_uri(order, 'invoice_cid', invoice_cid)
+        order_cid = self.put_json(order)
+        # Phase 2b: publish Order/Invoice LDP URIs (address of record).
+        cats_home = getattr(self, 'CATS_HOME', None)
+        if cats_home:
+            InvoiceLdpStore(cats_home).put(invoice_cid, invoice)
+            OrderLdpStore(cats_home).put(order_cid, order)
+            loc = LocatorIndex(cats_home)
+            loc.put(
+                invoice_cid,
+                uri=invoice_ldp_uri(invoice_cid),
+                media_type='application/json',
+            )
+            loc.put(
+                order_cid,
+                uri=order_ldp_uri(order_cid),
+                media_type='application/json',
+            )
         order_request = {
-            'order_cid': self.put_json(order)
+            'order_cid': order_cid,
+            'order_uri': order_ldp_uri(order_cid) if cats_home else None,
+            'invoice_cid': invoice_cid,
+            'invoice_uri': invoice_ldp_uri(invoice_cid) if cats_home else None,
         }
         return order_request

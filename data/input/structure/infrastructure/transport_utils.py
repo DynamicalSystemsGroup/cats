@@ -52,10 +52,12 @@ def _run(cmd, **kwargs):
 
 
 def _is_cas_content_id(content_id: str) -> bool:
-    """True for RFC 6920 ``ni:`` or lowercase hex sha256 digests."""
+    """True for RFC 6920 ``ni:``, hex sha256, or HTTP CAS/LDP URIs."""
     if not isinstance(content_id, str) or not content_id:
         return False
     if content_id.startswith('ni:'):
+        return True
+    if content_id.startswith('http://') or content_id.startswith('https://'):
         return True
     if len(content_id) == 64 and all(
         c in '0123456789abcdef' for c in content_id.lower()
@@ -79,6 +81,22 @@ def _cas_materialize(content_id: str, dest_dir: str, *, cats_home: str) -> str:
         is_directory_manifest,
         materialize_tree,
     )
+    from cats.network.cas.content_ref import is_http_uri
+
+    if is_http_uri(content_id):
+        from cats.network.address_store import AddressStore
+
+        class _NoIpfs:
+            def cat_bytes(self, cid):
+                raise RuntimeError(f'legacy CID not available in CAS transport: {cid!r}')
+
+            def get(self, cid, dest_path):
+                raise RuntimeError(f'legacy CID not available in CAS transport: {cid!r}')
+
+            def dag_export(self, cid, filepath):
+                raise RuntimeError(f'legacy CID not available in CAS transport: {cid!r}')
+
+        return AddressStore(_NoIpfs(), cats_home=cats_home).get(content_id, dest_dir)
 
     store = CasHttpStore(cats_home)
 
