@@ -41,6 +41,7 @@ data/input/.terraform/
 
 # data/input/structure — runtime artifacts
 # Committed: main.tf, infrastructure/* (incl. transport_utils.py), .terraform.lock.hcl
+data/input/structure/.applied-structure.id
 data/input/structure/.applied-structure.cid
 data/input/structure/.host-ipfs-daemon.pid
 data/input/structure/.host-ipfs-daemon.log

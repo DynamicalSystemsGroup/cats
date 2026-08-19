@@ -41,11 +41,12 @@ locals {
 }
 
 resource "shell_script" "host_ipfs_daemon" {
-  # InfraStructure content-store facet: sole Order-submitted ContentStore.ensure
-  # during Structure TF (à la carte; bare terraform apply can start host Kubo).
-  # Executor InfraStructure.apply only asserts is_ready after apply — it does
-  # not call ensure. Does not kill host Kubo on destroy — content store
-  # outlives Structure T&D (Docker peers / MinIO) and Plant.
+  # InfraStructure content-store facet: Order-submitted ContentStore.ensure on
+  # create (à la carte). Do **not** ForceNew every apply — that kills a live
+  # host Kubo and races repo.lock / "resource temporarily unavailable".
+  # Mid-apply death is healed by InfraStructure.content_store_assert (one
+  # ensure + backoff) after terraform apply. Does not kill host Kubo on
+  # destroy — content store outlives Structure T&D and Plant.
   lifecycle_commands {
     create = <<-EOF
       #!/bin/bash
@@ -62,7 +63,7 @@ resource "shell_script" "host_ipfs_daemon" {
     EOF
     delete = <<-EOF
       #!/bin/bash
-      # Content-store facet: leave host Kubo running for Order/BOM CIDs and
+      # Content-store facet: leave host Kubo running for legacy CID reads and
       # the next demo/Node session. Only clear a legacy pidfile if present.
       rm -f "${local.host_ipfs_daemon_pidfile}"
     EOF

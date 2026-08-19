@@ -223,15 +223,15 @@ def test_write_job_durable_config(tmp_path):
     store = _scratch_store()
     job_dir = tmp_path / 'job'
     job_dir.mkdir()
-    structure_cid = 'QmTestStructureCid01'
-    store.write_job_durable_config(str(job_dir), structure_cid)
+    structure_id = 'QmTestStructureCid01'
+    store.write_job_durable_config(str(job_dir), structure_id)
     path = job_dir / 'object_store_durable_config.json'
     assert path.is_file()
     config = json.loads(path.read_text(encoding='utf-8'))
     assert config['endpoint'] == 'http://172.19.0.1:9100'
     assert config['bucket'] == 'cats-durable'
-    assert config['structure_cid'] == structure_cid
-    assert config['structures_prefix'] == f'structures/{structure_cid}/er'
+    assert config['structure_id'] == structure_id
+    assert config['structures_prefix'] == f'structures/{structure_id}/er'
 
 
 def test_er_uri_shape():
@@ -247,22 +247,22 @@ def test_er_uri_shape():
 def test_promote_resolve_er_round_trip(local_s3):
     """promote_er writes er/current pointer; resolve_er reads it back."""
     store = _scratch_store()
-    structure_cid = 'QmStructPromote01'
+    structure_id = 'QmStructPromote01'
     name = 'edges'
     local_dir = local_s3.parent / 'er_src'
     local_dir.mkdir()
     (local_dir / 'table.csv').write_text('a,b\n1,2\n', encoding='utf-8')
 
-    uri = store.write_er(structure_cid, name, str(local_dir))
-    assert uri == store.er_uri(structure_cid, name)
-    pointer = store.promote_er(structure_cid, name)
+    uri = store.write_er(structure_id, name, str(local_dir))
+    assert uri == store.er_uri(structure_id, name)
+    pointer = store.promote_er(structure_id, name)
     assert pointer == {
         'uri': uri,
-        'structure_cid': structure_cid,
+        'structure_id': structure_id,
         'name': name,
     }
     assert store.resolve_er(name) == pointer
-    assert name in store.list_er(structure_cid)
+    assert name in store.list_er(structure_id)
 
 
 def test_gc_er_protects_pointer_roots(local_s3):
@@ -287,25 +287,55 @@ def test_gc_er_protects_pointer_roots(local_s3):
     assert live not in deleted
     assert store.list_er(live) == ['edges']
     assert store.list_er(dead) == []
-    assert store.resolve_er('edges')['structure_cid'] == live
+    assert store.resolve_er('edges')['structure_id'] == live
+
+
+def test_gc_er_reads_legacy_structure_cid_pointer(local_s3):
+    """gc-er treats legacy structure_cid pointer keys as live roots."""
+    store = _scratch_store()
+    live = 'QmLegacyPointerStruct01'
+    dead = 'QmUnreferencedStruct01'
+    src = local_s3.parent / 'er_legacy_ptr'
+    src.mkdir()
+    (src / 'x.csv').write_text('x\n1\n', encoding='utf-8')
+    store.write_er(live, 'edges', str(src))
+    store.write_er(dead, 'edges', str(src))
+
+    # Simulate a pre-§6j pointer still keyed structure_cid (same module as
+    # local_s3 monkeypatch).
+    legacy = {
+        'uri': store.er_uri(live, 'edges'),
+        'structure_cid': live,
+        'name': 'edges',
+    }
+    fs = obj_store_utils._s3_fs(store.as_durable_cli_config())
+    key = f"{store.durable_bucket}/{obj_store_utils._pointer_key('edges')}"
+    payload = json.dumps(legacy, separators=(',', ':')).encode('utf-8')
+    obj_store_utils._ensure_parent_dir(fs, key)
+    with fs.open_output_stream(key) as out:
+        out.write(payload)
+
+    dry = store.gc_er(delete=False)
+    assert dead in dry
+    assert live not in dry
 
 
 def test_gc_er_structure_refuses_without_force(local_s3):
-    """Targeted gc-er --structure refuses when er/current still points at it."""
+    """Targeted gc-er --structure-id refuses when er/current still points at it."""
     store = _scratch_store()
-    structure_cid = 'QmPinnedStruct01'
+    structure_id = 'QmPinnedStruct01'
     src = local_s3.parent / 'er_pin'
     src.mkdir()
     (src / 'x.csv').write_text('x\n1\n', encoding='utf-8')
-    store.write_er(structure_cid, 'nodes', str(src))
-    store.promote_er(structure_cid, 'nodes')
+    store.write_er(structure_id, 'nodes', str(src))
+    store.promote_er(structure_id, 'nodes')
 
     with pytest.raises(RuntimeError, match='referenced by'):
-        store.gc_er(delete=True, structure_cid=structure_cid)
+        store.gc_er(delete=True, structure_id=structure_id)
 
-    store.gc_er(delete=True, structure_cid=structure_cid, force=True)
+    store.gc_er(delete=True, structure_id=structure_id, force=True)
     assert store.resolve_er('nodes') is None
-    assert store.list_er(structure_cid) == []
+    assert store.list_er(structure_id) == []
 
 
 def test_scratch_destroy_does_not_wipe_durable_volume():

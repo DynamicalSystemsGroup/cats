@@ -1,4 +1,4 @@
-import os, time, subprocess
+import os, time, subprocess, threading
 
 
 class Dict2Class(object):
@@ -18,36 +18,46 @@ def subproc_run(cmd, cwd=None):
     )
     return proc
 
-#
-# def procInBackground(cmd, cwd=None):
-#     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, universal_newlines=True, cwd=cwd)
-#     print("The subprocess is running in the background.")
-#
-#     for path in execute(cmd):
-#         print(path, end="")
-#     return popen
 
 def executeCMD(cmd, cwd=None):
-    popen = None
-    def execute(x):
-        popen = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            shell=True,
-            universal_newlines=True,
-            cwd=cwd
-        )
-        for stdout_line in iter(popen.stdout.readline, ""):
-            yield stdout_line
-        popen.stdout.close()
-        return_code = popen.wait()
-        if return_code != 0:
-            print("Error:\n", popen.stderr.read())
-            raise subprocess.CalledProcessError(return_code, x)
+    """Run ``cmd``, stream stdout live, and fail with stderr in the message.
 
-    for path in execute(cmd):
-        print(path, end="")
+    stderr is drained on a side thread so a verbose failing process cannot
+    deadlock when the stderr pipe buffer fills (Popen + unread stderr).
+    """
+    popen = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True,
+        universal_newlines=True,
+        cwd=cwd,
+    )
+    err_chunks: list[str] = []
+
+    def _drain_stderr():
+        assert popen.stderr is not None
+        for line in iter(popen.stderr.readline, ''):
+            err_chunks.append(line)
+
+    drain = threading.Thread(target=_drain_stderr, daemon=True)
+    drain.start()
+    assert popen.stdout is not None
+    for stdout_line in iter(popen.stdout.readline, ''):
+        print(stdout_line, end='')
+    popen.stdout.close()
+    return_code = popen.wait()
+    drain.join(timeout=30)
+    err = ''.join(err_chunks)
+    if return_code != 0:
+        if err:
+            print('Error:\n', err)
+        # RuntimeError so Flask / catSubmit see stderr (CalledProcessError.__str__
+        # omits the stderr attribute).
+        raise RuntimeError(
+            f'Command {cmd!r} returned non-zero exit status {return_code}.\n'
+            f'{err}'.rstrip()
+        )
     return popen
 
 

@@ -1,4 +1,4 @@
-"""Function source directory CIDs + pickle bind hybrid on function_cid."""
+"""Function source directory ids + pickle bind hybrid on function_id."""
 import json
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -10,6 +10,26 @@ from cats.network import (
     resolve_function_package_dirs,
     stage_function_package,
 )
+from data.input.function.infrafunction import infrafunction_subproc
+from data.input.function.process import (
+    egress,
+    ingress,
+    integration_cache,
+    process_0,
+    process_1,
+)
+
+
+def _spy_put_json(client, monkeypatch):
+    put_objs = []
+    real = client.put_json
+
+    def _spy(obj, **kwargs):
+        put_objs.append(obj)
+        return real(obj, **kwargs)
+
+    monkeypatch.setattr(client, 'put_json', _spy)
+    return put_objs
 
 
 def _write_function_fixture(input_home: Path, *, with_pycache=True):
@@ -63,10 +83,8 @@ def test_stage_function_package_excludes_pycache(tmp_path):
 
 
 def test_create_order_request_emits_source_cids(monkeypatch, tmp_path):
-    """create_order_request emits process_source_cid and infrafunction_source_cid."""
+    """create_order_request emits process_source / infrafunction_source uri refs."""
     fake = MagicMock()
-    fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
-    fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmPy'
 
     structure = tmp_path / 'structure'
     (structure / 'plant').mkdir(parents=True)
@@ -81,36 +99,36 @@ def test_create_order_request_emits_source_cids(monkeypatch, tmp_path):
     data.mkdir()
     (data / 'f.csv').write_text('a\n')
 
-    def _cid_dir(path):
+    def _put_dir(path):
         name = Path(path).name
         return f'Qm{name}', name
 
     client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
-    monkeypatch.setattr(client, 'cidDir', _cid_dir)
+    monkeypatch.setattr(client, 'put_dir', _put_dir)
+    put_objs = _spy_put_json(client, monkeypatch)
 
     client.create_order_request(
-        ingress_subproc=lambda: None,
-        integrated_subproc=lambda: None,
-        egress_subproc=lambda: None,
-        integration_cache_subproc=lambda: None,
-        infrafunction_subproc=lambda: None,
+        ingress_subproc=ingress,
+        integrated_subproc=process_0,
+        egress_subproc=egress,
+        integration_cache_subproc=integration_cache,
+        infrafunction_subproc=infrafunction_subproc,
         data_dirpath=str(data),
         structure_filepath=str(structure),
     )
-    function_payload = json.loads(
-        next(
-            args[0]
-            for args, _ in fake.add_str.call_args_list
-            if '"process_source_cid"' in args[0]
-            and '"infrafunction_source_cid"' in args[0]
-        )
+    function_payload = next(
+        obj for obj in put_objs
+        if isinstance(obj, dict)
+        and 'process_source_uri' in obj
+        and 'infrafunction_source_uri' in obj
     )
-    assert function_payload['process_source_cid'] == 'Qmprocess'
-    assert function_payload['infrafunction_source_cid'] == 'Qminfrafunction'
-    assert 'process_cid' in function_payload
-    assert 'infrafunction_cid' in function_payload
-
+    assert function_payload['process_source_uri'] == 'Qmprocess'
+    assert function_payload['infrafunction_source_uri'] == 'Qminfrafunction'
+    assert 'process_uri' in function_payload
+    assert 'infrafunction_uri' in function_payload
+    assert 'process_cid' not in function_payload
+    assert 'infrafunction_cid' not in function_payload
 
 def test_get_enhanced_bom_requires_function_source_cids(monkeypatch, tmp_path):
     """getEnhancedBom fails when function_cid lacks source CIDs."""
@@ -142,7 +160,7 @@ def test_get_enhanced_bom_requires_function_source_cids(monkeypatch, tmp_path):
         'infrafunction_cid': 'QmIfrBind',
     }
 
-    def _get(cid, filepath, output=None):
+    def _get(content_id, filepath, output=None):
         dest_root = Path(output or tmp_path)
         path = dest_root / filepath
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -161,17 +179,17 @@ def test_get_enhanced_bom_requires_function_source_cids(monkeypatch, tmp_path):
             path.mkdir(parents=True, exist_ok=True)
         return filepath
 
-    def _cat(cid):
-        if cid == 'QmStruct':
+    def _cat(content_id):
+        if content_id == 'QmStruct':
             return json.dumps(structure)
-        if cid == 'QmFn':
+        if content_id == 'QmFn':
             return json.dumps(function)
         return '{}'
 
     monkeypatch.setattr(client, 'get', _get)
     monkeypatch.setattr(client, 'cat', _cat)
 
-    with pytest.raises(RuntimeError, match='process_source_cid'):
+    with pytest.raises(RuntimeError, match='process_source'):
         client.getEnhancedBom(
             'QmBom', INPUT_HOME=str(input_home), OUTPUT_HOME=str(output_home)
         )
@@ -209,8 +227,8 @@ def test_get_enhanced_bom_materializes_function_sources(monkeypatch, tmp_path):
     }
     gets = []
 
-    def _get(cid, filepath, output=None):
-        gets.append((cid, filepath))
+    def _get(content_id, filepath, output=None):
+        gets.append((content_id, filepath))
         dest_root = Path(output or tmp_path)
         path = dest_root / filepath
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -235,10 +253,10 @@ def test_get_enhanced_bom_materializes_function_sources(monkeypatch, tmp_path):
             (path / 'actuator.py').write_text('# from-order\n')
         return filepath
 
-    def _cat(cid):
-        if cid == 'QmStruct':
+    def _cat(content_id):
+        if content_id == 'QmStruct':
             return json.dumps(structure)
-        if cid == 'QmFn':
+        if content_id == 'QmFn':
             return json.dumps(function)
         return '{}'
 
@@ -261,8 +279,6 @@ def test_get_enhanced_bom_materializes_function_sources(monkeypatch, tmp_path):
 def test_link_process_carries_source_cids(monkeypatch, tmp_path):
     """linkProcess preserves prior process_source_cid / infrafunction_source_cid."""
     fake = MagicMock()
-    fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
-    fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmNewPy'
 
     prev_process = {
         'ingress_subproc_cid': 'QmIn',
@@ -276,19 +292,6 @@ def test_link_process_carries_source_cids(monkeypatch, tmp_path):
         'infrafunction_cid': 'QmIfrBind',
         'process_source_cid': 'QmProcSrc',
         'infrafunction_source_cid': 'QmIfrSrc',
-    }
-    order = {
-        'function_cid': 'QmFn',
-        'structure_cid': 'QmStruct',
-        'invoice_cid': 'QmInvOld',
-        'structure_filepath': 'structure',
-        'flat': {'function': prev_function},
-        'endpoint': 'http://127.0.0.1:5000/cat/node/init',
-    }
-    invoice = {
-        'data_cid': 'QmData',
-        'order_cid': 'QmOrder',
-        'order': order,
     }
     cat_response = {
         'bom': {
@@ -331,21 +334,19 @@ def test_link_process_carries_source_cids(monkeypatch, tmp_path):
     monkeypatch.setattr(client, 'cat', _cat)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
     monkeypatch.setenv('CAT_NODE_PORT', '5000')
+    put_objs = _spy_put_json(client, monkeypatch)
 
-    # flatten_bom uses cat; linkProcess calls flatten_bom then rebuilds.
-    client.linkProcess(cat_response, integrated_subproc=lambda: 'new')
+    client.linkProcess(cat_response, integrated_subproc=process_1)
 
-    function_payload = json.loads(
-        next(
-            args[0]
-            for args, _ in fake.add_str.call_args_list
-            if '"process_source_cid"' in args[0]
-            and '"infrafunction_source_cid"' in args[0]
-            and '"process_cid"' in args[0]
-        )
+    function_payload = next(
+        obj for obj in put_objs
+        if isinstance(obj, dict)
+        and 'process_source_uri' in obj
+        and 'infrafunction_source_uri' in obj
+        and 'process_uri' in obj
     )
-    assert function_payload['process_source_cid'] == 'QmProcSrc'
-    assert function_payload['infrafunction_source_cid'] == 'QmIfrSrc'
+    assert function_payload['process_source_uri'] == 'QmProcSrc'
+    assert function_payload['infrafunction_source_uri'] == 'QmIfrSrc'
 
 
 def test_link_process_fails_without_source_cids(monkeypatch, tmp_path):
@@ -391,4 +392,4 @@ def test_link_process_fails_without_source_cids(monkeypatch, tmp_path):
     monkeypatch.setattr(client, 'cat', _cat)
 
     with pytest.raises(RuntimeError, match='process_source_cid'):
-        client.linkProcess(cat_response, integrated_subproc=lambda: 'new')
+        client.linkProcess(cat_response, integrated_subproc=process_1)

@@ -27,40 +27,40 @@ if TYPE_CHECKING:
 
 
 def ingress(
-    input_dir_cid,
+    input_dir_id,
     transport: TransportPort,
     *,
     io: IoPort | None = None,
     num_partitions: int = 1,
 ):
-    """Transport / IoPort: migrate or partition-ingress invoice data CID."""
+    """Transport / IoPort: migrate or partition-ingress invoice data id."""
     if num_partitions > 1 and io is not None:
         return io.partition_ingress(
-            input_dir_cid, num_partitions=num_partitions
+            input_dir_id, num_partitions=num_partitions
         )
-    return transport.migrate(input_dir_cid)
+    return transport.migrate(input_dir_id)
 
 
 def egress(
-    input_dir_cid,
+    input_dir_id,
     transport: TransportPort,
     *,
     io: IoPort | None = None,
     num_partitions: int = 1,
 ):
-    """Transport / IoPort: migrate or partition-egress; return CID for Invoice."""
+    """Transport / IoPort: migrate or partition-egress; return id for Invoice."""
     if num_partitions > 1 and io is not None:
         return io.partition_egress(
-            input_dir_cid, num_partitions=num_partitions
+            input_dir_id, num_partitions=num_partitions
         )
-    cid, _ = transport.migrate(input_dir_cid)
+    cid, _ = transport.migrate(input_dir_id)
     return cid
 
 
-def integration_cache(input_dir_cid, cwd, transport: TransportPort, data_cache=None):
-    """Transport port: stage ingress CID onto Plant-facing integration cache."""
+def integration_cache(input_dir_id, cwd, transport: TransportPort, data_cache=None):
+    """Transport port: stage ingress id onto Plant-facing integration cache."""
     return transport.stage_for_plant(
-        input_dir_cid, cwd=cwd, data_cache=data_cache
+        input_dir_id, cwd=cwd, data_cache=data_cache
     )
 
 

@@ -1,5 +1,6 @@
-"""Phase 2a Node-hosted LDP BOM control plane."""
+"""Phase 2a Node-hosted LDP BOM control plane (§6d: uri-only envelope fields)."""
 from unittest.mock import MagicMock
+import json
 
 import pytest
 from flask import Flask
@@ -24,8 +25,8 @@ def _signed_bom(monkeypatch, tmp_path):
     did = node_did(cats_home=str(tmp_path))
     return sign_execution_bom(
         build_execution_bom(
-            log_cid='QmLog',
-            invoice_cid='QmInv',
+            log_id='QmLog',
+            invoice_id='QmInv',
             node_did=did,
         ),
         cats_home=str(tmp_path),
@@ -49,9 +50,10 @@ def test_bom_ldp_store_put_get_list(tmp_path, monkeypatch):
     bom = _signed_bom(monkeypatch, tmp_path)
     store = BomLdpStore(str(tmp_path))
     store.put('QmBom1', bom)
-    assert store.get('QmBom1')['invoice_cid'] == 'QmInv'
+    assert store.get('QmBom1')['invoice_uri'] == 'QmInv'
+    assert 'invoice_cid' not in store.get('QmBom1')
     assert store.list() == ['QmBom1']
-    store.put('QmBom2', {**bom, 'log_cid': 'QmLog2'})
+    store.put('QmBom2', {**bom, 'log_uri': 'QmLog2'})
     assert store.list()[0] in ('QmBom1', 'QmBom2')
     assert set(store.list()) == {'QmBom1', 'QmBom2'}
 
@@ -92,12 +94,13 @@ def test_fetch_bom_envelope_verifies(monkeypatch, tmp_path):
         'http://127.0.0.1:5002/ldp/boms/QmX',
         session=_Session(),
     )
-    assert out['invoice_cid'] == 'QmInv'
+    assert out['invoice_uri'] == 'QmInv'
+    assert 'invoice_cid' not in out
 
 
 def test_fetch_bom_envelope_tamper_fails(monkeypatch, tmp_path):
     bom = _signed_bom(monkeypatch, tmp_path)
-    bom['invoice_cid'] = 'QmEvil'
+    bom['invoice_uri'] = 'QmEvil'
 
     class _Resp:
         status_code = 200
@@ -134,7 +137,8 @@ def test_flask_ldp_routes(monkeypatch, tmp_path):
     resource = client.get('/ldp/boms/QmFlask')
     assert resource.status_code == 200
     assert LDP_RESOURCE in resource.headers.get('Link', '')
-    assert resource.get_json()['invoice_cid'] == 'QmInv'
+    assert resource.get_json()['invoice_uri'] == 'QmInv'
+    assert 'invoice_cid' not in resource.get_json()
 
     missing = client.get('/ldp/boms/QmMissing')
     assert missing.status_code == 404
@@ -144,8 +148,9 @@ def test_flask_ldp_routes(monkeypatch, tmp_path):
 
 
 def test_runtime_execute_publishes_ldp(monkeypatch, tmp_path):
-    """Runtime.execute stores BOM in BomLdpStore and returns bom_ldp_uri."""
+    """Runtime.execute stores BOM in BomLdpStore and returns content_id + bom_ldp_uri."""
     from cats.runtime import Runtime
+    from cats.network.registry import BomRegistry
 
     monkeypatch.delenv('CAT_NODE_DID', raising=False)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
@@ -153,23 +158,43 @@ def test_runtime_execute_publishes_ldp(monkeypatch, tmp_path):
     node_did(cats_home=str(tmp_path))
 
     mesh = MagicMock()
-    mesh.ipfsClient.add_str.return_value = 'QmRuntimeBom'
+    mesh.put_json.return_value = 'QmRuntimeBom'
+    mesh.cat.side_effect = lambda cid: {
+        'QmInvoice': json.dumps({
+            'order_cid': 'QmOrder',
+            'data_cid': 'QmDataOut',
+        }),
+        'QmOrder': json.dumps({
+            'function_cid': 'QmFn',
+            'structure_cid': 'QmStruct',
+            'invoice_cid': 'QmInvIn',
+        }),
+        'QmInvIn': json.dumps({'data_cid': 'QmDataIn'}),
+    }[cid]
     # Runtime.__init__ assigns paths onto contentMesh
     runtime = Runtime(contentMesh=mesh, CATS_HOME=str(tmp_path))
 
     factory = MagicMock()
     executor = MagicMock()
     executor.execute.return_value = (
-        {'log_cid': 'QmLog'},
+        {'log_uri': 'QmLog'},
         'QmInvoice',
     )
     factory.produce.return_value = executor
 
-    response = runtime.execute(factory, {'order_cid': 'QmOrder'})
-    assert response['bom_cid'] == 'QmRuntimeBom'
+    response = runtime.execute(factory, {'order_id': 'QmOrder'})
+    assert response['content_id'] == 'QmRuntimeBom'
+    assert 'bom_cid' not in response
     assert response['bom_ldp_uri'] == 'http://127.0.0.1:5002/ldp/boms/QmRuntimeBom'
     assert response['bom_solid_uri'] is None
     stored = BomLdpStore(str(tmp_path)).get('QmRuntimeBom')
     assert stored is not None
-    assert stored['invoice_cid'] == 'QmInvoice'
+    assert stored['invoice_uri'] == 'QmInvoice'
+    assert 'invoice_cid' not in stored
     assert 'proof' in stored
+    record = BomRegistry(str(tmp_path)).get('QmRuntimeBom')
+    assert record is not None
+    assert record['order'] == 'QmOrder'
+    assert record['data'] == 'QmDataOut'
+    assert 'order_cid' not in record
+    assert BomRegistry(str(tmp_path)).lookup_bom('QmDataOut') == ['QmRuntimeBom']

@@ -5,8 +5,10 @@ CAT Node process lifecycle: **ensure** host ContentStore, **start** / **stop** F
 CLI: `uv run python -m cats.node {start|stop|status|ensure}` (default: `start`).
 Make targets wrap the same commands.
 
-**Ownership rule:** Node is a client of InfraStructure’s long-lived **content-store facet** (host Kubo).
-`start` **asserts** readiness only; `ensure` **heals**/starts Kubo; `stop` kills Flask only — never host Kubo.
+**Ownership rule:** Node is a client of InfraStructure’s long-lived **content-store facet**.
+Host Kubo is the **legacy CID** reader / mid-migration ensure target; **new** content lives on
+Node **CAS-over-HTTP** (`GET /ldp/cas/<hex>`). `start` **asserts** Kubo readiness (legacy/T&D);
+`ensure` **heals**/starts Kubo; `stop` kills Flask only — never host Kubo.
 
 ## Quick reference
 
@@ -74,11 +76,20 @@ make node-start
 - Clears a prior `cats.node` listener on the Node port (does not kill unrelated processes, e.g. AirPlay on 5000).
 - Fails loud if the port is still held by a non-`cats.node` process — set `CAT_NODE_PORT` (e.g. `5002`) when macOS AirPlay owns `:5000`.
 - On SIGINT / SIGTERM, exits without stopping host Kubo.
-- Serves Order entry at `POST /cat/node/init` and Phase 2a LDP control plane
-  (local cache; Solid dual-write is separate — see [`SOLID.md`](SOLID.md)):
+- Serves Order entry at `POST /cat/node/init`, Phase 2a LDP control plane, registry,
+  and CAS-over-HTTP data plane (Solid dual-write is separate — see [`SOLID.md`](SOLID.md);
+  registry: [`BomRegistry.md`](BomRegistry.md); storage: [`STORAGE.md`](STORAGE.md)):
   - `GET /ldp/boms/` — Basic Container listing published BOM URIs
-  - `GET /ldp/boms/<bom_cid>` — signed ExecutionBom JSON-LD (publish via `Runtime.execute` only; HTTP PUT → 405)
-
+  - `GET /ldp/boms/<content_id>` — signed ExecutionBom JSON-LD (publish via `Runtime.execute` only; HTTP PUT → 405)
+  - `GET /ldp/registry/` — BOM registry container (Node-local index)
+  - `GET /ldp/registry/boms/<content_id>` — registry record JSON (`project_record`; no `*_cid`); PUT → 405
+  - `GET /ldp/registry/by-data/<data>` — `{content_id, bom_ids: [...]}`
+  - `GET /ldp/registry/by-order/<order>` — `{content_id, bom_ids: [...]}`
+  - `GET /ldp/registry/by-content/<digest>` — CAS locator map `{ content_id, locators }`
+  - `GET /ldp/cas/<digest>` — raw CAS blob bytes (sha256 identity); PUT → 405
+  - `GET /ldp/invoices/<id>` — Invoice JSON (Phase 2b URI address); PUT → 405
+  - `GET /ldp/orders/<id>` — Order JSON (Phase 2b URI address); PUT → 405
+  - `POST /cat/node/init` — body may use `order_uri`, or `bom_uri` / `bom_ldp_uri` / `bom_solid_uri` / unique `content_id` / `data_uri` / `hl` (values may be `hl:` / `ni:` / http) via the registry (legacy `order_cid` / `bom_cid` / `data_cid` → 400; ambiguous → 409 `{bom_ids}`). Set `CAT_NODE_HOST` to a peer-reachable address (or rely on Solid `bom_solid_uri` in `hl:` hints); `127.0.0.1` is not mesh-usable.
 ### Status
 
 ```bash
@@ -124,6 +135,7 @@ Make-only convenience: runs `node-stop`, then `ipfs shutdown`. Does **not** live
 - [`INSTALL.md`](./INSTALL.md) / [`ENV.md`](./ENV.md) — clone, `uv sync`, environment
 - [`DEMO.md`](./DEMO.md) — mesh demo after the Node is up
 - [`TEST.md`](./TEST.md) — integration tests that need a live Node
+- [`BomRegistry.md`](./BomRegistry.md) — Node-local BOM query index (`GET /ldp/registry/…`)
 - [`STORAGE.md`](./STORAGE.md) — content-store vs scratch ownership; why ensure ≠ start
 - [`IPFS.md`](./IPFS.md) — host Kubo facet, two-phase ensure, peering
 - [`DASHBOARDS.md`](./DASHBOARDS.md) — Ray / MinIO / IPFS WebUI once Structure is deployed

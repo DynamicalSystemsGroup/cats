@@ -31,7 +31,7 @@ def test_factory_accept_stages_bom_then_assembles(monkeypatch):
     )
 
     order_request = {
-        'order_cid': 'QmOrder',
+        'order_id': 'QmOrder',
         'order': {
             'structure_cid': 'QmStruct',
             'structure_filepath': 'structure',
@@ -42,10 +42,10 @@ def test_factory_accept_stages_bom_then_assembles(monkeypatch):
     factory = Factory(runtime).accept(order_request, 'QmInitData')
 
     assert len(init_calls) == 1
-    assert init_calls[0]['structure_cid'] == 'QmStruct'
-    assert init_calls[0]['function_cid'] == 'QmFn'
-    assert init_calls[0]['init_data_cid'] == 'QmInitData'
-    assert init_calls[0]['order_cid'] == 'QmOrder'
+    assert init_calls[0]['structure_id'] == 'QmStruct'
+    assert init_calls[0]['function_id'] == 'QmFn'
+    assert init_calls[0]['init_data_id'] == 'QmInitData'
+    assert init_calls[0]['order_id'] == 'QmOrder'
     assert factory.structure is fake_structure
     assert factory.function is fake_function
     assert factory.executor is fake_executor

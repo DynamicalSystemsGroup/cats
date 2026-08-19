@@ -197,7 +197,7 @@ class KuboRpcClient:
         return self._add_directory(path)
 
     def _add_directory(self, directory: Path) -> list[dict]:
-        """Multipart recursive add matching `ipfs add -r` / cidDir expectations.
+        """Multipart recursive add matching `ipfs add -r` / put_dir expectations.
 
         Skips ``__pycache__`` / ``*.pyc`` so importing Order-submitted utils
         cannot change plant/infrastructure CIDs between CAT runs.

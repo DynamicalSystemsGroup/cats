@@ -16,15 +16,15 @@ def _by_cid(lineage: list, cid: str) -> dict:
 
 def test_stage_lineage_derivation_chain():
     bom = build_execution_bom(
-        log_cid='log1',
-        invoice_cid='inv1',
+        log_id='log1',
+        invoice_id='inv1',
         node_did='did:key:zTest',
-        order_cid='ord1',
-        input_data_cid='inputData',
-        ingress_data_cid='ingress',
-        integration_data_cid='integration',
-        data_cid='egress',
-        structure_as_executed_cid='structExec',
+        order_id='ord1',
+        input_data_id='inputData',
+        ingress_data_id='ingress',
+        integration_data_id='integration',
+        data_id='egress',
+        structure_as_executed_id='structExec',
     )
     activity = bom['prov:wasGeneratedBy']
     assert activity['@id'] == EXECUTOR_RUN_ID
@@ -54,10 +54,10 @@ def test_stage_lineage_derivation_chain():
 
 def test_stage_lineage_omits_null_stages():
     bom = build_execution_bom(
-        log_cid='log1',
-        invoice_cid='inv1',
-        ingress_data_cid='ingress',
-        data_cid='egress',
+        log_id='log1',
+        invoice_id='inv1',
+        ingress_data_id='ingress',
+        data_id='egress',
     )
     lineage = bom['stageLineage']
     assert [e['@id'] for e in lineage] == [
@@ -72,7 +72,7 @@ def test_stage_lineage_omits_null_stages():
 
 
 def test_stage_lineage_absent_when_no_stage_cids():
-    bom = build_execution_bom(log_cid='log1', invoice_cid='inv1')
+    bom = build_execution_bom(log_id='log1', invoice_id='inv1')
     assert 'stageLineage' not in bom
     assert bom['prov:wasGeneratedBy']['@id'] == EXECUTOR_RUN_ID
     assert bom['prov:wasGeneratedBy']['prov:used'] == {'@id': 'ipfs://inv1'}
@@ -81,12 +81,12 @@ def test_stage_lineage_absent_when_no_stage_cids():
 def test_stage_lineage_covered_by_data_integrity(tmp_path):
     did = node_did(cats_home=str(tmp_path))
     bom = build_execution_bom(
-        log_cid='log1',
-        invoice_cid='inv1',
+        log_id='log1',
+        invoice_id='inv1',
         node_did=did,
-        ingress_data_cid='ingress',
-        integration_data_cid='integration',
-        data_cid='egress',
+        ingress_data_id='ingress',
+        integration_data_id='integration',
+        data_id='egress',
     )
     signed = sign_execution_bom(bom, cats_home=str(tmp_path))
     verify_execution_bom(signed)
@@ -99,9 +99,9 @@ def test_stage_lineage_covered_by_data_integrity(tmp_path):
 
 def test_context_binds_stage_lineage():
     bom = build_execution_bom(
-        log_cid='log1',
-        invoice_cid='inv1',
-        ingress_data_cid='ingress',
+        log_id='log1',
+        invoice_id='inv1',
+        ingress_data_id='ingress',
     )
     ctx = bom['@context'][1]
     assert ctx['stageLineage'] == 'cats:stageLineage'

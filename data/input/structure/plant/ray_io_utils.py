@@ -35,8 +35,8 @@ except ImportError:  # repo import when not in job working_dir
     )
 
 
-def run_partition_ingress(mesh, input_dir_cid: str, *, num_partitions: int) -> tuple[str, str]:
-    """Fetch ``input_dir_cid``, split into ``n`` CAR parts, return layout cidDir."""
+def run_partition_ingress(mesh, input_dir_id: str, *, num_partitions: int) -> tuple[str, str]:
+    """Fetch ``input_dir_id``, split into ``n`` CAR parts, return layout via ``put_dir``."""
     if num_partitions < 2:
         raise ValueError('partition_ingress requires num_partitions >= 2')
 
@@ -44,8 +44,8 @@ def run_partition_ingress(mesh, input_dir_cid: str, *, num_partitions: int) -> t
         tmp_path = Path(tmp)
         fetch_root = tmp_path / 'input'
         fetch_root.mkdir()
-        # Materialize CID at fetch_root (file or directory).
-        mesh.get(cid=input_dir_cid, filepath='input', output=str(tmp_path))
+        # Materialize content id at fetch_root (file or directory).
+        mesh.get(content_id=input_dir_id, filepath='input', output=str(tmp_path))
         source = fetch_root
         if not source.exists():
             # get may write to output/filepath as file without trailing dir
@@ -74,31 +74,31 @@ def run_partition_ingress(mesh, input_dir_cid: str, *, num_partitions: int) -> t
                 write_shard_tree(bag, bag_dir, source_root=root_for_rel)
                 _write_part_car(mesh, bag_dir, layout_dir / part_car_name(i))
 
-        result = mesh.cidDir(str(layout_dir))
+        result = mesh.put_dir(str(layout_dir))
         if isinstance(result, tuple):
-            layout_cid, layout_name = result
+            layout_id, layout_name = result
         else:
-            layout_cid, layout_name = result, layout_dir.name
-        return layout_cid, layout_name
+            layout_id, layout_name = result, layout_dir.name
+        return layout_id, layout_name
 
 
-def run_partition_egress(mesh, input_dir_cid: str, *, num_partitions: int) -> str:
-    """Materialize partition layout and publish partition-dir CID for Invoice.
+def run_partition_egress(mesh, input_dir_id: str, *, num_partitions: int) -> str:
+    """Materialize partition layout and publish partition-dir id for Invoice.
 
     Prefer an existing ``part-*.car`` layout. Else CAR-wrap ``part-*`` CSV/dir
-    shards 1:1. Else ``cidDir`` the whole tree (single root).
+    shards 1:1. Else ``put_dir`` the whole tree (single root).
     """
     if num_partitions < 2:
         raise ValueError('partition_egress requires num_partitions >= 2')
 
     with tempfile.TemporaryDirectory(prefix='cats-io-egress-') as tmp:
         tmp_path = Path(tmp)
-        mesh.get(cid=input_dir_cid, filepath='input', output=str(tmp_path))
+        mesh.get(content_id=input_dir_id, filepath='input', output=str(tmp_path))
         source = tmp_path / 'input'
         if source.is_dir():
             cars = list_part_cars(source)
             if len(cars) == num_partitions:
-                result = mesh.cidDir(str(source))
+                result = mesh.put_dir(str(source))
             else:
                 shards = list_part_shards(source)
                 if len(shards) == num_partitions:
@@ -108,11 +108,11 @@ def run_partition_egress(mesh, input_dir_cid: str, *, num_partitions: int) -> st
                         _write_part_car(
                             mesh, shard, layout_dir / part_car_name(i)
                         )
-                    result = mesh.cidDir(str(layout_dir))
+                    result = mesh.put_dir(str(layout_dir))
                 else:
-                    result = mesh.cidDir(str(source))
+                    result = mesh.put_dir(str(source))
         else:
-            result = mesh.cidDir(str(source.parent if source.is_file() else tmp_path))
+            result = mesh.put_dir(str(source.parent if source.is_file() else tmp_path))
         if isinstance(result, tuple):
             return result[0]
         return result
@@ -168,35 +168,35 @@ class RayIoPort:
         self.work_root = work_root
 
     def partition_ingress(
-        self, input_dir_cid: str, *, num_partitions: int
+        self, input_dir_id: str, *, num_partitions: int
     ) -> tuple[str, str]:
         if self.via_job and self.plant_port is not None:
             return self._run_job(
-                'ingress', input_dir_cid, num_partitions=num_partitions
+                'ingress', input_dir_id, num_partitions=num_partitions
             )
         return run_partition_ingress(
-            self.mesh, input_dir_cid, num_partitions=num_partitions
+            self.mesh, input_dir_id, num_partitions=num_partitions
         )
 
-    def partition_egress(self, input_dir_cid: str, *, num_partitions: int) -> str:
+    def partition_egress(self, input_dir_id: str, *, num_partitions: int) -> str:
         if self.via_job and self.plant_port is not None:
-            layout_cid, _ = self._run_job(
-                'egress', input_dir_cid, num_partitions=num_partitions
+            layout_id, _ = self._run_job(
+                'egress', input_dir_id, num_partitions=num_partitions
             )
-            return layout_cid
+            return layout_id
         return run_partition_egress(
-            self.mesh, input_dir_cid, num_partitions=num_partitions
+            self.mesh, input_dir_id, num_partitions=num_partitions
         )
 
     def _run_job(
-        self, direction: str, input_dir_cid: str, *, num_partitions: int
+        self, direction: str, input_dir_id: str, *, num_partitions: int
     ) -> tuple[str, str]:
         """Submit ``ray_io_entrypoint`` and read ``io_result.json``."""
         work = self.work_root or tempfile.mkdtemp(prefix='cats-ray-io-job-')
         Path(work).mkdir(parents=True, exist_ok=True)
         args = {
             'direction': direction,
-            'input_cid': input_dir_cid,
+            'input_id': input_dir_id,
             'num_partitions': num_partitions,
         }
         args_path = Path(work) / 'io_args.json'
@@ -214,11 +214,11 @@ class RayIoPort:
                 f'Ray I/O job {job_id} did not write io_result.json'
             )
         payload = json.loads(result_path.read_text(encoding='utf-8'))
-        layout_cid = payload.get('layout_cid') or payload.get('data_cid')
+        layout_id = payload.get('layout_id')
         layout_name = payload.get('layout_name') or 'layout'
-        if not layout_cid:
-            raise RuntimeError(f'Ray I/O job result missing CID: {payload!r}')
-        return layout_cid, layout_name
+        if not layout_id:
+            raise RuntimeError(f'Ray I/O job result missing layout_id: {payload!r}')
+        return layout_id, layout_name
 
 
 IO_ENTRYPOINT_FILENAME = 'ray_io_entrypoint.py'

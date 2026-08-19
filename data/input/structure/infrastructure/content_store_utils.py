@@ -164,7 +164,8 @@ def _heal_stale_repo_lock():
             flush=True,
         )
         _terminate_pids(sorted(pids))
-        time.sleep(0.25)
+        # Give the OS time to release flock / listen sockets before restart.
+        time.sleep(2.0)
 
     if ContentStore.is_ready():
         return
@@ -206,24 +207,35 @@ class ContentStore:
             f'Starting host IPFS daemon (waiting for {api_url})...',
             flush=True,
         )
-        proc = subprocess.Popen(
-            'ipfs daemon',
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            shell=True,
-            universal_newlines=True,
-            cwd=cwd,
-        )
-        if _wait_for_ipfs_api(timeout=ready_timeout):
-            print('Host IPFS daemon API ready.', flush=True)
-            return
-        err = ''
-        if proc.poll() is not None and proc.stderr is not None:
-            err = proc.stderr.read() or ''
+        last_err = ''
+        for attempt in range(1, 4):
+            proc = subprocess.Popen(
+                'ipfs daemon',
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                shell=True,
+                universal_newlines=True,
+                cwd=cwd,
+            )
+            if _wait_for_ipfs_api(timeout=ready_timeout):
+                print('Host IPFS daemon API ready.', flush=True)
+                return
+            err = ''
+            if proc.poll() is not None and proc.stderr is not None:
+                err = proc.stderr.read() or ''
+            last_err = err.strip()
+            print(
+                f'ipfs daemon start attempt {attempt}/3 failed'
+                + (f': {last_err}' if last_err else ''),
+                flush=True,
+            )
+            # Another hung start may hold the lock; heal and retry.
+            _heal_stale_repo_lock()
+            time.sleep(1.0)
         raise RuntimeError(
             'Timed out waiting for host IPFS daemon HTTP API at '
             f'{api_url}'
-            + (f': {err.strip()}' if err.strip() else '')
+            + (f': {last_err}' if last_err else '')
         )
 
 

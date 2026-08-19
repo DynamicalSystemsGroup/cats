@@ -5,11 +5,11 @@ CATs runs **two hard-isolated MinIO daemons** under InfraStructure [IaaS], both
 
 | Daemon | Bucket | Role | Lifetime |
 |--------|--------|------|----------|
-| **Scratch** | `cats-scratch` | Plant parallel Ray job landing destined for IPFS (`integration_data_cid`) | Structure: ILM expire **7 days** + destroy `down -v` hard floor |
+| **Scratch** | `cats-scratch` | Plant parallel Ray job landing destined for IPFS (`integration_data_id` / `ni:`) | Structure: ILM expire **7 days** + destroy `down -v` hard floor |
 | **Durable Entity Relationship** | `cats-durable` | Structure-namespaced Entity Relationship tables + global `er/current/` read index | Node: no ILM; survives Structure destroy; explicit `gc-er` only |
 
 Plant workers and `ObjectStore` use standard S3 semantics (`s3://…`, bucket/key layout).
-Durable **CAT product** retrieval after a run remains IPFS (`invoice.integration_data_cid`),
+Durable **CAT product** retrieval after a run remains IPFS (`invoice` integration data id / `ni:`),
 not MinIO scratch. Durable MinIO is for **Entity Relationship lookups** across Structure
 generations — not an IPFS substitute. See [`STORAGE.md`](./STORAGE.md).
 
@@ -67,15 +67,19 @@ BOM `log.object_store_result_uri`: `s3://cats-scratch/jobs/<uuid>/result`
 **Durable Entity Relationship** (structure namespace + global pointer):
 
 ```text
-cats-durable/structures/<applied_structure_cid>/er/<name>/…
+cats-durable/structures/<applied_structure_id>/er/<name>/…
 cats-durable/er/current/<name>          # pointer JSON → structure-scoped URI
 ```
 
 Pointer shape:
 
 ```json
-{"uri":"s3://cats-durable/structures/<cid>/er/<name>","structure_cid":"<cid>","name":"<name>"}
+{"uri":"s3://cats-durable/structures/<id>/er/<name>","structure_id":"<id>","name":"<name>"}
 ```
+
+New promotes write `structure_id`. `gc_er` / pointer reads still accept legacy
+`structure_cid` for one migration cycle. Path segments under `structures/<id>/`
+stay opaque (not renamed).
 
 Writes go under the structure namespace; ambient Node reads use `resolve_er` after an
 explicit `promote_er`. BOM `log` may record `durable_er_uri` / `durable_er_pointer`
@@ -90,15 +94,15 @@ uv run python data/input/structure/infrastructure/obj_store_utils.py list-files 
 uv run python data/input/structure/infrastructure/obj_store_utils.py get-file <job_uuid> <name.csv>
 
 # Durable Entity Relationship
-uv run python data/input/structure/infrastructure/obj_store_utils.py write-er <structure_cid> <name> <local_path>
-uv run python data/input/structure/infrastructure/obj_store_utils.py list-er <structure_cid>
-uv run python data/input/structure/infrastructure/obj_store_utils.py promote-er <structure_cid> <name>
+uv run python data/input/structure/infrastructure/obj_store_utils.py write-er <structure_id> <name> <local_path>
+uv run python data/input/structure/infrastructure/obj_store_utils.py list-er <structure_id>
+uv run python data/input/structure/infrastructure/obj_store_utils.py promote-er <structure_id> <name>
 uv run python data/input/structure/infrastructure/obj_store_utils.py resolve-er <name>
 
 # Pointer-aware GC (roots = er/current/*; never runs on Structure destroy)
 uv run python data/input/structure/infrastructure/obj_store_utils.py gc-er --dry-run
 uv run python data/input/structure/infrastructure/obj_store_utils.py gc-er --delete
-uv run python data/input/structure/infrastructure/obj_store_utils.py gc-er --structure <cid> --delete --force
+uv run python data/input/structure/infrastructure/obj_store_utils.py gc-er --structure-id <id> --delete --force
 ```
 
 Env overrides: `MINIO_SCRATCH_*` (scratch; `MINIO_*` still accepted as fallback),

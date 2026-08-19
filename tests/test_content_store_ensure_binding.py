@@ -175,7 +175,7 @@ def test_content_store_assert_passes_when_ready(tmp_path):
 
 
 def test_content_store_assert_raises_when_not_ready(tmp_path):
-    """content_store_assert raises when Order-tree ContentStore is not ready."""
+    """content_store_assert raises when Order-tree ContentStore stays not ready."""
     structure_home = tmp_path / 'order_structure'
     utils_path = (
         structure_home
@@ -187,6 +187,44 @@ def test_content_store_assert_raises_when_not_ready(tmp_path):
     infra = _infra_with_structure_home(structure_home, tmp_path / 'cats_home')
     with pytest.raises(RuntimeError, match='ContentStore not ready'):
         infra.content_store_assert()
+    # Do not re-exec the module (that resets class state); use the loaded copy.
+    mod = sys.modules['infrastructure_content_store_utils_order']
+    assert mod.ContentStore.ensured
+
+
+def test_content_store_assert_heals_once_when_ensure_recovers(tmp_path):
+    """content_store_assert succeeds if one ensure brings the API back."""
+    structure_home = tmp_path / 'order_structure'
+    utils_path = (
+        structure_home
+        / 'infrastructure'
+        / 'content_store_utils.py'
+    )
+    utils_path.parent.mkdir(parents=True, exist_ok=True)
+    utils_path.write_text(
+        textwrap.dedent(
+            """\
+            class ContentStore:
+                ensured = []
+                _ready = False
+
+                @classmethod
+                def ensure(cls, cwd=None):
+                    cls.ensured.append({'cwd': cwd})
+                    cls._ready = True
+
+                @classmethod
+                def is_ready(cls):
+                    return cls._ready
+            """
+        ),
+        encoding='utf-8',
+    )
+    infra = _infra_with_structure_home(structure_home, tmp_path / 'cats_home')
+    infra.content_store_assert()
+    mod = sys.modules['infrastructure_content_store_utils_order']
+    assert mod.ContentStore.ensured
+    assert mod.ContentStore.is_ready()
 
 
 def test_apply_does_not_call_content_store_ensure(tmp_path, monkeypatch):
@@ -318,8 +356,8 @@ def test_meshclient_init_does_not_call_bootstrap_ensure(tmp_path, monkeypatch):
     assert client._bootstrap_content_store_ensured is False
 
 
-def test_meshclient_ciddir_triggers_bootstrap_readiness_once(tmp_path, monkeypatch):
-    """cidDir triggers bootstrap readiness checks (soft probe path)."""
+def test_meshclient_put_dir_triggers_bootstrap_readiness_once(tmp_path, monkeypatch):
+    """put_dir triggers bootstrap readiness checks (soft probe path)."""
     calls = []
 
     def _spy(self):
@@ -329,7 +367,6 @@ def test_meshclient_ciddir_triggers_bootstrap_readiness_once(tmp_path, monkeypat
     monkeypatch.setattr(ContentMesh, 'ensure_bootstrap_content_store', _spy)
 
     fake_ipfs = MagicMock()
-    fake_ipfs.add.return_value = {'Hash': 'bafyFake', 'Name': 'payload'}
     client = ContentMesh(ipfsClient=fake_ipfs, CATS_HOME=str(tmp_path))
     assert calls == []
 
@@ -337,10 +374,14 @@ def test_meshclient_ciddir_triggers_bootstrap_readiness_once(tmp_path, monkeypat
     payload.mkdir()
     (payload / 'f.txt').write_text('x', encoding='utf-8')
 
-    assert client.cidDir(str(payload)) == 'bafyFake'
+    dir_id, dir_name = client.put_dir(str(payload))
+    assert dir_id.startswith('ni:///sha-256;')
+    assert dir_name == 'payload'
     assert calls == ['ready_check']
+    # New trees mint on CAS — no Kubo add.
+    fake_ipfs.add.assert_not_called()
 
-    client.cidDir(str(payload))
+    client.put_dir(str(payload))
     assert calls == ['ready_check', 'ready_check']
 
 

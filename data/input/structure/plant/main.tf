@@ -86,6 +86,18 @@ resource "helm_release" "ray-cluster" {
     type  = "string"
   }
   set {
+    # Kind/Docker Desktop often leaves Ray's auto plasma budget under the
+    # 75MiB floor after a VM restart (CrashLoopBackOff). Pin a valid size.
+    name  = "head.rayStartParams.object-store-memory"
+    value = "100000000"
+    type  = "string"
+  }
+  set {
+    name  = "worker.rayStartParams.object-store-memory"
+    value = "100000000"
+    type  = "string"
+  }
+  set {
     # Chart default is 2G, which only leaves a sliver of headroom once
     # GCS/dashboard/autoscaler/log-monitor overhead (~1.1G) and a job's own
     # driver/actors are accounted for - observed tipping into OOM-kills

@@ -1,7 +1,7 @@
 """InfraStructure [IaaS] object-store helpers (MinIO) for Plant scratch +
 durable Entity Relationship.
 
-Ships inside `infrastructure/` so it is part of `infrastructure_cid`
+Ships inside `infrastructure/` so it is part of `infrastructure_id`
 (directory model). Owns ObjectStore resolution, credential-free snapshots,
 job scratch config write / host download, durable Entity Relationship
 structure-scoped writes + er/current pointer index, pointer-aware GC,
@@ -9,7 +9,7 @@ stale Terraform/compose cleanup, and a local CLI. Ray job landing
 (entrypoint / ``RayComputePort``) is Plant-owned under ``plant_cid``.
 There is no CAT Node HTTP API — operators use the MinIO Console / S3 API,
 or this module's CLI. Durable CAT product retrieval remains IPFS
-`integration_data_cid` (scratch path); durable MinIO is for Entity
+`integration_data_id` (scratch path); durable MinIO is for Entity
 Relationship lookups across Structure generations.
 
 See docs/MinIO.md and docs/STORAGE.md.
@@ -159,7 +159,7 @@ class ObjectStore:
             prefix=handle.prefix,
         )
 
-    def write_job_durable_config(self, job_dir: str, structure_cid: str) -> None:
+    def write_job_durable_config(self, job_dir: str, structure_id: str) -> None:
         """Write optional durable Entity Relationship config for future Ray jobs.
 
         Not consumed by the current scratch CSV entrypoint; stages pod-reachable
@@ -171,7 +171,7 @@ class ObjectStore:
             access_key=self.durable_access_key,
             secret_key=self.durable_secret_key,
             bucket=self.durable_bucket,
-            structure_cid=structure_cid,
+            structure_id=structure_id,
         )
 
     def download_job_result(self, handle: JobHandle, output: str) -> None:
@@ -183,59 +183,59 @@ class ObjectStore:
             )
         download_job_result_prefix(self.as_scratch_cli_config(), handle.prefix, output)
 
-    def er_prefix(self, structure_cid: str, name: str) -> str:
+    def er_prefix(self, structure_id: str, name: str) -> str:
         """Key prefix under the durable bucket for one Entity Relationship."""
-        _validate_structure_cid(structure_cid)
+        _validate_structure_id(structure_id)
         _validate_er_name(name)
-        return f'{ER_STRUCTURES_PREFIX}/{structure_cid}/er/{name}'
+        return f'{ER_STRUCTURES_PREFIX}/{structure_id}/er/{name}'
 
-    def er_uri(self, structure_cid: str, name: str) -> str:
+    def er_uri(self, structure_id: str, name: str) -> str:
         """Structure-scoped durable Entity Relationship URI."""
-        return f's3://{self.durable_bucket}/{self.er_prefix(structure_cid, name)}'
+        return f's3://{self.durable_bucket}/{self.er_prefix(structure_id, name)}'
 
     def durable_er_pointer_uri(self, name: str) -> str:
         """Global read-index URI for an Entity Relationship name."""
         _validate_er_name(name)
         return f's3://{self.durable_bucket}/{ER_CURRENT_PREFIX}/{name}'
 
-    def write_er(self, structure_cid: str, name: str, local_path: str) -> str:
+    def write_er(self, structure_id: str, name: str, local_path: str) -> str:
         """Upload a local file or directory under the structure ER namespace.
 
         Returns the structure-scoped ``er_uri``.
         """
         return write_er_objects(
             self.as_durable_cli_config(),
-            structure_cid,
+            structure_id,
             name,
             local_path,
         )
 
-    def promote_er(self, structure_cid: str, name: str) -> dict:
+    def promote_er(self, structure_id: str, name: str) -> dict:
         """Write ``er/current/<name>`` pointer JSON targeting structure NS URI."""
         return promote_er_pointer(
-            self.as_durable_cli_config(), structure_cid, name
+            self.as_durable_cli_config(), structure_id, name
         )
 
     def resolve_er(self, name: str) -> Optional[dict]:
         """Read global ``er/current/<name>`` pointer, or None if missing."""
         return resolve_er_pointer(self.as_durable_cli_config(), name)
 
-    def list_er(self, structure_cid: str) -> list:
+    def list_er(self, structure_id: str) -> list:
         """List Entity Relationship names under a structure namespace."""
-        return list_er_names(self.as_durable_cli_config(), structure_cid)
+        return list_er_names(self.as_durable_cli_config(), structure_id)
 
     def gc_er(
         self,
         *,
         delete: bool = False,
-        structure_cid: Optional[str] = None,
+        structure_id: Optional[str] = None,
         force: bool = False,
     ) -> list:
         """Pointer-aware durable GC; see ``gc_er_prefixes``."""
         return gc_er_prefixes(
             self.as_durable_cli_config(),
             delete=delete,
-            structure_cid=structure_cid,
+            structure_id=structure_id,
             force=force,
         )
 
@@ -348,14 +348,19 @@ def load_obj_store_utils(structure_home: str):
 load_minIO_utils = load_obj_store_utils
 
 
-def _validate_structure_cid(structure_cid: str) -> None:
-    if not structure_cid or not _SAFE_CID_RE.match(structure_cid):
-        raise ValueError('invalid structure_cid')
+def _validate_structure_id(structure_id: str) -> None:
+    if not structure_id or not _SAFE_CID_RE.match(structure_id):
+        raise ValueError('invalid structure_id')
 
 
 def _validate_er_name(name: str) -> None:
     if not name or not _SAFE_NAME_RE.match(name):
         raise ValueError('invalid er name')
+
+
+def _pointer_structure_id(ptr: dict) -> Optional[str]:
+    """Read structure id from pointer JSON (``structure_id`` or legacy ``structure_cid``)."""
+    return ptr.get('structure_id') or ptr.get('structure_cid')
 
 
 def write_job_scratch_object_store_config(
@@ -386,10 +391,10 @@ def write_job_durable_object_store_config(
     access_key,
     secret_key,
     bucket,
-    structure_cid,
+    structure_id,
 ):
     """Write object_store_durable_config.json for future Ray ER writers."""
-    _validate_structure_cid(structure_cid)
+    _validate_structure_id(structure_id)
     path = os.path.join(job_dir, 'object_store_durable_config.json')
     with open(path, 'w', encoding='utf-8') as config_file:
         json.dump({
@@ -397,9 +402,9 @@ def write_job_durable_object_store_config(
             'access_key': access_key,
             'secret_key': secret_key,
             'bucket': bucket,
-            'structure_cid': structure_cid,
+            'structure_id': structure_id,
             'structures_prefix': (
-                f'{ER_STRUCTURES_PREFIX}/{structure_cid}/er'
+                f'{ER_STRUCTURES_PREFIX}/{structure_id}/er'
             ),
         }, config_file)
 
@@ -451,14 +456,14 @@ def _s3_fs(config):
     )
 
 
-def _er_prefix(structure_cid: str, name: str) -> str:
-    _validate_structure_cid(structure_cid)
+def _er_prefix(structure_id: str, name: str) -> str:
+    _validate_structure_id(structure_id)
     _validate_er_name(name)
-    return f'{ER_STRUCTURES_PREFIX}/{structure_cid}/er/{name}'
+    return f'{ER_STRUCTURES_PREFIX}/{structure_id}/er/{name}'
 
 
-def _er_uri(config, structure_cid: str, name: str) -> str:
-    return f"s3://{config['bucket']}/{_er_prefix(structure_cid, name)}"
+def _er_uri(config, structure_id: str, name: str) -> str:
+    return f"s3://{config['bucket']}/{_er_prefix(structure_id, name)}"
 
 
 def _pointer_key(name: str) -> str:
@@ -480,12 +485,12 @@ def _ensure_parent_dir(fs, path: str) -> None:
         pass
 
 
-def write_er_objects(config, structure_cid, name, local_path) -> str:
+def write_er_objects(config, structure_id, name, local_path) -> str:
     """Put local file or directory contents under structures/<cid>/er/<name>/."""
     if not os.path.exists(local_path):
         raise FileNotFoundError(local_path)
     fs = _s3_fs(config)
-    prefix = _er_prefix(structure_cid, name)
+    prefix = _er_prefix(structure_id, name)
     base = f"{config['bucket']}/{prefix}"
 
     if os.path.isfile(local_path):
@@ -503,14 +508,14 @@ def write_er_objects(config, structure_cid, name, local_path) -> str:
                 with open(abs_path, 'rb') as src, \
                         fs.open_output_stream(dest) as dst:
                     dst.write(src.read())
-    return _er_uri(config, structure_cid, name)
+    return _er_uri(config, structure_id, name)
 
 
-def promote_er_pointer(config, structure_cid, name) -> dict:
+def promote_er_pointer(config, structure_id, name) -> dict:
     """Write er/current/<name> JSON pointer to the structure-scoped URI."""
     pointer = {
-        'uri': _er_uri(config, structure_cid, name),
-        'structure_cid': structure_cid,
+        'uri': _er_uri(config, structure_id, name),
+        'structure_id': structure_id,
         'name': name,
     }
     fs = _s3_fs(config)
@@ -534,11 +539,11 @@ def resolve_er_pointer(config, name) -> Optional[dict]:
         return json.loads(src.read().decode('utf-8'))
 
 
-def list_er_names(config, structure_cid) -> list:
+def list_er_names(config, structure_id) -> list:
     """List ER names under structures/<cid>/er/ that still have objects."""
-    _validate_structure_cid(structure_cid)
+    _validate_structure_id(structure_id)
     fs = _s3_fs(config)
-    base = f"{config['bucket']}/{ER_STRUCTURES_PREFIX}/{structure_cid}/er"
+    base = f"{config['bucket']}/{ER_STRUCTURES_PREFIX}/{structure_id}/er"
     try:
         infos = fs.get_file_info(
             pyarrow.fs.FileSelector(base, recursive=True)
@@ -557,8 +562,8 @@ def list_er_names(config, structure_cid) -> list:
     return sorted(names)
 
 
-def list_structure_cids(config) -> list:
-    """List structure_cid prefixes under structures/."""
+def list_structure_ids(config) -> list:
+    """List structure_id prefixes under structures/."""
     fs = _s3_fs(config)
     base = f"{config['bucket']}/{ER_STRUCTURES_PREFIX}"
     try:
@@ -639,51 +644,51 @@ def gc_er_prefixes(
     config,
     *,
     delete: bool = False,
-    structure_cid: Optional[str] = None,
+    structure_id: Optional[str] = None,
     force: bool = False,
 ) -> list:
     """Pointer-aware durable GC.
 
     Roots are ``er/current/*`` pointers. Unreferenced ``structures/<cid>/``
-    prefixes are candidates. Targeted ``structure_cid`` refuses if still
+    prefixes are candidates. Targeted ``structure_id`` refuses if still
     referenced unless ``force`` (which also clears those pointers).
 
-    Returns list of structure_cid prefixes that would be / were deleted.
+    Returns list of structure_id prefixes that would be / were deleted.
     """
     pointers = list_er_current_pointers(config)
     referenced = {
-        ptr.get('structure_cid')
+        sid
         for ptr in pointers.values()
-        if ptr.get('structure_cid')
+        if (sid := _pointer_structure_id(ptr))
     }
 
-    if structure_cid is not None:
-        _validate_structure_cid(structure_cid)
+    if structure_id is not None:
+        _validate_structure_id(structure_id)
         pointing = [
             name for name, ptr in pointers.items()
-            if ptr.get('structure_cid') == structure_cid
+            if _pointer_structure_id(ptr) == structure_id
         ]
         if pointing and not force:
             raise RuntimeError(
-                f'structure_cid {structure_cid!r} is referenced by '
+                f'structure_id {structure_id!r} is referenced by '
                 f'er/current pointers: {sorted(pointing)}; '
                 f'pass force=True to clear pointers and delete'
             )
-        candidates = [structure_cid]
+        candidates = [structure_id]
         if delete:
             if force:
                 for name in pointing:
                     _delete_pointer(config, name)
             _delete_prefix(
-                config, f'{ER_STRUCTURES_PREFIX}/{structure_cid}'
+                config, f'{ER_STRUCTURES_PREFIX}/{structure_id}'
             )
         return candidates
 
-    all_cids = list_structure_cids(config)
-    candidates = [cid for cid in all_cids if cid not in referenced]
+    all_ids = list_structure_ids(config)
+    candidates = [sid for sid in all_ids if sid not in referenced]
     if delete:
-        for cid in candidates:
-            _delete_prefix(config, f'{ER_STRUCTURES_PREFIX}/{cid}')
+        for sid in candidates:
+            _delete_prefix(config, f'{ER_STRUCTURES_PREFIX}/{sid}')
     return candidates
 
 
@@ -821,15 +826,15 @@ def _main(argv=None):
     p_get.add_argument('name')
 
     p_list_er = sub.add_parser(
-        'list-er', help='List ER names under a structure_cid namespace'
+        'list-er', help='List ER names under a structure_id namespace'
     )
-    p_list_er.add_argument('structure_cid')
+    p_list_er.add_argument('structure_id')
 
     p_promote = sub.add_parser(
         'promote-er',
         help='Write er/current/<name> pointer to structures/<cid>/er/<name>',
     )
-    p_promote.add_argument('structure_cid')
+    p_promote.add_argument('structure_id')
     p_promote.add_argument('name')
 
     p_resolve = sub.add_parser(
@@ -841,7 +846,7 @@ def _main(argv=None):
         'write-er',
         help='Upload a local file/dir to structures/<cid>/er/<name>/',
     )
-    p_write.add_argument('structure_cid')
+    p_write.add_argument('structure_id')
     p_write.add_argument('name')
     p_write.add_argument('local_path')
 
@@ -863,10 +868,10 @@ def _main(argv=None):
         help='List candidates only (default when --delete is absent)',
     )
     p_gc.add_argument(
-        '--structure',
-        dest='structure_cid',
+        '--structure-id',
+        dest='structure_id',
         default=None,
-        help='Target a single structure_cid namespace',
+        help='Target a single structure_id namespace',
     )
     p_gc.add_argument(
         '--force',
@@ -893,13 +898,13 @@ def _main(argv=None):
         return 0
 
     if args.cmd == 'list-er':
-        for name in list_er_names(durable, args.structure_cid):
-            print(f"{name}\t{_er_uri(durable, args.structure_cid, name)}")
+        for name in list_er_names(durable, args.structure_id):
+            print(f"{name}\t{_er_uri(durable, args.structure_id, name)}")
         return 0
 
     if args.cmd == 'promote-er':
         pointer = promote_er_pointer(
-            durable, args.structure_cid, args.name
+            durable, args.structure_id, args.name
         )
         print(json.dumps(pointer))
         return 0
@@ -914,7 +919,7 @@ def _main(argv=None):
 
     if args.cmd == 'write-er':
         uri = write_er_objects(
-            durable, args.structure_cid, args.name, args.local_path
+            durable, args.structure_id, args.name, args.local_path
         )
         print(uri)
         return 0
@@ -924,7 +929,7 @@ def _main(argv=None):
         candidates = gc_er_prefixes(
             durable,
             delete=delete,
-            structure_cid=args.structure_cid,
+            structure_id=args.structure_id,
             force=bool(args.force),
         )
         mode = 'deleted' if delete else 'would-delete'
