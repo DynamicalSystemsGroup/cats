@@ -6,13 +6,14 @@ from unittest.mock import MagicMock
 import pytest
 
 from cats.network import ContentMesh
+from data.input.function.process import process_1
 
 
 def _cat_response_fixture(
     *,
-    function_cid='QmFn',
-    structure_cid='QmStruct',
-    data_cid='QmDataOut',
+    function_id='QmFn',
+    structure_id='QmStruct',
+    data_id='QmDataOut',
     structure=None,
 ):
     if structure is None:
@@ -43,21 +44,21 @@ def _cat_response_fixture(
 
     def _cat(cid):
         if cid == 'QmInv':
-            return json.dumps({'order_cid': 'QmOrder', 'data_cid': data_cid})
+            return json.dumps({'order_cid': 'QmOrder', 'data_cid': data_id})
         if cid == 'QmOrder':
             return json.dumps({
-                'function_cid': function_cid,
-                'structure_cid': structure_cid,
+                'function_cid': function_id,
+                'structure_cid': structure_id,
                 'invoice_cid': 'QmInvOld',
                 'structure_filepath': 'structure',
                 'endpoint': 'http://127.0.0.1:5000/cat/node/init',
             })
-        if cid == function_cid:
+        if cid == function_id:
             return json.dumps(prev_function)
-        if cid == structure_cid:
+        if cid == structure_id:
             return json.dumps(structure)
         if cid == 'QmInvOld':
-            return json.dumps({'data_cid': data_cid})
+            return json.dumps({'data_cid': data_id})
         if cid == 'QmProcBind':
             return json.dumps(prev_process)
         if cid == 'QmIfrBind':
@@ -66,7 +67,7 @@ def _cat_response_fixture(
             return json.dumps({})
         return '{}'
 
-    return cat_response, _cat, structure, function_cid, structure_cid, data_cid
+    return cat_response, _cat, structure, function_id, structure_id, data_id
 
 
 def _write_structure_tree(tmp_path: Path):
@@ -81,31 +82,37 @@ def _write_structure_tree(tmp_path: Path):
     return structure
 
 
-def _last_order_json(fake):
-    return json.loads(
-        next(
-            args[0]
-            for args, _ in reversed(fake.add_str.call_args_list)
-            if '"endpoint"' in args[0] and '"function_cid"' in args[0]
-        )
+def _spy_put_json(client, monkeypatch):
+    put_objs = []
+    real = client.put_json
+
+    def _spy(obj, **kwargs):
+        put_objs.append(obj)
+        return real(obj, **kwargs)
+
+    monkeypatch.setattr(client, 'put_json', _spy)
+    return put_objs
+
+
+def _last_order(put_objs):
+    return next(
+        obj for obj in reversed(put_objs)
+        if isinstance(obj, dict) and 'endpoint' in obj and 'function_uri' in obj
     )
 
 
-def _invoice_payloads(fake):
+def _invoice_payloads(put_objs):
     return [
-        json.loads(args[0])
-        for args, _ in fake.add_str.call_args_list
-        if args[0].startswith('{"data_cid"')
+        obj for obj in put_objs
+        if isinstance(obj, dict) and set(obj) == {'data_uri'}
     ]
 
 
 def test_link_order_function_only(monkeypatch, tmp_path):
-    """linkOrder Function-only mutates function_cid and chains prior data_cid."""
+    """linkOrder Function-only mutates function_id and chains prior data_id."""
     fake = MagicMock()
-    fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
-    fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmNewPy'
 
-    cat_response, _cat, _, function_cid, structure_cid, data_cid = (
+    cat_response, _cat, _, function_id, structure_id, data_id = (
         _cat_response_fixture()
     )
     client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
@@ -113,25 +120,28 @@ def test_link_order_function_only(monkeypatch, tmp_path):
     monkeypatch.setattr(client, 'cat', _cat)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
     monkeypatch.setenv('CAT_NODE_PORT', '5000')
+    put_objs = _spy_put_json(client, monkeypatch)
 
-    order_req = client.linkOrder(
-        cat_response, integrated_subproc=lambda: 'new'
-    )
-    assert order_req['order_cid']
+    order_req = client.linkOrder(cat_response, integrated_subproc=process_1)
+    assert order_req['content_id']
+    assert 'order_cid' not in order_req
+    assert 'invoice_cid' not in order_req
+    assert 'order_uri' in order_req
+    assert 'invoice_uri' in order_req
 
-    order = _last_order_json(fake)
-    assert order['function_cid'] != function_cid
-    assert order['structure_cid'] == structure_cid
+    order = _last_order(put_objs)
+    assert order['function_uri'] != function_id
+    assert order['structure_uri'] == structure_id
     assert order['endpoint'] == 'http://127.0.0.1:5000/cat/node/init'
-    assert _invoice_payloads(fake) == [{'data_cid': data_cid}]
+    assert _invoice_payloads(put_objs) == [{'data_uri': data_id}]
+    assert not any(k.endswith('_cid') for k in order)
 
 
 def test_link_order_structure_only(monkeypatch, tmp_path):
-    """linkOrder Structure-only mutates pairing and keeps function_cid."""
+    """linkOrder Structure-only mutates pairing and keeps function_id."""
     fake = MagicMock()
-    fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
 
-    cat_response, _cat, prev_structure, function_cid, structure_cid, data_cid = (
+    cat_response, _cat, prev_structure, function_id, structure_id, data_id = (
         _cat_response_fixture()
     )
     client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
@@ -139,38 +149,35 @@ def test_link_order_structure_only(monkeypatch, tmp_path):
     monkeypatch.setattr(client, 'cat', _cat)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
     monkeypatch.setenv('CAT_NODE_PORT', '5000')
+    put_objs = _spy_put_json(client, monkeypatch)
 
-    client.linkOrder(cat_response, plant_cid='QmPlantV2')
+    client.linkOrder(cat_response, plant_id='QmPlantV2')
 
-    order = _last_order_json(fake)
-    assert order['function_cid'] == function_cid
-    assert order['structure_cid'] != structure_cid
+    order = _last_order(put_objs)
+    assert order['function_uri'] == function_id
+    assert order['structure_uri'] != structure_id
     assert order['structure_filepath'] == 'structure'
 
-    pairing = json.loads(
-        next(
-            args[0]
-            for args, _ in fake.add_str.call_args_list
-            if '"root_cid"' in args[0]
-            and '"plant_cid"' in args[0]
-            and '"infrastructure_cid"' in args[0]
-        )
+    pairing = next(
+        obj for obj in put_objs
+        if isinstance(obj, dict)
+        and 'root_uri' in obj
+        and 'plant_uri' in obj
+        and 'infrastructure_uri' in obj
     )
     assert pairing == {
-        'root_cid': prev_structure['root_cid'],
-        'plant_cid': 'QmPlantV2',
-        'infrastructure_cid': prev_structure['infrastructure_cid'],
+        'root_uri': prev_structure['root_cid'],
+        'plant_uri': 'QmPlantV2',
+        'infrastructure_uri': prev_structure['infrastructure_cid'],
     }
-    assert _invoice_payloads(fake) == [{'data_cid': data_cid}]
+    assert _invoice_payloads(put_objs) == [{'data_uri': data_id}]
 
 
 def test_link_order_both_sides_single_invoice(monkeypatch, tmp_path):
-    """linkOrder can change Function and Structure with one Invoice data_cid."""
+    """linkOrder can change Function and Structure with one Invoice data_id."""
     fake = MagicMock()
-    fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
-    fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmNewPy'
 
-    cat_response, _cat, _, function_cid, structure_cid, data_cid = (
+    cat_response, _cat, _, function_id, structure_id, data_id = (
         _cat_response_fixture()
     )
     client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
@@ -178,26 +185,27 @@ def test_link_order_both_sides_single_invoice(monkeypatch, tmp_path):
     monkeypatch.setattr(client, 'cat', _cat)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
     monkeypatch.setenv('CAT_NODE_PORT', '5000')
+    put_objs = _spy_put_json(client, monkeypatch)
 
     structure = _write_structure_tree(tmp_path)
 
-    def _cid_dir(path):
+    def _put_dir(path):
         name = Path(path).name
         return f'QmNew{name}', name
 
-    monkeypatch.setattr(client, 'cidDir', _cid_dir)
+    monkeypatch.setattr(client, 'put_dir', _put_dir)
 
     client.linkOrder(
         cat_response,
-        integrated_subproc=lambda: 'new',
+        integrated_subproc=process_1,
         structure_filepath=str(structure),
     )
 
-    order = _last_order_json(fake)
-    assert order['function_cid'] != function_cid
-    assert order['structure_cid'] != structure_cid
+    order = _last_order(put_objs)
+    assert order['function_uri'] != function_id
+    assert order['structure_uri'] != structure_id
     assert order['structure_filepath'] == 'structure'
-    assert _invoice_payloads(fake) == [{'data_cid': data_cid}]
+    assert _invoice_payloads(put_objs) == [{'data_uri': data_id}]
 
 
 def test_link_order_fails_when_neither_side(monkeypatch, tmp_path):
@@ -215,7 +223,6 @@ def test_link_order_fails_when_neither_side(monkeypatch, tmp_path):
 def test_link_order_fails_when_structure_pairing_unchanged(monkeypatch, tmp_path):
     """linkOrder rejects Structure overrides that leave pairing unchanged."""
     fake = MagicMock()
-    fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
     cat_response, _cat, prev_structure, _, _, _ = _cat_response_fixture()
     client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
@@ -223,5 +230,5 @@ def test_link_order_fails_when_structure_pairing_unchanged(monkeypatch, tmp_path
 
     with pytest.raises(RuntimeError, match='unchanged structure pairing'):
         client.linkOrder(
-            cat_response, plant_cid=prev_structure['plant_cid']
+            cat_response, plant_id=prev_structure['plant_cid']
         )

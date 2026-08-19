@@ -18,9 +18,9 @@ from cats.executor.structure.plant import Plant
 
 
 class InfraStructure:
-    def __init__(self, runtime, structure_cid):
+    def __init__(self, runtime, structure_id):
         self.runtime = runtime
-        self.structure_cid = structure_cid
+        self.structure_id = structure_id
         self.INPUT_STRUCTURE_HOME = self.runtime.INPUT_STRUCTURE_HOME
         configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
         ensure_integration_cache_env(self.runtime)
@@ -32,16 +32,18 @@ class InfraStructure:
     def compose(self):
         return Plant(self)
 
-    def snapshot(self, *, object_store_as_executed_cid: str) -> dict:
-        """Infra as-executed pairing (CID refs; widen later beyond ObjectStore).
+    def snapshot(self, *, object_store_as_executed_id: str) -> dict:
+        """Infra as-executed pairing (uri-only refs; widen later beyond ObjectStore).
 
-        Parallel to as-Code ``infrastructure_cid``. Currently records only the
+        Parallel to as-Code ``infrastructure`` ref. Currently records only the
         ObjectStore facet; transport / ContentStore keys may be added later.
-        Minted by Executor as ``infrastructure_as_executed_cid``.
+        Minted by Executor as ``infrastructure_as_executed``.
         """
-        return {
-            'object_store_as_executed_cid': object_store_as_executed_cid,
-        }
+        from cats.network.cas import set_ref
+
+        out = {}
+        set_ref(out, 'object_store_as_executed', object_store_as_executed_id)
+        return out
 
     def _load_obj_store_module(self):
         """Load Order-submitted infrastructure object-store utils."""
@@ -128,7 +130,8 @@ class InfraStructure:
 
         Distinct from ContentMesh bootstrap ensure (repo default tree). Structure
         apply does **not** call this — TF ``shell_script.host_ipfs_daemon``
-        create is the sole Order-submitted mutate path; apply only asserts.
+        create is the Order-submitted mutate path; apply asserts (with one
+        soft-heal) afterward.
         """
         utils = self._load_content_store_module()
         utils.ContentStore.ensure(cwd=cwd)
@@ -136,17 +139,37 @@ class InfraStructure:
     def content_store_assert(self):
         """Fail loud if Order-submitted ContentStore is not ready after TF.
 
-        Executor composes à la carte TF (which ensures on host_ipfs_daemon
-        create); this only probes readiness.
+        Executor composes à la carte TF (host_ipfs_daemon ensures every apply).
+        If the API is still down at assert time (hung-daemon heal race during
+        the rest of apply), run one Order-tree ``ContentStore.ensure`` then
+        re-probe with a short backoff before failing closed.
         """
+        import time
+
         utils = self._load_content_store_module()
         if utils.ContentStore.is_ready():
             return
+        print(
+            'Host Kubo ContentStore not ready after Structure terraform apply; '
+            'running Order-submitted ContentStore.ensure once...',
+            flush=True,
+        )
+        try:
+            utils.ContentStore.ensure(cwd=self.INPUT_STRUCTURE_HOME)
+        except Exception as exc:
+            raise RuntimeError(
+                'Host Kubo ContentStore not ready after Structure terraform '
+                'apply, and ContentStore.ensure failed. Heal via make '
+                'content-store-ensure / node ensure.'
+            ) from exc
+        for _ in range(20):
+            if utils.ContentStore.is_ready():
+                return
+            time.sleep(0.5)
         raise RuntimeError(
             'Host Kubo ContentStore not ready after Structure terraform apply. '
-            'TF shell_script.host_ipfs_daemon create should have ensured it; '
-            'heal via make content-store-ensure / node ensure, or replace '
-            'host_ipfs_daemon so create re-runs.'
+            'TF shell_script.host_ipfs_daemon should have ensured it on this '
+            'apply; heal via make content-store-ensure / node ensure.'
         )
 
     def _cleanup_stale_structure_state(self):
@@ -220,7 +243,8 @@ class InfraStructure:
         configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
         ensure_integration_cache_env(self.runtime)
         # ContentStore.ensure is à la carte TF (host_ipfs_daemon create), not
-        # Python apply — Executor only asserts readiness after terraform apply.
+        # Python apply — Executor asserts readiness after terraform apply and
+        # soft-heals once if the API is still down.
         self._cleanup_stale_structure_state()
         self.runtime.executeCMD(
             f'{terraform_bin(self.runtime)} apply --auto-approve',

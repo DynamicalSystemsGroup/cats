@@ -18,6 +18,7 @@ import pytest
 from cats import DATA_HOME, CONTENT_MESH as contentMesh
 from cats import INPUT_STRUCTURE_HOME, INPUT_DATA_HOME
 from cats.network import _node_init_endpoint
+from cats.network.cas import ref_id, ref_uri
 from cats.network.feedback import verify_execution_bom
 
 from data.input.function.process import (
@@ -30,21 +31,21 @@ from data.input.function.process import (
 from data.input.function.infrafunction import infrafunction_subproc
 
 PROCESS_BIND_KEYS = (
-    'ingress_subproc_cid',
-    'integrated_subproc_cid',
-    'egress_subproc_cid',
-    'integration_cache_subproc_cid',
+    'ingress_subproc',
+    'integrated_subproc',
+    'egress_subproc',
+    'integration_cache_subproc',
 )
-INFRAFUNCTION_BIND_KEYS = ('infrafunction_subproc_cid',)
+INFRAFUNCTION_BIND_KEYS = ('infrafunction_subproc',)
 FUNCTION_PAIRING_KEYS = (
-    'process_cid',
-    'infrafunction_cid',
-    'process_source_cid',
-    'infrafunction_source_cid',
+    'process',
+    'infrafunction',
+    'process_source',
+    'infrafunction_source',
 )
-STRUCTURE_PAIRING_KEYS = ('root_cid', 'plant_cid', 'infrastructure_cid')
+STRUCTURE_PAIRING_KEYS = ('root', 'plant', 'infrastructure')
 PLANT_SNAPSHOT_KEYS = (
-    'applied_structure_cid',
+    'applied_structure_id',
     'kind_cluster_name',
     'kubeconfig_context',
     'ray_dashboard_address',
@@ -105,13 +106,15 @@ def _assert_job_handle_uri(object_store_result_uri):
     )
 
 
-def _assert_named_bind_leaf(leaf_cid, *, expected_source_cid):
-    """Stock leaf CID is named-bind JSON pinned to the package source_cid."""
-    leaf = json.loads(contentMesh.cat(leaf_cid))
-    assert set(leaf) == {'source_cid', 'module', 'qualname'}, (
-        f'named-bind leaf keys unexpected: {leaf!r}'
+def _assert_named_bind_leaf(leaf_id, *, expected_source_id):
+    """Stock leaf is named-bind JSON pinned to the package source id."""
+    leaf = json.loads(contentMesh.cat(leaf_id))
+    assert 'module' in leaf and 'qualname' in leaf
+    assert 'source_cid' not in leaf
+    source = leaf.get('contentId') or ref_id(leaf, 'source')
+    assert source == expected_source_id, (
+        f'named-bind source unexpected: {leaf!r}'
     )
-    assert leaf['source_cid'] == expected_source_cid
     assert isinstance(leaf['module'], str) and leaf['module']
     assert isinstance(leaf['qualname'], str) and leaf['qualname']
 
@@ -120,13 +123,18 @@ def assert_provenance_record(bom_response, order_request):
     """Assert full Order / Invoice / BOM / log / as-executed provenance coverage."""
     assert 'error' not in bom_response, bom_response.get('error')
     assert 'bom' in bom_response
-    assert 'bom_cid' in bom_response and bom_response['bom_cid']
-    # bom_cid is response-only; never written into the IPFS-addressed bom dict.
+    assert 'content_id' in bom_response and bom_response['content_id']
+    assert 'bom_cid' not in bom_response
+    # content_id is response-only; never written into the addressed bom dict.
     bom = bom_response['bom']
     assert 'bom_cid' not in bom
+    assert 'content_id' not in bom
 
-    for key in ('invoice_cid', 'log_cid', 'node_did'):
-        assert bom.get(key), f'bom.{key} should be set'
+    assert bom.get('invoice_uri'), 'bom.invoice_uri should be set'
+    assert bom.get('log_uri'), 'bom.log_uri should be set'
+    assert 'invoice_cid' not in bom
+    assert 'log_cid' not in bom
+    assert bom.get('node_did'), 'bom.node_did should be set'
     assert str(bom['node_did']).startswith('did:'), (
         f'bom.node_did must be a DID, got {bom["node_did"]!r}'
     )
@@ -141,6 +149,9 @@ def assert_provenance_record(bom_response, order_request):
     assert 'node_uri' not in bom
     assert 'plant_snapshot_cid' not in bom
     assert 'infrastructure_snapshot_cid' not in bom
+    assert not any(
+        isinstance(k, str) and k.endswith('_cid') for k in bom
+    ), f'bom still has *_cid keys: {sorted(k for k in bom if str(k).endswith("_cid"))}'
 
 
     flat = bom_response['flat_bom']
@@ -154,55 +165,65 @@ def assert_provenance_record(bom_response, order_request):
     object_store_as_executed = flat['object_store_as_executed']
 
     # --- Order (submitted) vs Invoice backfill ---
-    assert order_request.get('order_cid'), 'order_request.order_cid missing'
-    assert invoice.get('order_cid') == order_request['order_cid'], (
-        'Invoice.order_cid must equal the submitted Order CID'
+    order_id = order_request.get('content_id') or order_request.get('order_cid')
+    assert order_id, 'order_request.content_id missing'
+    assert ref_id(invoice, 'order') == order_id, (
+        'Invoice.order ref must equal the submitted Order content id'
     )
-    assert order.get('function_cid'), 'order.function_cid missing'
-    assert order.get('structure_cid'), 'order.structure_cid missing'
-    assert order.get('invoice_cid'), 'order.invoice_cid missing'
+    assert ref_id(order, 'function'), 'order.function ref missing'
+    assert ref_id(order, 'structure'), 'order.structure ref missing'
+    assert ref_id(order, 'invoice'), 'order.invoice ref missing'
     assert order.get('structure_filepath'), 'order.structure_filepath missing'
-
-    # --- Function pairing (hybrid source CIDs) ---
-    assert set(FUNCTION_PAIRING_KEYS) <= set(function), (
-        f'function_cid missing keys: {function!r}'
+    assert not any(k.endswith('_cid') for k in order), (
+        f'order still has *_cid keys: {sorted(k for k in order if k.endswith("_cid"))}'
     )
-    for key in FUNCTION_PAIRING_KEYS:
-        assert function[key], f'function.{key} should be set'
 
-    process_bind = json.loads(contentMesh.cat(function['process_cid']))
-    for key in PROCESS_BIND_KEYS:
-        assert process_bind.get(key), f'process bind missing {key}'
-        _assert_named_bind_leaf(
-            process_bind[key],
-            expected_source_cid=function['process_source_cid'],
-        )
+    # --- Function pairing (hybrid source refs) ---
+    for stem in FUNCTION_PAIRING_KEYS:
+        assert ref_id(function, stem), f'function.{stem} should be set'
+    assert not any(k.endswith('_cid') for k in function), (
+        f'function still has *_cid keys: '
+        f'{sorted(k for k in function if k.endswith("_cid"))}'
+    )
 
-    ifr_bind = json.loads(contentMesh.cat(function['infrafunction_cid']))
-    for key in INFRAFUNCTION_BIND_KEYS:
-        assert ifr_bind.get(key), f'infrafunction bind missing {key}'
-        _assert_named_bind_leaf(
-            ifr_bind[key],
-            expected_source_cid=function['infrafunction_source_cid'],
-        )
+    process_id = ref_id(function, 'process')
+    process_bind = json.loads(contentMesh.cat(ref_uri(function, 'process') or process_id))
+    process_source = ref_id(function, 'process_source')
+    for stem in PROCESS_BIND_KEYS:
+        leaf_id = ref_id(process_bind, stem)
+        assert leaf_id, f'process bind missing {stem}'
+        _assert_named_bind_leaf(leaf_id, expected_source_id=process_source)
+
+    ifr_id = ref_id(function, 'infrafunction')
+    ifr_bind = json.loads(
+        contentMesh.cat(ref_uri(function, 'infrafunction') or ifr_id)
+    )
+    ifr_source = ref_id(function, 'infrafunction_source')
+    for stem in INFRAFUNCTION_BIND_KEYS:
+        leaf_id = ref_id(ifr_bind, stem)
+        assert leaf_id, f'infrafunction bind missing {stem}'
+        _assert_named_bind_leaf(leaf_id, expected_source_id=ifr_source)
 
     # --- Structure pairing (apply-complete) ---
-    assert set(STRUCTURE_PAIRING_KEYS) <= set(structure), (
-        f'structure_cid missing keys: {structure!r}'
+    for stem in STRUCTURE_PAIRING_KEYS:
+        assert ref_id(structure, stem), f'structure.{stem} should be set'
+    assert not any(k.endswith('_cid') for k in structure), (
+        f'structure still has *_cid keys: '
+        f'{sorted(k for k in structure if k.endswith("_cid"))}'
     )
-    for key in STRUCTURE_PAIRING_KEYS:
-        assert structure[key], f'structure.{key} should be set'
 
-    # --- Invoice: data + stage CIDs; Seed (#187) ---
-    assert invoice.get('data_cid'), 'invoice.data_cid should be set'
-    assert invoice.get('ingress_data_cid'), 'invoice.ingress_data_cid should be set'
-    assert invoice.get('integration_data_cid'), (
-        'invoice.integration_data_cid should be set'
-    )
-    assert invoice.get('seed_cid'), 'invoice.seed_cid should be a real CID, not null'
+    # --- Invoice: data + stage refs; Seed (#187) ---
+    data_id = ref_id(invoice, 'data')
+    ingress_id = ref_id(invoice, 'ingress_data')
+    integration_id = ref_id(invoice, 'integration_data')
+    seed_id = ref_id(invoice, 'seed')
+    assert data_id, 'invoice.data should be set'
+    assert ingress_id, 'invoice.ingress_data should be set'
+    assert integration_id, 'invoice.integration_data should be set'
+    assert seed_id, 'invoice.seed should be a real content id, not null'
     seed = invoice.get('seed')
     assert seed is not None, (
-        'flat_bom.invoice.seed should be resolved by flatten_bom from seed_cid'
+        'flat_bom.invoice.seed should be resolved by flatten_bom from seed ref'
     )
     assert set(seed) == {'seed', 'rng_seed', 'num_partitions'}, (
         f'seed keys unexpected: {seed!r}'
@@ -217,35 +238,42 @@ def assert_provenance_record(bom_response, order_request):
     assert isinstance(seed['num_partitions'], int) and seed['num_partitions'] >= 1, (
         f"seed['num_partitions'] should be a positive int: {seed!r}"
     )
-    assert invoice.get('structure_as_executed_cid'), (
-        'invoice.structure_as_executed_cid should be set'
+    assert ref_id(invoice, 'structure_as_executed'), (
+        'invoice.structure_as_executed should be set'
     )
-    assert input_invoice.get('data_cid'), (
-        'order.flat.invoice.data_cid (input) should be set'
+    assert ref_id(input_invoice, 'data'), (
+        'order.flat.invoice.data (input) should be set'
+    )
+    assert not any(k.endswith('_cid') for k in invoice if k != 'order'), (
+        f'invoice still has *_cid keys: '
+        f'{sorted(k for k in invoice if k.endswith("_cid"))}'
     )
 
     structure_as_executed = flat['structure_as_executed']
     assert structure_as_executed is not None
-    assert structure_as_executed.get('plant_as_executed_cid')
-    assert structure_as_executed.get('infrastructure_as_executed_cid')
+    assert ref_id(structure_as_executed, 'plant_as_executed')
+    assert ref_id(structure_as_executed, 'infrastructure_as_executed')
     infrastructure_as_executed = flat['infrastructure_as_executed']
     assert infrastructure_as_executed is not None
-    assert infrastructure_as_executed.get('object_store_as_executed_cid')
+    assert ref_id(infrastructure_as_executed, 'object_store_as_executed')
 
-    # --- Log mirrors stage CIDs + JobHandle correlator ---
-    assert log.get('ingress_data_cid') == invoice['ingress_data_cid']
-    assert log.get('integration_data_cid') == invoice['integration_data_cid']
-    assert log.get('egress_data_cid') == invoice['data_cid']
+    # --- Log mirrors stage refs + JobHandle correlator ---
+    assert ref_id(log, 'ingress_data') == ingress_id
+    assert ref_id(log, 'integration_data') == integration_id
+    assert ref_id(log, 'egress_data') == data_id
     assert 'plant_rebuilt' in log
     assert isinstance(log['plant_rebuilt'], bool)
     _assert_job_handle_uri(log.get('object_store_result_uri'))
+    assert not any(k.endswith('_cid') for k in log), (
+        f'log still has *_cid keys: {sorted(k for k in log if k.endswith("_cid"))}'
+    )
 
     # --- Plant as-executed (observed; flattened) ---
     assert plant is not None
     for key in PLANT_SNAPSHOT_KEYS:
         assert key in plant, f'plant as-executed missing {key}'
-    assert plant['applied_structure_cid'] == order['structure_cid'], (
-        'plant.applied_structure_cid must equal order.structure_cid'
+    assert plant['applied_structure_id'] == ref_id(order, 'structure'), (
+        'plant.applied_structure_id must equal order.structure content id'
     )
     assert isinstance(plant['rebuilt'], bool)
 
@@ -259,8 +287,8 @@ def assert_provenance_record(bom_response, order_request):
     assert 'secret_key' not in object_store_as_executed
 
     return {
-        'input_data_cid': input_invoice['data_cid'],
-        'output_data_cid': invoice['data_cid'],
+        'input_data_cid': ref_id(input_invoice, 'data'),
+        'output_data_cid': data_id,
         'invoice': invoice,
         'seed': seed,
         'log': log,

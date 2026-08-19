@@ -16,7 +16,7 @@ def stage_structure_root(structure_filepath, staging_parent=None):
     """Copy allowlisted Structure root files into a temp ``structure-root/`` dir.
 
     Returns the staging directory path (basename ``structure-root``) for
-    ``cidDir``. Caller must remove the parent temp tree when finished if
+    ``put_dir``. Caller must remove the parent temp tree when finished if
     ``staging_parent`` was not supplied.
     """
     structure_filepath = structure_filepath.rstrip('/')
@@ -107,7 +107,7 @@ def stage_function_package(package_dir, staging_parent=None, *, basename=None):
     """Copy a Function package tree excluding ``__pycache__`` / ``*.pyc``.
 
     Returns the staging directory path (basename matches the package name)
-    for ``cidDir``. Caller must remove the parent temp tree when finished if
+    for ``put_dir``. Caller must remove the parent temp tree when finished if
     ``staging_parent`` was not supplied.
     """
     package_dir = package_dir.rstrip('/')

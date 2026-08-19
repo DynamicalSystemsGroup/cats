@@ -48,13 +48,13 @@ These seams are how interoperability is supposed to work without rewriting Funct
 
 | Port / API | Owner (Function) | Adapter (Structure) | Demo implementation |
 |------------|------------------|---------------------|---------------------|
-| **TransportPort** | Process ingress / egress / integration_cache (`n=1`) | `TransportContext` | Docker Kubo peers + host Bitswap |
-| **IoPort** | Process ingress / egress when `num_partitions > 1` | `RayIoPort` (`plant/ray_io_utils.py`) | Partition CAR layout via ContentMesh / AddressStore; optional Plant job (`CATS_IO_VIA_JOB`) |
+| **TransportPort** | Process ingress / egress / integration_cache (`n=1`); kwargs `input_dir_id` | `TransportContext` | **CAS** materialize/`put_tree` for `ni:` / HTTP URI; Docker Kubo peers + Bitswap for **legacy CID** only |
+| **IoPort** | Process ingress / egress when `num_partitions > 1`; kwargs `input_dir_id` | `RayIoPort` (`plant/ray_io_utils.py`) | Partition CAR layout via ContentMesh / AddressStore (CAS manifests for new trees); optional Plant job (`CATS_IO_VIA_JOB`) with `io_args`/`io_result` keys `input_id` / `layout_id` |
 | **ComputePort** | Process `process_*` hotF | `RayComputePort` (job working_dir) | Ray Data `map_batches`; `num_partitions` aligns blocks to `part-*` layout |
 | **PlantPort** | InfraFunction actuator | `RayPlantPort` | Ray Job Submission |
-| **JobHandle** / ObjectStore | InfraFunction scratch correlator; durable Entity Relationship façade | `begin_job` / `write_job_scratch`; `er_uri` / `promote_er` / `resolve_er` / `gc_er` | Scratch MinIO `cats-scratch` + durable MinIO `cats-durable` |
+| **JobHandle** / ObjectStore | InfraFunction scratch correlator; durable Entity Relationship façade (`structure_id`) | `begin_job` / `write_job_scratch`; `er_uri` / `promote_er` / `resolve_er` / `gc_er` | Scratch MinIO `cats-scratch` + durable MinIO `cats-durable` |
 
-**Partition I/O:** set `CATS_IO_PARTITIONS=n` (`n=1` default keeps TransportPort.migrate). For `n>1`, ingress/egress use IoPort and produce/consume a UnixFS directory of `part-00000.car` … `part-{n-1:05d}.car` (stable shuffle keys). Invoice stage fields remain single root CIDs. Invoice `seed_cid` now *records* the `num_partitions` observed for the run (plus a Process/NumPy-usable `rng_seed` int a second Plant's `ComputePort` may map to its own engine RNG); `CATS_IO_PARTITIONS` remains the demo-fallback *selector* of `n` until the Executor reads it from Seed instead ([#187](https://github.com/DynamicalSystemsGroup/cats/issues/187); see [`populate_invoice_seed_field`](../.cursor/plans/populate_invoice_seed_field_c499fe02.plan.md) plan).
+**Partition I/O:** set `CATS_IO_PARTITIONS=n` (`n=1` default keeps TransportPort.migrate). For `n>1`, ingress/egress use IoPort and produce/consume a directory of `part-00000.car` … `part-{n-1:05d}.car` (stable shuffle keys; under CAS, CARs are opaque file blobs in a digest-keyed manifest). Invoice stage fields remain single root content ids (`ni:` or legacy CID) plus Phase 2b companion `*_uri` when minted. Invoice `seed_cid` now *records* the `num_partitions` observed for the run (plus a Process/NumPy-usable `rng_seed` int a second Plant's `ComputePort` may map to its own engine RNG); `CATS_IO_PARTITIONS` remains the demo-fallback *selector* of `n` until the Executor reads it from Seed instead ([#187](https://github.com/DynamicalSystemsGroup/cats/issues/187); see [`populate_invoice_seed_field`](../.cursor/plans/populate_invoice_seed_field_c499fe02.plan.md) plan).
 
 Process public surface is locked by `process.__all__` and
 [`tests/test_process_public_surface.py`](../tests/test_process_public_surface.py)
@@ -83,7 +83,7 @@ Process public surface is locked by `process.__all__` and
 |---------------|----------|--------|------------|
 | **Plant [SaaS]** | Implements `PlantPort`; BOM snapshot may stay tool-specific | Demo-proved (KubeRay only) | **2f**: second Plant module (non-Ray) with `plant_port_from_context` equivalent |
 | **InfraStructure [IaaS] — content-store** | Host Kubo facet; ContentMesh client; TF ensure / apply assert | Demo-proved; soft dual-job documented | Interop = mesh CIDs remain valid across Structure swaps; destroy must not kill host Kubo (already). Optional hard dual-daemon isolation is **not** required for Function interop |
-| **InfraStructure [IaaS] — T&D transport** | `TransportContext` / `TransportPort` | Demo-proved (Compose peers) | Optional second transport adapter only if a Plant cannot use Docker Kubo peers; Function stays on `TransportPort` |
+| **InfraStructure [IaaS] — T&D transport** | `TransportContext` / `TransportPort` | Demo-proved (CAS for `ni:`; Compose peers for legacy CID) | Optional second transport adapter only if a Plant cannot use CAS / Docker Kubo peers; Function stays on `TransportPort` |
 | **InfraStructure [IaaS] — object store** | `ObjectStore` / `JobHandle` + durable Entity Relationship | Demo-proved (dual MinIO: scratch + durable); **2g** JobHandle-only `result_uri` / `download_job_result` | **2f** may keep MinIO; alternate scratch backend needs `begin_job` / `download_job_result` / Plant-owned entrypoint landing; durable ER is structure-NS + `er/current` pointers |
 
 ## 2f. Second Plant (interop incomplete as product)
@@ -109,7 +109,9 @@ adapter modules).
 5. Docs: which Plants are supported; BOM snapshot fields may differ per Plant.
 6. **Structure lineage tooling:** `linkProcess()` mutates Function; **`linkStructure()`** mutates
    apply-complete `structure_cid`; **`linkOrder()`** mutates Function and/or Structure in one
-   lineage step (single Invoice `data_cid` chain). A-la-carte helpers remain
+   lineage step (single Invoice `data_cid` chain). Each accepts `cat_response` **or**
+   `bom_cid=` / `data_cid=` via the Node-local BOM registry
+   ([`BomRegistry.md`](./BomRegistry.md)). A-la-carte helpers remain
    (see [`LineageOfProvenance.md`](./LineageOfProvenance.md)). Available as Order ops for proving
    2f; second Plant adapters still required for a full interop prove.
 7. **Executor / Factory adapter-blind CI:** Function modules are grep-guarded against Ray /
@@ -179,6 +181,7 @@ Treat remaining soft edges (`job_endpoint` shape) as cleanup with the first non-
 - [`PLANTs.md`](./PLANTs.md) — Plant analogies and generation vs T&D
 - [`STORAGE.md`](./STORAGE.md) — content-store vs T&D facets; TransportPort / ComputePort / PlantPort / JobHandle
 - [`BOM.md`](./BOM.md) — Order Function/Structure CIDs; named Process imports
+- [`BomRegistry.md`](./BomRegistry.md) — Node-local BOM index; `link*` without a caller-held `cat_response`
 - [`LineageOfProvenance.md`](./LineageOfProvenance.md) — `linkProcess` / `linkStructure` / `linkOrder` Order lineage; **2f** still needs second Plant adapters
 - [`IPFS.md`](./IPFS.md) — host Kubo content-store; transport peering
 - [`MinIO.md`](./MinIO.md) — dual MinIO (scratch + durable Entity Relationship) / JobHandle / `gc-er`

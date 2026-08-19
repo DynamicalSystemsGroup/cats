@@ -1,29 +1,38 @@
 ### Manage the Host IPFS Daemon (InfraStructure content-store facet)
 
 CATs relies on a host [IPFS (Kubo)](https://docs.ipfs.tech/install/command-line/#system-requirements) daemon as
-InfraStructure [IaaS] **content-addressed storage** — the long-lived **content-store facet** used for Order /
-Invoice / BOM / stage CIDs across the [Demo](./DEMO.md) and [Test](./TEST.md) workflows. See [`DEPS.md`](./DEPS.md)
-for installing Kubo itself and [`STORAGE.md`](./STORAGE.md) for how this facet relates to Docker transport peers
-and MinIO (T&D).
+InfraStructure [IaaS] **legacy content-addressed storage** — still used to **read** historical CIDs and for T&D peering /
+mid-migration `ContentStore.ensure`. **New** Order / Invoice / Function / Structure / stage blobs mint on
+**CAS-over-HTTP** (`ni:` + Node `GET /ldp/cas/<hex>`) with Phase 2b companion HTTP **`*_uri`** (also `/ldp/invoices/`, `/ldp/orders/`); Kubo is **not** written for those mints. See [`DEPS.md`](./DEPS.md)
+for installing Kubo itself and [`STORAGE.md`](./STORAGE.md) for how this facet relates to Docker transport peers,
+MinIO (T&D), and the Node CAS store.
 
 The Python side talks to that daemon with a thin sync Kubo HTTP RPC client
 (`cats/network/clients/ipfs_client.py` → `http://{IPFS_API_HOST}:{IPFS_API_PORT}/api/v0/*`,
 defaults `127.0.0.1:5001`, via `requests`), not `ipfshttpclient`. **ContentMesh** uses that client
-for **writes** and for `ls`. **`cat` / `catObj` / `get` / `getCar`** go through
-`cats.network.address_store.AddressStore` (Phase 2a gateway-first):
+for **legacy** `ls` / RPC paths and mid-migration tools. **New writes** use `put_bytes` / `put_json` / `put_tree` /
+`put_dir` (CAS). **`cat(content_id=)` / `catObj` / `get(content_id=)` / `getCar(cid=)`** go through
+`cats.network.address_store.AddressStore`:
+
+| Id form | Read path |
+|---------|-----------|
+| `ni:` / hex digest | Locator index → `GET /ldp/cas/<hex>` → sha256 verify |
+| `hl:` | Hint HTTP URIs then bare `ni:` fallback → sha256 verify |
+| `http(s)://…` URI | Local LDP / HTTP GET → sha256 verify when digest known (Phase 2b) |
+| Legacy CID (`Qm…` / `bafy…`) | Gateway (`IPFS_GATEWAY_URL`) then Kubo RPC; UnixFS / `only-hash` verify |
 
 | Env | Role |
 |-----|------|
-| `IPFS_GATEWAY_URL` | Optional base URL (e.g. `http://127.0.0.1:8080`). When set, reads prefer gateway (`GET /ipfs/{cid}`, CAR via `?format=car`, file `get`); else Kubo RPC. |
-| `CATS_CID_VERIFY` | Set to `1` to verify RPC cats too. Gateway `cat` always verifies. |
+| `IPFS_GATEWAY_URL` | Optional base URL (e.g. `http://127.0.0.1:8080`). When set, **legacy CID** reads prefer gateway; else Kubo RPC. |
+| `CATS_CID_VERIFY` | Set to `1` to verify RPC cats of legacy CIDs too. Gateway `cat` always verifies. |
 
-**CID verify** (gateway hygiene): pure-Python UnixFS File CID for Kubo’s default importer (single- and multi-block balanced `size-262144` dag-pb Files; no Kubo required on the happy path); Kubo `add?only-hash=true` remains the fallback for exotic layouts (trickle, `raw-leaves`, custom chunker, directories).
+**CID verify** (legacy gateway hygiene): pure-Python UnixFS File CID for Kubo’s default importer (single- and multi-block balanced `size-262144` dag-pb Files); Kubo `add?only-hash=true` remains the fallback for exotic layouts.
 
-**Directory `get`:** gateway file GET for UnixFS files; directories via trustless CAR (`?format=car`) + pure-Python UnixFS extract (File + flat Directory); Kubo RPC `get` remains the fallback for HAMT/symlink/incomplete CAR.
+**Directory `get`:** **new** trees are CAS manifests (`materialize_tree`); legacy directories via trustless CAR (`?format=car`) + UnixFS extract (RPC fallback for HAMT/symlink).
 
-**Partition CAR layout (Process IoPort):** when `CATS_IO_PARTITIONS>1`, Plant `RayIoPort` builds a directory CID of `part-XXXXX.car` files (each body is CARv1 of a shard). AddressStore verify/extract apply per part; Invoice still records the layout root CID only.
+**Partition CAR layout (Process IoPort):** when `CATS_IO_PARTITIONS>1`, Plant `RayIoPort` builds a directory of `part-XXXXX.car` files. Under CAS, those CARs are **opaque file blobs** in a digest-keyed manifest (not UnixFS directory CIDs as names).
 
-Mesh reads do not require Bitswap swarm connect; Bitswap remains the T&D peer path and an optional fill when Kubo itself must fetch remote blocks. No `ipfs` CLI from ContentMesh. The CLI remains operator-only (manual `ipfs daemon` / `ipfs shutdown` / debugging).
+New CAS content does not require Bitswap; Bitswap remains the T&D peer path and an optional fill for legacy CIDs. No `ipfs` CLI from ContentMesh. The CLI remains operator-only (manual `ipfs daemon` / `ipfs shutdown` / debugging).
 
 **Same API address for ensure/status:** `ContentStore.is_ready` / `ensure` probe
 `http://{IPFS_API_HOST}:{IPFS_API_PORT}/api/v0/id` (same env as `connect()`). Optional override:
@@ -47,7 +56,7 @@ process exit. Structure `terraform destroy` tears down T&D (Docker peers / MinIO
 
 One host Kubo (default `:5001`, one repo) serves **two traffic classes** on purpose:
 
-1. **Content-store** — durable mesh / provenance CIDs (Order, Invoice, BOM, …) via ContentMesh.
+1. **Content-store** — durable mesh / provenance content ids via ContentMesh (**`ni:`** on CAS for new; legacy CIDs on Kubo).
 2. **Bitswap peer of T&D** — Structure Docker peers (`TransportContext`) swarm-connect to that same host so migrate/stage can fetch host-added CIDs without a second `IPFS_PATH`.
 
 Peers are Structure-lifetime; the host daemon is not. Destroy / `node stop` never kill host Kubo. This is the soft plane (not a dual-daemon hard split). Details: [`STORAGE.md`](./STORAGE.md#one-daemon-two-traffic-classes).
@@ -67,7 +76,7 @@ jobs in this module.
 | Phase | When | Which tree |
 |-------|------|------------|
 | **Bootstrap** | Node `start` / `ensure`; ContentMesh readiness check; operator CLI | Repo default under `CATS_HOME/data/input/structure/.../content_store_utils.py` |
-| **Execution (mutate)** | TF `shell_script.host_ipfs_daemon` create (bare `terraform apply` or via Executor) | Order-submitted under `INPUT_STRUCTURE_HOME/.../content_store_utils.py` |
+| **Execution (mutate)** | TF `shell_script.host_ipfs_daemon` on create | Order-submitted under `INPUT_STRUCTURE_HOME/.../content_store_utils.py` |
 | **Execution (assert)** | `InfraStructure.apply` after `terraform apply` | Same Order-submitted tree (`ContentStore.is_ready`) |
 
 * **Node start** (`python -m cats.node start`) — **strict** bootstrap `ContentStore.is_ready` before Flask binds
@@ -76,8 +85,7 @@ jobs in this module.
 * **Node ensure** — operator heal facade: repo-tree `ContentStore.ensure` (no Flask).
 * **ContentMesh bootstrap** (`ensure_bootstrap_content_store`) — **lazy** readiness soft-warn on the
   default tree only; does **not** call `ensure`. **Not** Order-bound.
-* **Order execution** — TF `host_ipfs_daemon` create is the sole **automatic** Order-submitted ensure
-  (Executor composes that à la carte unit). `InfraStructure.apply` only **asserts** readiness after TF.
+* **Order execution** — TF `host_ipfs_daemon` ensures on **create** (create-once; do not ForceNew every apply — that races a live Kubo). `InfraStructure.apply` **asserts** readiness after TF and soft-heals once (`ContentStore.ensure` + backoff) if the API is down.
 
 Both probe the Kubo **HTTP API** (`POST http://{IPFS_API_HOST}:{IPFS_API_PORT}/api/v0/id`) before treating
 the store as ready — not bare `ipfs id`, which modern Kubo can answer from the local repo with the daemon
@@ -163,6 +171,13 @@ Process transport callables (`ingress` / `integration_cache` / `egress`) are a *
 **not** heal or re-peer. If peers are down after TF, `transport_assert` / `assert_ready` fails fast — re-apply
 Structure or run the CLI below.
 
+**`migrate` / `stage_for_plant` dual path:**
+
+| Content id | Behavior |
+| ---------- | -------- |
+| `ni:` / hex digest | CAS materialize (+ `put_tree` on migrate); no Bitswap; no shell `ipfs get` of `ni:` |
+| Legacy CID (`Qm…` / `bafy…`) | Docker peer `ipfs get`→re-add (quoted); Bitswap as before |
+
 ```bash
 # from repo root, with transport containers up — sole peering CLI (no shell script)
 uv run python data/input/structure/infrastructure/transport_utils.py ensure-peered
@@ -170,5 +185,5 @@ uv run python data/input/structure/infrastructure/transport_utils.py status
 ```
 
 If the host ContentStore isn't up when peering runs, host peering is skipped gracefully — Docker peers can still
-connect to each other. Host Kubo remains the durable content-store facet; Docker peers are Structure-lifetime T&D.
+connect to each other. Host Kubo remains the **legacy CID** durable content-store facet + T&D peer; **new** digests live on Node CAS. Docker peers are Structure-lifetime T&D.
 There is no `ipfs_connect_peers.sh` — that orphan was retired in favor of `TransportContext.ensure_peered`.

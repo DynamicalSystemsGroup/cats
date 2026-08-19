@@ -91,11 +91,15 @@ def test_fetch_ipfs_object_uses_bytes(monkeypatch):
 
 def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
     """create_order_request defaults endpoint to /cat/node/init."""
+    from data.input.function.infrafunction import infrafunction_subproc
+    from data.input.function.process import (
+        egress,
+        ingress,
+        integration_cache,
+        process_0,
+    )
+
     fake = MagicMock()
-    # Minimal stubs so create_order_request can run far enough to set endpoint.
-    fake.add.return_value = [{'Name': 'data', 'Hash': 'QmData'}]
-    fake.add_str.side_effect = lambda s: f'cid-{hash(s) & 0xFFFF:x}'
-    fake.add_pyobj.side_effect = lambda *_a, **_k: 'QmPy'
 
     structure = tmp_path / 'structure'
     plant = structure / 'plant'
@@ -117,62 +121,65 @@ def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
     data.mkdir()
     (data / 'f.csv').write_text('a\n')
 
-    def _cid_dir(path):
+    def _put_dir(path):
         name = Path(path).name
         return f'Qm{name}', name
 
     client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
-    monkeypatch.setattr(client, 'cidDir', _cid_dir)
+    monkeypatch.setattr(client, 'put_dir', _put_dir)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
     monkeypatch.setenv('CAT_NODE_PORT', '5000')
+    put_objs = []
+    real_put = client.put_json
 
-    # create_order_request still calls cidDir on real paths via self.cidDir — stubbed.
-    # Also needs add_str for structure/function/invoice/order JSON.
+    def _spy_put(obj, **kwargs):
+        put_objs.append(obj)
+        return real_put(obj, **kwargs)
+
+    monkeypatch.setattr(client, 'put_json', _spy_put)
+
+    # Stock callables mint named-bind leaves on CAS (no Kubo add_str).
     order_req = client.create_order_request(
-        ingress_subproc=lambda: None,
-        integrated_subproc=lambda: None,
-        egress_subproc=lambda: None,
-        integration_cache_subproc=lambda: None,
-        infrafunction_subproc=lambda: None,
+        ingress_subproc=ingress,
+        integrated_subproc=process_0,
+        egress_subproc=egress,
+        integration_cache_subproc=integration_cache,
+        infrafunction_subproc=infrafunction_subproc,
         data_dirpath=str(data),
         structure_filepath=str(structure),
     )
-    order = json.loads(
-        # last add_str for order body — recover from fake call args that look like order JSON
-        next(
-            args[0]
-            for args, _ in reversed(fake.add_str.call_args_list)
-            if '"endpoint"' in args[0]
-        )
+    order = next(
+        obj for obj in reversed(put_objs)
+        if isinstance(obj, dict) and 'endpoint' in obj
     )
     assert order['endpoint'] == 'http://127.0.0.1:5000/cat/node/init'
-    assert order_req['order_cid']
+    assert order_req['content_id']
+    assert 'order_cid' not in order_req
+    assert 'invoice_cid' not in order_req
+    assert 'order_uri' in order_req
+    assert 'invoice_uri' in order_req
 
-    structure_payload = json.loads(
-        next(
-            args[0]
-            for args, _ in fake.add_str.call_args_list
-            if '"root_cid"' in args[0]
-            and '"plant_cid"' in args[0]
-            and '"infrastructure_cid"' in args[0]
-        )
+    structure_payload = next(
+        obj for obj in put_objs
+        if isinstance(obj, dict)
+        and 'root_uri' in obj
+        and 'plant_uri' in obj
+        and 'infrastructure_uri' in obj
     )
-    assert structure_payload['root_cid'] == 'Qmstructure-root'
-    assert structure_payload['plant_cid'] == 'Qmplant'
-    assert structure_payload['infrastructure_cid'] == 'Qminfrastructure'
+    assert structure_payload['root_uri'] == 'Qmstructure-root'
+    assert structure_payload['plant_uri'] == 'Qmplant'
+    assert structure_payload['infrastructure_uri'] == 'Qminfrastructure'
 
-    function_payload = json.loads(
-        next(
-            args[0]
-            for args, _ in fake.add_str.call_args_list
-            if '"process_source_cid"' in args[0]
-            and '"infrafunction_source_cid"' in args[0]
-            and '"process_cid"' in args[0]
-        )
+    function_payload = next(
+        obj for obj in put_objs
+        if isinstance(obj, dict)
+        and 'process_source_uri' in obj
+        and 'infrafunction_source_uri' in obj
+        and 'process_uri' in obj
     )
-    assert function_payload['process_source_cid'] == 'Qmprocess'
-    assert function_payload['infrafunction_source_cid'] == 'Qminfrafunction'
+    assert function_payload['process_source_uri'] == 'Qmprocess'
+    assert function_payload['infrafunction_source_uri'] == 'Qminfrafunction'
 
 
 def test_cat_submit_uses_requests(monkeypatch, capsys):
@@ -188,6 +195,7 @@ def test_cat_submit_uses_requests(monkeypatch, capsys):
 
     class _Resp:
         status_code = 200
+        ok = True
         content = b'{"bom": true}'
 
         def raise_for_status(self):
@@ -203,10 +211,16 @@ def test_cat_submit_uses_requests(monkeypatch, capsys):
         return _Resp()
 
     monkeypatch.setattr(content_mesh_mod.requests, 'post', _post)
-    out = client.catSubmit({'order_cid': 'QmOrder'})
+    out = client.catSubmit({
+        'content_id': 'QmOrder',
+        'order_uri': 'http://127.0.0.1:5000/ldp/orders/QmOrder',
+    })
     assert out['bom'] is True
     assert posts == [
-        ('http://127.0.0.1:5000/cat/node/init', {'order_cid': 'QmOrder'})
+        (
+            'http://127.0.0.1:5000/cat/node/init',
+            {'order_uri': 'http://127.0.0.1:5000/ldp/orders/QmOrder'},
+        )
     ]
     assert 'curl -X POST' in out['POST']
     captured = capsys.readouterr().out

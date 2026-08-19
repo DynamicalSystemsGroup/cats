@@ -3,21 +3,29 @@
 AddressStore (Phase 2a gateway reads) is covered in test_address_store_gateway.py.
 """
 
+from cats.network.cas import ref_id
 from cats.network.feedback import attach_node_did, build_execution_bom
 from cats.network.identity import node_did, node_uri
 
 
-def test_build_execution_bom_includes_node_did_and_cid_keys():
+def test_build_execution_bom_includes_node_did_and_uri_keys():
     bom = build_execution_bom(
-        log_cid='log',
-        invoice_cid='inv',
+        log_id='log',
+        invoice_id='inv',
         node_did='did:key:zTest',
     )
-    assert bom['invoice_cid'] == 'inv'
-    assert bom['log_cid'] == 'log'
+    assert bom['invoice_uri'] == 'inv'
+    assert bom['log_uri'] == 'log'
+    assert 'invoice_cid' not in bom
+    assert 'log_cid' not in bom
     assert bom['node_did'] == 'did:key:zTest'
     assert bom['@type'] == ['prov:Entity', 'cats:ExecutionBom']
     assert bom['@context'][0] == 'https://www.w3.org/ns/prov#'
+    ctx_terms = bom['@context'][1]
+    assert 'invoice_uri' in ctx_terms
+    assert 'log_uri' in ctx_terms
+    assert 'invoice_cid' not in ctx_terms
+    assert 'log_cid' not in ctx_terms
     assert bom['prov:wasAttributedTo'] == {'@id': 'did:key:zTest'}
     assert bom['prov:wasGeneratedBy']['@type'] == 'prov:Activity'
     assert bom['prov:wasGeneratedBy']['@id'] == '#executorRun'
@@ -26,23 +34,32 @@ def test_build_execution_bom_includes_node_did_and_cid_keys():
     assert 'infrastructure_snapshot_cid' not in bom
     assert 'node_uri' not in bom
     assert 'bom_cid' not in bom
+    assert not any(k.endswith('_cid') for k in bom if isinstance(k, str))
 
 
 def test_build_execution_bom_omits_node_did_when_none():
     bom = build_execution_bom(
-        log_cid='log',
-        invoice_cid='inv',
+        log_id='log',
+        invoice_id='inv',
     )
     assert 'node_did' not in bom
     assert 'prov:wasAttributedTo' not in bom
-    assert bom['invoice_cid'] == 'inv'
-    assert bom['log_cid'] == 'log'
+    assert bom['invoice_uri'] == 'inv'
+    assert bom['log_uri'] == 'log'
+    assert 'invoice_cid' not in bom
+    assert 'log_cid' not in bom
     assert '@context' in bom
     assert '@type' in bom
 
 
+def test_ref_id_reads_legacy_data_cid_only():
+    """Readers still accept CID-only fixtures via ref_id legacy fallback."""
+    assert ref_id({'data_cid': 'QmLegacyOnly'}, 'data') == 'QmLegacyOnly'
+    assert ref_id({'data_uri': 'QmUriOnly'}, 'data') == 'QmUriOnly'
+
+
 def test_attach_node_did_sets_field():
-    pkg = attach_node_did({'invoice_cid': 'inv'}, 'did:key:zNode')
+    pkg = attach_node_did({'invoice_uri': 'inv'}, 'did:key:zNode')
     assert pkg['node_did'] == 'did:key:zNode'
 
 
@@ -67,9 +84,10 @@ def test_node_did_rejects_non_did_env(monkeypatch, tmp_path):
     monkeypatch.setenv('CAT_NODE_DID', 'http://127.0.0.1:5000')
     try:
         node_did(cats_home=str(tmp_path))
-        assert False, 'expected ValueError'
     except ValueError as exc:
         assert 'did:' in str(exc)
+    else:
+        assert False, 'expected ValueError'
 
 
 def test_node_did_persists_did_key(monkeypatch, tmp_path):

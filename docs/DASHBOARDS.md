@@ -12,6 +12,7 @@ the Structure's lifetime.
   InfraFunction dispatches (`Processor.Integration()` — runtime of Process [Composed Function] → Job Submission API).
 - Live address is `Plant.snapshot()['ray_dashboard_address']`, threaded into
   `Function.execute(…, dashboard_address=…)`. It is **not** a Service field.
+- `RayPlantPort` connect wait is **180s** (kind/KubeRay cold start); failures mention dashboard readiness.
 - Static NodePort `30265` → host `8265` via kind `extraPortMappings`
   (`data/input/structure/plant/main.tf`).
 
@@ -21,7 +22,7 @@ the Structure's lifetime.
 - **Credentials:** `cats-scratch` / `cats-scratch-secret`
 - Structure-lifetime scratch (`cats-scratch` / `jobs/<uuid>/result`). Volume
   `structure_minio_scratch_data`; ILM 7 days + Structure destroy `down -v`. Integration
-  outputs for provenance remain IPFS (`invoice.integration_data_cid`).
+  outputs for provenance remain IPFS (`invoice` integration data id / `ni:`).
   Compose: `infrastructure/minio_scratch_compose.yaml`.
 
 ### [MinIO Console — durable Entity Relationship](http://127.0.0.1:9101)
@@ -29,7 +30,8 @@ the Structure's lifetime.
 - **URL:** http://127.0.0.1:9101 (S3 API: http://127.0.0.1:9100)
 - **Credentials:** `cats-durable` / `cats-durable-secret`
 - Node-lifetime Entity Relationship store (`cats-durable`):
-  `structures/<applied_structure_cid>/er/<name>/` plus `er/current/<name>` pointers.
+  `structures/<applied_structure_id>/er/<name>/` plus `er/current/<name>` pointers
+  (`structure_id` in pointer JSON; legacy `structure_cid` readable one cycle).
   Volume `node_minio_durable_data` survives Structure destroy; GC via `gc-er` only.
   Compose: `infrastructure/minio_durable_compose.yaml`.
 

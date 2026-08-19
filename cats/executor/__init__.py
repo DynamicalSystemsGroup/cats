@@ -6,8 +6,8 @@ from cats.executor.structure import (
     Plant,
     Structure,
     modules_installed,
-    read_applied_structure_cid,
-    write_applied_structure_cid,
+    read_applied_structure_id,
+    write_applied_structure_id,
 )
 
 __all__ = [
@@ -19,6 +19,6 @@ __all__ = [
     'InfraStructure',
     'Plant',
     'modules_installed',
-    'read_applied_structure_cid',
-    'write_applied_structure_cid',
+    'read_applied_structure_id',
+    'write_applied_structure_id',
 ]

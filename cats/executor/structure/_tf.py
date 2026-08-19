@@ -8,7 +8,8 @@ import sys
 from cats.utils import subproc_run
 
 DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE = "module.infrastructure.shell_script.docker_compose_ipfs_transport"
-APPLIED_STRUCTURE_MARKER = '.applied-structure.cid'
+APPLIED_STRUCTURE_MARKER = '.applied-structure.id'
+LEGACY_APPLIED_STRUCTURE_MARKER = '.applied-structure.cid'
 TF_STATE_LOCK_INFO = '.terraform.tfstate.lock.info'
 
 
@@ -33,22 +34,47 @@ def _applied_structure_marker_path(structure_home):
     return os.path.join(structure_home, APPLIED_STRUCTURE_MARKER)
 
 
-def read_applied_structure_cid(structure_home):
-    """Return the structure_cid this Structure's Terraform state currently
-    reflects, or None if nothing has been successfully applied yet."""
-    marker_path = _applied_structure_marker_path(structure_home)
-    if not os.path.isfile(marker_path):
+def _legacy_applied_structure_marker_path(structure_home):
+    return os.path.join(structure_home, LEGACY_APPLIED_STRUCTURE_MARKER)
+
+
+def _read_marker_file(path):
+    if not os.path.isfile(path):
         return None
-    with open(marker_path, encoding='utf-8') as marker_file:
+    with open(path, encoding='utf-8') as marker_file:
         return marker_file.read().strip() or None
 
 
-def write_applied_structure_cid(structure_home, structure_cid):
-    """Record the structure_cid Terraform state now reflects, so a later
+def read_applied_structure_id(structure_home):
+    """Return the structure id this Structure's Terraform state currently
+    reflects, or None if nothing has been successfully applied yet.
+
+    Prefers ``.applied-structure.id``; falls back to legacy
+    ``.applied-structure.cid`` for one migration cycle.
+    """
+    value = _read_marker_file(_applied_structure_marker_path(structure_home))
+    if value is not None:
+        return value
+    return _read_marker_file(_legacy_applied_structure_marker_path(structure_home))
+
+
+def write_applied_structure_id(structure_home, structure_id):
+    """Record the structure id Terraform state now reflects, so a later
     CAT execution with an unchanged (content-addressed) Structure can
-    reconcile in place instead of destroying and rebuilding the Plant."""
-    with open(_applied_structure_marker_path(structure_home), 'w', encoding='utf-8') as marker_file:
-        marker_file.write(structure_cid or '')
+    reconcile in place instead of destroying and rebuilding the Plant.
+
+    Writes only ``.applied-structure.id``; removes legacy
+    ``.applied-structure.cid`` when present.
+    """
+    with open(
+        _applied_structure_marker_path(structure_home), 'w', encoding='utf-8'
+    ) as marker_file:
+        marker_file.write(structure_id or '')
+    legacy = _legacy_applied_structure_marker_path(structure_home)
+    try:
+        os.remove(legacy)
+    except FileNotFoundError:
+        pass
 
 
 def terraform_bin(runtime):
@@ -89,7 +115,9 @@ def ensure_provider_binaries_executable(tf_data_dir):
 
 def configure_terraform_data_dir(structure_home):
     # TF_DATA_DIR must not equal the module root; that breaks backend state loading.
-    tf_data_dir = os.path.join(structure_home, '.terraform-data')
+    # Always absolute: terraform resolves relative TF_DATA_DIR against its cwd
+    # (structure_home), while this helper may run with a different process cwd.
+    tf_data_dir = os.path.abspath(os.path.join(structure_home, '.terraform-data'))
     os.makedirs(tf_data_dir, exist_ok=True)
     os.environ['TF_DATA_DIR'] = tf_data_dir
     ensure_provider_binaries_executable(tf_data_dir)

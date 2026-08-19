@@ -5,6 +5,7 @@ from pathlib import Path
 
 from cats.executor.function import Function
 from cats.executor.structure import Structure
+from cats.network.cas import content_uri, ref_id, ref_uri, set_ref
 
 
 class Executor:
@@ -16,16 +17,16 @@ class Executor:
 
         self.structure: Structure = structure
         self.function: Function = function
-        self.bom_json_cid: str = self.runtime.bom_json_cid
+        self.bom_json_id: str = self.runtime.bom_json_id
         self.enhanced_bom, self.bom = self.runtime.contentMesh.getEnhancedBom(
-            self.bom_json_cid, self.runtime.INPUT_HOME, self.runtime.OUTPUT_HOME
+            self.bom_json_id, self.runtime.INPUT_HOME, self.runtime.OUTPUT_HOME
         )
         self.orderCID = None
         self.invoiceCID = None
 
-        self.ingress_data_cid = None
-        self.integration_data_cid = None
-        self.egress_data_cid = None
+        self.ingress_data_id = None
+        self.integration_data_id = None
+        self.egress_data_id = None
 
     def catStore(self):
         self.CAT_HOME = self.runtime.CAT_HOME = self.runtime.contentMesh.CAT_HOME = \
@@ -45,56 +46,79 @@ class Executor:
     def execute(self, order_request):
         self.catStore()
 
-        self.invoiceCID = self.enhanced_bom['invoice_cid']
-        self.orderCID = self.enhanced_bom['invoice']['order_cid']
+        cats_home = self.runtime.CATS_HOME
+        self.invoiceCID = ref_id(
+            self.enhanced_bom, 'invoice', cats_home=cats_home
+        )
+        self.orderCID = ref_id(
+            self.enhanced_bom['invoice'], 'order', cats_home=cats_home
+        )
         plant_snapshot = self.structure.reconcile()
         object_store = self.structure.infraStructure.obj_store_context()
         plant = self.structure.plant.plant_port()
         transport = self.structure.infraStructure.transport_context()
-        self.ingress_data_cid, self.integration_data_cid, self.egress_data_cid = \
+        self.ingress_data_id, self.integration_data_id, self.egress_data_id = \
             self.function.execute(
                 object_store=object_store,
                 plant=plant,
                 transport=transport,
             )
 
-        # function_cid / structure_cid: as-Code; structure_as_executed_cid on
-        # the Invoice records what Plant / InfraStructure actually ran.
-        self.enhanced_bom['function'] = json.loads(self.runtime.contentMesh.cat(self.enhanced_bom['order']['function_cid']))
-        self.enhanced_bom['structure'] = json.loads(self.runtime.contentMesh.cat(self.enhanced_bom['order']['structure_cid']))
-        ipfs = self.runtime.contentMesh.ipfsClient
-        object_store_as_executed_cid = ipfs.add_json(object_store.snapshot())
-        infrastructure_as_executed_cid = ipfs.add_json(
+        # function / structure: as-Code; structure_as_executed on the Invoice
+        # records what Plant / InfraStructure actually ran.
+        mesh = self.runtime.contentMesh
+        function_locator = ref_uri(self.enhanced_bom['order'], 'function') or ref_id(
+            self.enhanced_bom['order'], 'function', cats_home=cats_home
+        )
+        structure_locator = ref_uri(self.enhanced_bom['order'], 'structure') or ref_id(
+            self.enhanced_bom['order'], 'structure', cats_home=cats_home
+        )
+        self.enhanced_bom['function'] = json.loads(mesh.cat(function_locator))
+        self.enhanced_bom['structure'] = json.loads(mesh.cat(structure_locator))
+
+        object_store_as_executed_id = mesh.put_json(object_store.snapshot())
+        infrastructure_as_executed_id = mesh.put_json(
             self.structure.infraStructure.snapshot(
-                object_store_as_executed_cid=object_store_as_executed_cid,
+                object_store_as_executed_id=object_store_as_executed_id,
             )
         )
-        plant_as_executed_cid = ipfs.add_json(plant_snapshot)
-        structure_as_executed_cid = ipfs.add_json({
-            'plant_as_executed_cid': plant_as_executed_cid,
-            'infrastructure_as_executed_cid': infrastructure_as_executed_cid,
-        })
+        plant_as_executed_id = mesh.put_json(plant_snapshot)
+        structure_as_executed = {}
+        set_ref(structure_as_executed, 'plant_as_executed', plant_as_executed_id)
+        set_ref(
+            structure_as_executed,
+            'infrastructure_as_executed',
+            infrastructure_as_executed_id,
+        )
+        structure_as_executed_id = mesh.put_json(structure_as_executed)
         self.enhanced_bom['log'] = {
-            'ingress_data_cid': self.ingress_data_cid,
-            'integration_data_cid': self.integration_data_cid,
-            'egress_data_cid': self.egress_data_cid,
             'plant_rebuilt': plant_snapshot['rebuilt'],
             # Non-secret object-store scratch URI for Structure-lifetime
-            # correlation; durable retrieval remains integration_data_cid (IPFS).
+            # correlation; durable retrieval remains integration_data (CAS).
             'object_store_result_uri': self.function.processor.object_store_result_uri,
             # Durable Entity Relationship correlators (None until promote is used).
             'durable_er_uri': self.function.processor.durable_er_uri,
             'durable_er_pointer': self.function.processor.durable_er_pointer,
         }
-        # Invoice feedback (Seed deferred / #187): stage CIDs on Invoice until
-        # Seed holds the Process replay dictionary.
-        self.enhanced_bom['invoice']['data_cid'] = self.function.invoice_data_cid
-        self.enhanced_bom['invoice']['ingress_data_cid'] = self.ingress_data_cid
-        self.enhanced_bom['invoice']['integration_data_cid'] = self.integration_data_cid
-        self.enhanced_bom['invoice']['structure_as_executed_cid'] = (
-            structure_as_executed_cid
+        set_ref(self.enhanced_bom['log'], 'ingress_data', self.ingress_data_id)
+        set_ref(
+            self.enhanced_bom['log'], 'integration_data', self.integration_data_id
         )
-        self.enhanced_bom['log_cid'] = ipfs.add_json(self.enhanced_bom['log'])
+        set_ref(self.enhanced_bom['log'], 'egress_data', self.egress_data_id)
+        # Invoice feedback (Seed deferred / #187): stage refs on Invoice until
+        # Seed holds the Process replay dictionary.
+        invoice = self.enhanced_bom['invoice']
+        set_ref(invoice, 'data', self.function.invoice_data_id)
+        set_ref(invoice, 'ingress_data', self.ingress_data_id)
+        set_ref(invoice, 'integration_data', self.integration_data_id)
+        set_ref(invoice, 'structure_as_executed', structure_as_executed_id)
+        log_id = mesh.put_json(self.enhanced_bom['log'])
+        set_ref(self.enhanced_bom, 'log', log_id)
+        # Prefer explicit content_uri when available (set_ref already sets
+        # log_uri; refresh if CAS LDP URI is resolvable).
+        log_uri = content_uri(log_id)
+        if log_uri:
+            self.enhanced_bom['log_uri'] = log_uri
 
         # Process replay dictionary (CFL §4B / #187). num_partitions is the
         # observed I/O + hotF alignment `n` this run used (Processor's
@@ -110,23 +134,36 @@ class Executor:
             'rng_seed': int(seed_hex[:8], 16) & 0x7FFFFFFF,
             'num_partitions': int(n),
         }
-        self.enhanced_bom['invoice']['seed_cid'] = ipfs.add_json(seed)
+        seed_id = mesh.put_json(seed)
+        set_ref(invoice, 'seed', seed_id)
 
-        # Invoice CID: produced here (by the Executor), not by
+        # Invoice content id: produced here (by the Executor), not by
         # Runtime.execute() - so "Invoice CIDs are produced by the
-        # Executor" holds at the class level. Backfilling order_cid with
-        # the real, already-submitted order_request['order_cid'] directly
-        # (as opposed to the placeholder order_cid getEnhancedBom() may
+        # Executor" holds at the class level. Backfilling order with
+        # the real, already-submitted order_request['order_id'] directly
+        # (as opposed to the placeholder order ref getEnhancedBom() may
         # have fetched into self.enhanced_bom['order']) is what makes the
         # Invoice point at "the original CID-ed Order" (see
         # docs/NodeProductFlow.md#2b). Factory.accept threads this same
-        # order_cid into the bootstrap Invoice via Runtime.initBOMcar /
+        # order id into the bootstrap Invoice via Runtime.initBOMcar /
         # ContentMesh.initBOMjson, so the locally materialized order.json
-        # and this final Invoice's order_cid are the exact same CID for
+        # and this final Invoice's order ref are the exact same id for
         # every execution, not just a re-hash that happens to match it.
-        self.enhanced_bom['invoice']['order_cid'] = order_request['order_cid']
-        invoice_cid = ipfs.add_str(json.dumps(self.enhanced_bom['invoice']))
+        order_id = order_request['order_id']
+        set_ref(invoice, 'order', order_id)
+        invoice_id = mesh.put_json(invoice)
+        # Phase 2b: publish Invoice LDP resource (URI address of record).
+        from cats.network.cas import LocatorIndex
+        from cats.network.ldp import InvoiceLdpStore, invoice_ldp_uri
 
-        del self.enhanced_bom['bom_json_cid']
-        del self.enhanced_bom['init_data_cid']
-        return self.enhanced_bom, invoice_cid
+        InvoiceLdpStore(self.runtime.CATS_HOME).put(invoice_id, invoice)
+        inv_uri = invoice_ldp_uri(invoice_id)
+        LocatorIndex(self.runtime.CATS_HOME).put(
+            invoice_id, uri=inv_uri, media_type='application/json'
+        )
+        self.enhanced_bom['invoice_uri'] = inv_uri
+
+        del self.enhanced_bom['bom_json_id']
+        self.enhanced_bom.pop('init_data_cid', None)
+        self.enhanced_bom.pop('init_data_uri', None)
+        return self.enhanced_bom, invoice_id

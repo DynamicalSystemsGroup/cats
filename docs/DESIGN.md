@@ -30,9 +30,10 @@ structural elements required for its function”
     - The CAT Order is updated in alignment with event-driven functionality and operations: mutating InfraStructure 
     (IaaS)'s provisioning produces a new Order with an updated `structure_cid` (*)
 
-(* Each of these Order mutations produces the next Order a subsequent CAT execution processes - see 
-**[ControlFeedbackLoop.md](ControlFeedbackLoop.md)**, whose step-2 note documents how that next Order is (once the 
-not-yet-built registry exists) meant to be discovered rather than supplied out-of-band.)
+(* Each of these Order mutations produces the next Order a subsequent CAT execution processes - see
+**[ControlFeedbackLoop.md](ControlFeedbackLoop.md)**, whose step-2 note documents how that next Order is discovered
+via the Node-local BOM registry (`bom_cid` / `data_cid`) rather than only supplied out-of-band as `order_cid`
+([`BomRegistry.md`](BomRegistry.md)).)
 
 Each of these components is content-addressed and reconstituted at runtime with the same composition it was CID-ed with: the Factory consumes a single **Order CID** - resolving to Input Invoice, Function, and Structure CIDs - composes `Function` and constructs `Structure` from those CIDs, then instantiates a fresh, ephemeral **Executor** per CAT execution with them as its dependencies - `Structure` in turn composing its `Plant` from its `InfraStructure`, and `Function` its `Process` from its `InfraFunction` - and the Executor itself (not a layer above it) produces the resulting **Invoice CID**.
 
