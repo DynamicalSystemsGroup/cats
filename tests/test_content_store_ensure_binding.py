@@ -356,8 +356,8 @@ def test_meshclient_init_does_not_call_bootstrap_ensure(tmp_path, monkeypatch):
     assert client._bootstrap_content_store_ensured is False
 
 
-def test_meshclient_ciddir_triggers_bootstrap_readiness_once(tmp_path, monkeypatch):
-    """cidDir triggers bootstrap readiness checks (soft probe path)."""
+def test_meshclient_put_dir_triggers_bootstrap_readiness_once(tmp_path, monkeypatch):
+    """put_dir triggers bootstrap readiness checks (soft probe path)."""
     calls = []
 
     def _spy(self):
@@ -374,14 +374,14 @@ def test_meshclient_ciddir_triggers_bootstrap_readiness_once(tmp_path, monkeypat
     payload.mkdir()
     (payload / 'f.txt').write_text('x', encoding='utf-8')
 
-    dir_cid, dir_name = client.cidDir(str(payload))
-    assert dir_cid.startswith('ni:///sha-256;')
+    dir_id, dir_name = client.put_dir(str(payload))
+    assert dir_id.startswith('ni:///sha-256;')
     assert dir_name == 'payload'
     assert calls == ['ready_check']
     # New trees mint on CAS — no Kubo add.
     fake_ipfs.add.assert_not_called()
 
-    client.cidDir(str(payload))
+    client.put_dir(str(payload))
     assert calls == ['ready_check', 'ready_check']
 
 

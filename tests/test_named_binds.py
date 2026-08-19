@@ -64,7 +64,7 @@ def test_bind_subproc_stock_vs_lambda(monkeypatch, tmp_path):
     assert is_ni_or_digest(cid) or cid.startswith('ni:')
     named_payload = json.loads(client.cat(cid))
     assert named_payload == {
-        'source_cid': 'QmProcSrc',
+        'contentId': 'QmProcSrc',
         'module': process_0.__module__,
         'qualname': 'process_0',
     }
@@ -96,10 +96,10 @@ def test_resolve_subproc_named_and_pickle(tmp_path, monkeypatch):
         }[cid],
     )
 
-    resolved = client.resolve_subproc('QmNamed', expected_source_cid='QmProcSrc')
+    resolved = client.resolve_subproc('QmNamed', expected_source_id='QmProcSrc')
     assert resolved is process_0
 
-    resolved_pickle = client.resolve_subproc('QmPickle', expected_source_cid='QmProcSrc')
+    resolved_pickle = client.resolve_subproc('QmPickle', expected_source_id='QmProcSrc')
     assert resolved_pickle.__name__ == 'process_1'
 
 
@@ -115,7 +115,7 @@ def test_resolve_subproc_source_mismatch(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(client, 'catObj', lambda cid: json.dumps(named).encode('utf-8'))
     with pytest.raises(RuntimeError, match='does not match'):
-        client.resolve_subproc('QmNamed', expected_source_cid='QmProcSrc')
+        client.resolve_subproc('QmNamed', expected_source_id='QmProcSrc')
 
 
 def _write_order_fixture(tmp_path: Path):
@@ -144,13 +144,13 @@ def test_create_order_request_stock_emits_named_bind_leaves(monkeypatch, tmp_pat
     fake = MagicMock()
     structure, data = _write_order_fixture(tmp_path)
 
-    def _cid_dir(path):
+    def _put_dir(path):
         name = Path(path).name
         return f'Qm{name}', name
 
     client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
-    monkeypatch.setattr(client, 'cidDir', _cid_dir)
+    monkeypatch.setattr(client, 'put_dir', _put_dir)
     put_objs = []
     real_put = client.put_json
 
@@ -173,7 +173,7 @@ def test_create_order_request_stock_emits_named_bind_leaves(monkeypatch, tmp_pat
     named_leaves = [
         obj for obj in put_objs
         if isinstance(obj, dict)
-        and set(obj) >= {'qualname', 'source_cid', 'module'}
+        and set(obj) >= {'qualname', 'contentId', 'module'}
     ]
     qualnames = {leaf['qualname'] for leaf in named_leaves}
     assert qualnames == {
@@ -183,7 +183,9 @@ def test_create_order_request_stock_emits_named_bind_leaves(monkeypatch, tmp_pat
         'integration_cache',
         'infrafunction_subproc',
     }
-    assert all(leaf['source_cid'] in ('Qmprocess', 'Qminfrafunction') for leaf in named_leaves)
+    assert all(
+        leaf['contentId'] in ('Qmprocess', 'Qminfrafunction') for leaf in named_leaves
+    )
 
 
 def test_link_process_rewrites_stock_named_bind(monkeypatch, tmp_path):
@@ -258,20 +260,20 @@ def test_link_process_rewrites_stock_named_bind(monkeypatch, tmp_path):
     named_leaves = [
         obj for obj in put_objs
         if isinstance(obj, dict)
-        and set(obj) >= {'qualname', 'source_cid'}
+        and set(obj) >= {'qualname', 'contentId'}
     ]
     assert len(named_leaves) == 1
     assert named_leaves[0]['qualname'] == 'process_1'
-    assert named_leaves[0]['source_cid'] == 'QmProcSrc'
+    assert named_leaves[0]['contentId'] == 'QmProcSrc'
 
-    # Carried slots: process bind JSON should still reference prior leaf CIDs
-    # for unchanged slots.
+    # Carried slots: process bind JSON should still reference prior leaf ids
+    # for unchanged slots (uri-only remint via set_ref).
     process_maps = [
         obj for obj in put_objs
         if isinstance(obj, dict)
-        and 'ingress_subproc_cid' in obj
-        and 'integrated_subproc_cid' in obj
+        and 'ingress_subproc_uri' in obj
+        and 'integrated_subproc_uri' in obj
     ]
     assert process_maps
-    assert process_maps[-1]['ingress_subproc_cid'] == 'QmIn'
-    assert process_maps[-1]['egress_subproc_cid'] == 'QmEg'
+    assert process_maps[-1]['ingress_subproc_uri'] == 'QmIn'
+    assert process_maps[-1]['egress_subproc_uri'] == 'QmEg'

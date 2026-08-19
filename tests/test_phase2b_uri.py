@@ -51,13 +51,13 @@ def test_content_ref_and_set_cid_uri(tmp_path, monkeypatch):
     store = CasHttpStore(str(tmp_path))
     ni = store.put(b'{"x":1}\n')
     ref = build_content_ref(ni, base_url='http://127.0.0.1:5099')
-    assert ref['cid'] == ni
+    assert ref['content_id'] == ni
     assert ref['uri'].endswith(f'/ldp/cas/{from_ni(ni)}')
     assert content_uri(ni, base_url='http://127.0.0.1:5099') == ref['uri']
 
     obj: dict = {}
     set_cid_uri(obj, 'data_cid', ni, base_url='http://127.0.0.1:5099')
-    assert obj['data_cid'] == ni
+    assert 'data_cid' not in obj
     assert obj['data_uri'] == ref['uri']
 
 
@@ -127,16 +127,18 @@ def test_envelope_prefers_uri_id(tmp_path, monkeypatch):
     inv_uri = 'http://127.0.0.1:5099/ldp/invoices/' + ('a' * 64)
     data_uri = 'http://127.0.0.1:5099/ldp/cas/' + ('b' * 64)
     bom = build_execution_bom(
-        log_cid=to_ni('c' * 64),
-        invoice_cid=to_ni('a' * 64),
+        log_id=to_ni('c' * 64),
+        invoice_id=to_ni('a' * 64),
         invoice_uri=inv_uri,
-        data_cid=to_ni('b' * 64),
+        data_id=to_ni('b' * 64),
         data_uri=data_uri,
-        ingress_data_cid=to_ni('d' * 64),
-        integration_data_cid=to_ni('e' * 64),
+        ingress_data_id=to_ni('d' * 64),
+        integration_data_id=to_ni('e' * 64),
         node_did=None,
     )
     assert bom['invoice_uri'] == inv_uri
+    assert 'invoice_cid' not in bom
+    assert 'log_cid' not in bom
     assert bom['stageLineage'][-1]['@id'] == data_uri
     assert bom['stageLineage'][-1]['contentId'] == to_ni('b' * 64)
     signed = sign_execution_bom(bom, cats_home=str(tmp_path))

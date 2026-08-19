@@ -47,8 +47,8 @@ def _signed_bom(monkeypatch, tmp_path):
     did = node_did(cats_home=str(tmp_path))
     return sign_execution_bom(
         build_execution_bom(
-            log_cid='QmLog',
-            invoice_cid='QmInv',
+            log_id='QmLog',
+            invoice_id='QmInv',
             node_did=did,
         ),
         cats_home=str(tmp_path),
@@ -181,12 +181,15 @@ def test_ldn_inbox_urls(monkeypatch):
 
 def test_build_bom_announcement():
     note = build_bom_announcement(
-        bom_cid='QmC',
+        content_id='QmC',
         bom_solid_uri='https://pod.example/boms/QmC',
+        hl='hl:abc:https://pod.example/boms/QmC',
     )
     assert note['@type'] == 'Announce'
     assert note['object']['@id'] == 'https://pod.example/boms/QmC'
-    assert note['bom_cid'] == 'QmC'
+    assert note['content_id'] == 'QmC'
+    assert note['hl'].startswith('hl:')
+    assert 'bom_cid' not in note
 
 
 def test_announce_bom_multi_inbox():
@@ -298,7 +301,7 @@ def test_fetch_bom_envelope_solid_url(monkeypatch, tmp_path):
         'https://pod.example/user/boms/QmX',
         session=_Session(),
     )
-    assert out['invoice_cid'] == 'QmInv'
+    assert out['invoice_uri'] == 'QmInv'
 
 
 def test_runtime_execute_dual_publish(monkeypatch, tmp_path):
@@ -322,7 +325,7 @@ def test_runtime_execute_dual_publish(monkeypatch, tmp_path):
 
     factory = MagicMock()
     executor = MagicMock()
-    executor.execute.return_value = ({'log_cid': 'QmLog'}, 'QmInvoice')
+    executor.execute.return_value = ({'log_uri': 'QmLog'}, 'QmInvoice')
     factory.produce.return_value = executor
 
     solid_uri = 'https://pod.example/user/boms/QmRuntimeBom'
@@ -334,11 +337,11 @@ def test_runtime_execute_dual_publish(monkeypatch, tmp_path):
         'cats.runtime.announce_bom',
         return_value=['https://inbox.example/notify'],
     ) as announce:
-        response = runtime.execute(factory, {'order_cid': 'QmOrder'})
+        response = runtime.execute(factory, {'order_id': 'QmOrder'})
 
     publish.assert_called_once()
-    announce.assert_called_once_with(None, 'QmRuntimeBom', solid_uri)
-    assert response['bom_cid'] == 'QmRuntimeBom'
+    announce.assert_called_once_with(None, 'QmRuntimeBom', solid_uri, hl=None)
+    assert response['content_id'] == 'QmRuntimeBom'
     assert response['bom_ldp_uri'] == (
         'http://127.0.0.1:5002/ldp/boms/QmRuntimeBom'
     )
@@ -380,7 +383,7 @@ def test_runtime_execute_solid_failure_raises(monkeypatch, tmp_path):
         lambda **kw: SolidBomPublisher(session=_Session()),
     ):
         with pytest.raises(SolidPublishError, match='denied'):
-            runtime.execute(factory, {'order_cid': 'QmOrder'})
+            runtime.execute(factory, {'order_id': 'QmOrder'})
 
 
 def test_runtime_execute_solid_unset_identical(monkeypatch, tmp_path):
@@ -401,6 +404,6 @@ def test_runtime_execute_solid_unset_identical(monkeypatch, tmp_path):
     executor.execute.return_value = ({'log_cid': 'QmLog'}, 'QmInvoice')
     factory.produce.return_value = executor
 
-    response = runtime.execute(factory, {'order_cid': 'QmOrder'})
+    response = runtime.execute(factory, {'order_id': 'QmOrder'})
     assert response['bom_solid_uri'] is None
     assert response['bom_ldp_uri'].endswith('/ldp/boms/QmLocal')

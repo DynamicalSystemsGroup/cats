@@ -121,13 +121,13 @@ def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
     data.mkdir()
     (data / 'f.csv').write_text('a\n')
 
-    def _cid_dir(path):
+    def _put_dir(path):
         name = Path(path).name
         return f'Qm{name}', name
 
     client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
-    monkeypatch.setattr(client, 'cidDir', _cid_dir)
+    monkeypatch.setattr(client, 'put_dir', _put_dir)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
     monkeypatch.setenv('CAT_NODE_PORT', '5000')
     put_objs = []
@@ -154,28 +154,32 @@ def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
         if isinstance(obj, dict) and 'endpoint' in obj
     )
     assert order['endpoint'] == 'http://127.0.0.1:5000/cat/node/init'
-    assert order_req['order_cid']
+    assert order_req['content_id']
+    assert 'order_cid' not in order_req
+    assert 'invoice_cid' not in order_req
+    assert 'order_uri' in order_req
+    assert 'invoice_uri' in order_req
 
     structure_payload = next(
         obj for obj in put_objs
         if isinstance(obj, dict)
-        and 'root_cid' in obj
-        and 'plant_cid' in obj
-        and 'infrastructure_cid' in obj
+        and 'root_uri' in obj
+        and 'plant_uri' in obj
+        and 'infrastructure_uri' in obj
     )
-    assert structure_payload['root_cid'] == 'Qmstructure-root'
-    assert structure_payload['plant_cid'] == 'Qmplant'
-    assert structure_payload['infrastructure_cid'] == 'Qminfrastructure'
+    assert structure_payload['root_uri'] == 'Qmstructure-root'
+    assert structure_payload['plant_uri'] == 'Qmplant'
+    assert structure_payload['infrastructure_uri'] == 'Qminfrastructure'
 
     function_payload = next(
         obj for obj in put_objs
         if isinstance(obj, dict)
-        and 'process_source_cid' in obj
-        and 'infrafunction_source_cid' in obj
-        and 'process_cid' in obj
+        and 'process_source_uri' in obj
+        and 'infrafunction_source_uri' in obj
+        and 'process_uri' in obj
     )
-    assert function_payload['process_source_cid'] == 'Qmprocess'
-    assert function_payload['infrafunction_source_cid'] == 'Qminfrafunction'
+    assert function_payload['process_source_uri'] == 'Qmprocess'
+    assert function_payload['infrafunction_source_uri'] == 'Qminfrafunction'
 
 
 def test_cat_submit_uses_requests(monkeypatch, capsys):
@@ -191,6 +195,7 @@ def test_cat_submit_uses_requests(monkeypatch, capsys):
 
     class _Resp:
         status_code = 200
+        ok = True
         content = b'{"bom": true}'
 
         def raise_for_status(self):
@@ -206,10 +211,16 @@ def test_cat_submit_uses_requests(monkeypatch, capsys):
         return _Resp()
 
     monkeypatch.setattr(content_mesh_mod.requests, 'post', _post)
-    out = client.catSubmit({'order_cid': 'QmOrder'})
+    out = client.catSubmit({
+        'content_id': 'QmOrder',
+        'order_uri': 'http://127.0.0.1:5000/ldp/orders/QmOrder',
+    })
     assert out['bom'] is True
     assert posts == [
-        ('http://127.0.0.1:5000/cat/node/init', {'order_cid': 'QmOrder'})
+        (
+            'http://127.0.0.1:5000/cat/node/init',
+            {'order_uri': 'http://127.0.0.1:5000/ldp/orders/QmOrder'},
+        )
     ]
     assert 'curl -X POST' in out['POST']
     captured = capsys.readouterr().out

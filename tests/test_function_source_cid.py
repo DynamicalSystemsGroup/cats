@@ -83,7 +83,7 @@ def test_stage_function_package_excludes_pycache(tmp_path):
 
 
 def test_create_order_request_emits_source_cids(monkeypatch, tmp_path):
-    """create_order_request emits process_source_cid and infrafunction_source_cid."""
+    """create_order_request emits process_source / infrafunction_source uri refs."""
     fake = MagicMock()
 
     structure = tmp_path / 'structure'
@@ -99,13 +99,13 @@ def test_create_order_request_emits_source_cids(monkeypatch, tmp_path):
     data.mkdir()
     (data / 'f.csv').write_text('a\n')
 
-    def _cid_dir(path):
+    def _put_dir(path):
         name = Path(path).name
         return f'Qm{name}', name
 
     client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
-    monkeypatch.setattr(client, 'cidDir', _cid_dir)
+    monkeypatch.setattr(client, 'put_dir', _put_dir)
     put_objs = _spy_put_json(client, monkeypatch)
 
     client.create_order_request(
@@ -120,14 +120,15 @@ def test_create_order_request_emits_source_cids(monkeypatch, tmp_path):
     function_payload = next(
         obj for obj in put_objs
         if isinstance(obj, dict)
-        and 'process_source_cid' in obj
-        and 'infrafunction_source_cid' in obj
+        and 'process_source_uri' in obj
+        and 'infrafunction_source_uri' in obj
     )
-    assert function_payload['process_source_cid'] == 'Qmprocess'
-    assert function_payload['infrafunction_source_cid'] == 'Qminfrafunction'
-    assert 'process_cid' in function_payload
-    assert 'infrafunction_cid' in function_payload
-
+    assert function_payload['process_source_uri'] == 'Qmprocess'
+    assert function_payload['infrafunction_source_uri'] == 'Qminfrafunction'
+    assert 'process_uri' in function_payload
+    assert 'infrafunction_uri' in function_payload
+    assert 'process_cid' not in function_payload
+    assert 'infrafunction_cid' not in function_payload
 
 def test_get_enhanced_bom_requires_function_source_cids(monkeypatch, tmp_path):
     """getEnhancedBom fails when function_cid lacks source CIDs."""
@@ -188,7 +189,7 @@ def test_get_enhanced_bom_requires_function_source_cids(monkeypatch, tmp_path):
     monkeypatch.setattr(client, 'get', _get)
     monkeypatch.setattr(client, 'cat', _cat)
 
-    with pytest.raises(RuntimeError, match='process_source_cid'):
+    with pytest.raises(RuntimeError, match='process_source'):
         client.getEnhancedBom(
             'QmBom', INPUT_HOME=str(input_home), OUTPUT_HOME=str(output_home)
         )
@@ -340,12 +341,12 @@ def test_link_process_carries_source_cids(monkeypatch, tmp_path):
     function_payload = next(
         obj for obj in put_objs
         if isinstance(obj, dict)
-        and 'process_source_cid' in obj
-        and 'infrafunction_source_cid' in obj
-        and 'process_cid' in obj
+        and 'process_source_uri' in obj
+        and 'infrafunction_source_uri' in obj
+        and 'process_uri' in obj
     )
-    assert function_payload['process_source_cid'] == 'QmProcSrc'
-    assert function_payload['infrafunction_source_cid'] == 'QmIfrSrc'
+    assert function_payload['process_source_uri'] == 'QmProcSrc'
+    assert function_payload['infrafunction_source_uri'] == 'QmIfrSrc'
 
 
 def test_link_process_fails_without_source_cids(monkeypatch, tmp_path):
