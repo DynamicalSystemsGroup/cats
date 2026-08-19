@@ -83,6 +83,9 @@
   # CAS-over-HTTP — CasHttpStore, ni:/digest, manifests, locators, AddressStore
   uv run pytest -s tests/test_cas_http.py
 
+  # Phase 2b — URI address + ni: proof, Order/Invoice LDP, hl: emit
+  uv run pytest -s tests/test_phase2b_uri.py
+
   # ContentMesh Kubo RPC + CAT_NODE_* endpoints (no ipfs CLI)
   uv run pytest -s tests/test_meshclient_rpc_surface.py
 

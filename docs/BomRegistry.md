@@ -6,10 +6,11 @@
 prior BOM (`bom_cid` → `order_cid`) and recovers *which* BOM produced a given
 output (`data_cid` → `[bom_cid, …]`) without a caller-held HTTP `cat_response`.
 
-CID **or** digest/`ni:` remains the **address of record** for Invoice / Order / stage bytes
-([AddressStore](IPFS.md) / [CAS-over-HTTP](STORAGE.md)). The registry is an append-only **projection** of those
+CID **or** digest/`ni:` remains the **equality / lineage key** for Invoice / Order / stage bytes;
+**new** mints also carry HTTP `*_uri` as the data-plane address of record
+([AddressStore](IPFS.md) / [CAS-over-HTTP](STORAGE.md) / Phase 2b). The registry is an append-only **projection** of those
 envelopes — not a second store of provenance payloads. `LocatorIndex` (`by-content/`) maps
-content ids to HTTP CAS locators.
+content ids to HTTP CAS / Order / Invoice locators. Index **keys** stay hash-based (`by-data` / `by-order`), not URL-based.
 
 | This is | This is not |
 | --- | --- |
@@ -37,9 +38,8 @@ Without a registry:
   `cat_response` in the caller’s process.
 
 The registry closes those gaps **on one Node**. Remaining work is mesh
-federation of the index, Solid dual-write of registry records, and Phase 2b
-URI-as-address — not “no reverse lookup at all.” `content_id` → HTTP locators
-is landed with CAS-over-HTTP. See [`W3C.md`](W3C.md).
+federation of the index and Solid dual-write of registry records (Phase 2b
+URI + `ni:` dual-field and `content_id` → HTTP locators are landed). See [`W3C.md`](W3C.md).
 
 ```mermaid
 flowchart LR
@@ -191,11 +191,12 @@ discoverable from the consuming CAT’s side, going forward — see
 
 ## Out of scope (later)
 
-Aligned with the path to Phase 2b URI-as-address:
+Beyond Phase 2b MVP (URI + `ni:` dual-field is landed):
 
 - Mesh federation of the index / Action Plane catalog filters
 - Solid PUT of registry records
 - Mesh-federated / Solid dual-write of CAS locator maps
+- Hard-drop of `*_cid` field names (URI-only graph slots)
 - SPARQL over the index
 - Consumer-side downstream edges
 - Plant / MinIO / Ray
@@ -212,6 +213,7 @@ hint), Flask GET / PUT 405, `init` `{bom_cid}` / `{data_cid}` / 409, and
 `linkProcess(bom_cid=…)` / `linkProcess(data_cid=…)`. Runtime execute
 indexing is asserted in [`tests/test_ldp_bom_control_plane.py`](../tests/test_ldp_bom_control_plane.py).
 CAS put/get/verify, manifests, and locators: [`tests/test_cas_http.py`](../tests/test_cas_http.py).
+Phase 2b URI dual-field: [`tests/test_phase2b_uri.py`](../tests/test_phase2b_uri.py).
 
 See also [`TEST.md`](TEST.md).
 
@@ -222,6 +224,6 @@ See also [`TEST.md`](TEST.md).
 - [`LineageOfProvenance.md`](LineageOfProvenance.md) — `data_cid` reverse lookup; `link*`
 - [`NodeLifeCycle.md`](NodeLifeCycle.md) — Flask routes served by `node-start`
 - [`SOLID.md`](SOLID.md) — envelope locators vs this index
-- [`W3C.md`](W3C.md) — provenance discovery; CAS-over-HTTP landed; remaining federation / 2b gaps
+- [`W3C.md`](W3C.md) — provenance discovery; CAS-over-HTTP + Phase 2b MVP landed; remaining federation / hard-drop `*_cid`
 - [`DESIGN.md`](DESIGN.md) — next Order discovered via registry, not only `order_cid`
 - [`INTEROP.md`](INTEROP.md) — `link*` as Structure-lineage ops for second-Plant prove

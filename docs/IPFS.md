@@ -3,7 +3,7 @@
 CATs relies on a host [IPFS (Kubo)](https://docs.ipfs.tech/install/command-line/#system-requirements) daemon as
 InfraStructure [IaaS] **legacy content-addressed storage** — still used to **read** historical CIDs and for T&D peering /
 mid-migration `ContentStore.ensure`. **New** Order / Invoice / Function / Structure / stage blobs mint on
-**CAS-over-HTTP** (`ni:` + Node `GET /ldp/cas/<hex>`); Kubo is **not** written for those mints. See [`DEPS.md`](./DEPS.md)
+**CAS-over-HTTP** (`ni:` + Node `GET /ldp/cas/<hex>`) with Phase 2b companion HTTP **`*_uri`** (also `/ldp/invoices/`, `/ldp/orders/`); Kubo is **not** written for those mints. See [`DEPS.md`](./DEPS.md)
 for installing Kubo itself and [`STORAGE.md`](./STORAGE.md) for how this facet relates to Docker transport peers,
 MinIO (T&D), and the Node CAS store.
 
@@ -17,6 +17,7 @@ for **legacy** `ls` / RPC paths and mid-migration tools. **New writes** use `put
 | Id form | Read path |
 |---------|-----------|
 | `ni:` / hex digest | Locator index → `GET /ldp/cas/<hex>` → sha256 verify |
+| `http(s)://…` URI | Local LDP / HTTP GET → sha256 verify when digest known (Phase 2b) |
 | Legacy CID (`Qm…` / `bafy…`) | Gateway (`IPFS_GATEWAY_URL`) then Kubo RPC; UnixFS / `only-hash` verify |
 
 | Env | Role |

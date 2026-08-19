@@ -1,6 +1,6 @@
 # What's Inside a BOM's Content Ids
 
-**Addressing note:** **new** Order / Invoice / Function / Structure / stage / BOM bytes mint as **`ni:`** digests on [CAS-over-HTTP](STORAGE.md). Historical examples and field names still say `*_cid` / `ipfs cat` / `ipfs ls` — those apply to **legacy CID** content; for `ni:` use AddressStore / `GET /ldp/cas/<hex>` (or mesh `cat` / `get`).
+**Addressing note:** **new** Order / Invoice / Function / Structure / stage / BOM bytes mint as **`ni:`** digests on [CAS-over-HTTP](STORAGE.md) and also carry HTTP **`*_uri`** (Phase 2b dual-field: URI = address of record for fetch; `*_cid` / `ni:` = equality / lineage). Historical examples and field names still say `*_cid` / `ipfs cat` / `ipfs ls` — those apply to **legacy CID** content; for `ni:` / URI use AddressStore / `GET /ldp/cas/<hex>` / `GET /ldp/invoices|orders/…` (or mesh `cat` / `get`).
 
 Each of the Architectural Quantum's four components (Function, InfraFunction, Structure, InfraStructure) is content-addressed independently, then paired back together as a small JSON object so the Order records both halves under a single content id:
 
@@ -118,17 +118,18 @@ Lineage helpers (all chain Invoice `data_cid` from a prior BOM): `linkProcess()`
 
 ### Node-local BOM registry
 
-Full contract: **[`BomRegistry.md`](BomRegistry.md)** — append-only query index (`cats/network/registry/`), not the envelope store (`BomLdpStore` / Solid) and not LDN. `Runtime.execute` writes after LDP/Solid locators are known (fail closed). `POST /cat/node/init` accepts `order_cid` (bootstrap), or `bom_cid` / unique `data_cid` via the index (`GET /ldp/registry/…`). **CAS-over-HTTP** mints new Order/Invoice/stage bytes as `ni:` and registers `GET /ldp/registry/by-content/…` locators. Remaining gaps: mesh federation, Solid dual-write of registry records, Phase 2b URI-as-address.
+Full contract: **[`BomRegistry.md`](BomRegistry.md)** — append-only query index (`cats/network/registry/`), not the envelope store (`BomLdpStore` / Solid) and not LDN. `Runtime.execute` writes after LDP/Solid locators are known (fail closed). `POST /cat/node/init` accepts `order_cid` (bootstrap), or `bom_cid` / unique `data_cid` / `data_uri` via the index (`GET /ldp/registry/…`). **CAS-over-HTTP** mints new Order/Invoice/stage bytes as `ni:` and registers `GET /ldp/registry/by-content/…` locators; **Phase 2b** dual-field adds HTTP `*_uri` (Order/Invoice LDP). Remaining gaps: mesh federation, Solid dual-write of registry records, hard-drop of `*_cid` names.
 
 ### Invoice stage CIDs + Seed
 
 After `Executor.execute()` (`cats/executor/executor.py`), the Invoice records both the data-product stage CIDs (Control-Feedback Loop feedback) and the Process replay dictionary ([#187](https://github.com/DynamicalSystemsGroup/cats/issues/187)):
 
-- `invoice.data_cid` — egress / output data CID (existing)
-- `invoice.ingress_data_cid` — CID produced by ingress transport
-- `invoice.integration_data_cid` — CID of Plant integration outputs after the hotF runs (durable IPFS copy of data downloaded from MinIO scratch)
-- `invoice.seed_cid` — Process replay dictionary CID, minted fresh each execution: `{'seed': <hex>, 'rng_seed': <31-bit int>, 'num_partitions': <int>}`. `seed` is a `uuid4().hex` identity string (differs per run, e.g. across CAT0/CAT1); `rng_seed` is derived from it (`int(seed[:8], 16) & 0x7FFFFFFF`) and is directly usable by `np.random.default_rng` / Ray Data `seed=`, though no Process step consumes it yet; `num_partitions` mirrors `Processor.num_partitions` (env `CATS_IO_PARTITIONS`-selected today) as observed provenance, not yet as the control-plane source of `n`. `ContentMesh.flatten_bom()` resolves `seed_cid` → `flat_bom.invoice.seed` the same way it resolves `order_cid` → `order`.
-- `invoice.structure_as_executed_cid` — observed Structure pairing (see Nest tree above)
+- `invoice.data_cid` / `invoice.data_uri` — egress / output (equality id + Phase 2b fetch URI)
+- `invoice.ingress_data_cid` / `ingress_data_uri` — ingress transport
+- `invoice.integration_data_cid` / `integration_data_uri` — Plant integration outputs after the hotF (durable CAS copy of data downloaded from MinIO scratch)
+- `invoice.seed_cid` / `seed_uri` — Process replay dictionary, minted fresh each execution: `{'seed': <hex>, 'rng_seed': <31-bit int>, 'num_partitions': <int>}`. `seed` is a `uuid4().hex` identity string (differs per run, e.g. across CAT0/CAT1); `rng_seed` is derived from it (`int(seed[:8], 16) & 0x7FFFFFFF`) and is directly usable by `np.random.default_rng` / Ray Data `seed=`, though no Process step consumes it yet; `num_partitions` mirrors `Processor.num_partitions` (env `CATS_IO_PARTITIONS`-selected today) as observed provenance, not yet as the control-plane source of `n`. `ContentMesh.flatten_bom()` resolves `seed_cid` → `flat_bom.invoice.seed` the same way it resolves `order_cid` → `order`.
+- `invoice.structure_as_executed_cid` / `structure_as_executed_uri` — observed Structure pairing (see Nest tree above)
+- `invoice.order_cid` / `order_uri` — Order content id + Order LDP URI when published
 
 The BOM `log` mirrors those stage CIDs as `ingress_data_cid` / `integration_data_cid` / `egress_data_cid` (plus `plant_rebuilt`), and records `object_store_result_uri` (`s3://cats-scratch/jobs/<uuid>/result`) as a non-secret correlator for Structure-lifetime scratch MinIO — not a substitute for `integration_data_cid`. Scratch objects expire via ILM (7 days) and are wiped on Structure destroy (`down -v`). Optional `durable_er_uri` / `durable_er_pointer` correlators are set when Entity Relationship promote is used (otherwise `null`); durable MinIO is Node-lifetime and GC’d only via `gc-er`. Access is InfraStructure-as-Code (Consoles / S3 / `infrastructure/obj_store_utils.py` / `ObjectStore` / `JobHandle`); there is no CAT Node jobs API (see [`MinIO.md`](./MinIO.md) / [`STORAGE.md`](./STORAGE.md)). Plant, object-store, and transport config are not Runtime fields — Executor threads `Plant.plant_port()`, `obj_store_context()`, and `as_transport_port(transport_context())` into Function stages. Plant input for the hotF is the host path returned by `integration_cache` under `INTEGRATION_INPUT_DATA_CACHE`, not an Ingress side-channel path.
 

@@ -87,7 +87,9 @@ make node-start
   - `GET /ldp/registry/by-order/<order_cid>` — `{order_cid, bom_cids: [...]}`
   - `GET /ldp/registry/by-content/<digest>` — CAS locator map `{ content_id, locators }`
   - `GET /ldp/cas/<digest>` — raw CAS blob bytes (sha256 identity); PUT → 405
-  - `POST /cat/node/init` — body may use `order_cid` (bootstrap), or `bom_cid` / unique `data_cid` via the registry (ambiguous `data_cid` → 409)
+  - `GET /ldp/invoices/<id>` — Invoice JSON (Phase 2b URI address); PUT → 405
+  - `GET /ldp/orders/<id>` — Order JSON (Phase 2b URI address); PUT → 405
+  - `POST /cat/node/init` — body may use `order_cid` (bootstrap), or `bom_cid` / unique `data_cid` / `data_uri` via the registry (ambiguous `data_cid` → 409)
 ### Status
 
 ```bash

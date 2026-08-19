@@ -2,12 +2,12 @@
 
 Scope: **how provenance is modeled, attributed, signed, published, and discovered** — not Plant/MinIO/transport rewrites.
 
-Phases **1 / 1b / 2a** (signed JSON-LD/PROV envelope, AddressStore gateway, Node LDP, optional Solid dual-write), the **Node-local BOM registry**, and **CAS-over-HTTP** (before 2b) are **on mainline**. The `w3c` vs `dev` columns below are a **historical** comparison of pre-merge `dev` (implicit CID threading) against that stack — branches are now tip-aligned. Remaining gaps are mesh federation of the index and Phase 2b URI-as-address — not signing, and not “no reverse lookup at all.”
+Phases **1 / 1b / 2a** (signed JSON-LD/PROV envelope, AddressStore gateway, Node LDP, optional Solid dual-write), the **Node-local BOM registry**, **CAS-over-HTTP**, and **Phase 2b MVP** (URI address + `ni:` proof dual-field) are **on mainline**. The `w3c` vs `dev` columns below are a **historical** comparison of pre-merge `dev` (implicit CID threading) against that stack — branches are now tip-aligned. Remaining gaps are mesh federation of the index and hard-drop of `*_cid` names — not signing, and not “no reverse lookup at all.”
 
 ## One-line verdict (provenance)
 
 * **Before (pre-merge `dev`):** provenance was mostly **implicit** [CID](https://docs.ipfs.tech/concepts/content-addressing/) **threading**.
-* **Now (mainline):** lineage is an **explicit,** [DID](https://www.w3.org/TR/did-core/)**-attributed**, [Data Integrity](https://www.w3.org/TR/vc-data-integrity/)**-signed** [JSON-LD](https://www.w3.org/TR/json-ld11/)/[PROV-O](https://www.w3.org/TR/prov-o/) **envelope**, published at [LDP](https://www.w3.org/TR/ldp/)/[Solid](https://solidproject.org/) **HTTP locators** peers can fetch and verify — while **new** data-plane content uses **`ni:`** / digest ([CAS-over-HTTP](STORAGE.md)); legacy **CID** remains readable via Kubo/gateway. Node-local **BOM registry** reverse lookup (`data_cid` → BOM / BOM → Order) is landed ([`BomRegistry.md`](BomRegistry.md)).
+* **Now (mainline):** lineage is an **explicit,** [DID](https://www.w3.org/TR/did-core/)**-attributed**, [Data Integrity](https://www.w3.org/TR/vc-data-integrity/)**-signed** [JSON-LD](https://www.w3.org/TR/json-ld11/)/[PROV-O](https://www.w3.org/TR/prov-o/) **envelope**, published at [LDP](https://www.w3.org/TR/ldp/)/[Solid](https://solidproject.org/) **HTTP locators** peers can fetch and verify — while **new** data-plane content uses **`ni:`** equality plus HTTP **`*_uri`** address of record ([CAS-over-HTTP](STORAGE.md) / Phase 2b); legacy **CID** remains readable via Kubo/gateway. Node-local **BOM registry** reverse lookup (`data_cid` → BOM / BOM → Order) is landed ([`BomRegistry.md`](BomRegistry.md)).
 
 ## Envelope vs stage payloads (unchanged discipline)
 
@@ -35,9 +35,9 @@ Stage products (`ingress_data_cid`, `integration_data_cid`, `data_cid`, `structu
 
 | Plane | What | Address of record |
 | --- | --- | --- |
-| **Data** | Quantum blobs, Invoice/log, IaC | **CID** (AddressStore) |
-| **Control** | Signed ExecutionBom JSON-LD | **Solid URI** when set; else Node `bom_ldp_uri` |
-| **Index** | Verified BOM query projection (`BomRegistry`) | Node-local `{CATS_HOME}/.cats/registry/` (CID keys; not the envelope store) |
+| **Data** | Quantum blobs, Invoice/log, IaC | **HTTP `*_uri`** (new); **`ni:`** equality; legacy **CID** |
+| **Control** | Signed ExecutionBom JSON-LD | **Solid URI** when set; else Node `bom_ldp_uri` (+ DI) |
+| **Index** | Verified BOM query projection (`BomRegistry`) | Node-local `{CATS_HOME}/.cats/registry/` (hash keys; not the envelope store) |
 
 ---
 
@@ -79,7 +79,7 @@ Full contract, record shape, disk layout, and routes: [`BomRegistry.md`](BomRegi
 | **2a** | CID + AddressStore; LDP/Solid envelope locators | **CID** (legacy) | Landed |
 | **Registry (before 2b)** | BOM→Order, `data_cid`→BOM; `init` / `link*` via index | **CID / `ni:`** (index keys) | **Landed** (Node-local) |
 | **CAS-over-HTTP (before 2b)** | Digest-keyed LDP/`ni:` store; locator index; Kubo = legacy CID read | **digest / `ni:`** | **Landed** |
-| **Phase 2b (later)** | URI as address; CID/hashlink as proof only | **HTTP URI** | Deferred |
+| **Phase 2b** | URI as address; DI-signed BOM → URI/`ni:`/`hl:` payloads | **HTTP URI** (data); DI (control) | **Landed** (MVP dual-field) |
 
 ---
 
@@ -96,7 +96,7 @@ Full contract, record shape, disk layout, and routes: [`BomRegistry.md`](BomRegi
 | **EdDSA Cryptosuite (`eddsa-jcs-2022`)** | [W3C TR](https://www.w3.org/TR/vc-di-eddsa/) | Sign/verify cryptosuite used by CATs | No | Yes |
 | **JSON Canonicalization Scheme (JCS)** | [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) | Deterministic JSON before hash/sign | No | Yes (`rfc8785` dep) |
 | **Ed25519** | [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032) | Node signing key algorithm | No | Yes (`cryptography`) |
-| **Linked Data Platform (LDP)** | [W3C TR](https://www.w3.org/TR/ldp/) | Stable HTTP locator/cache for the provenance package; GET-only registry + CAS containers | No | Yes (`GET /ldp/boms/`, `GET /ldp/registry/`, `GET /ldp/cas/`; PUT → 405) |
+| **Linked Data Platform (LDP)** | [W3C TR](https://www.w3.org/TR/ldp/) | Stable HTTP locator/cache for the provenance package; GET-only registry + CAS + Order/Invoice containers | No | Yes (`GET /ldp/boms/`, `/ldp/registry/`, `/ldp/cas/`, `/ldp/invoices/`, `/ldp/orders/`; PUT → 405) |
 | **Solid** | [Solid Project](https://solidproject.org/) / [Solid Protocol](https://solidproject.org/TR/protocol) | Open-world HTTP publish of envelopes | No | Optional (CSS-compatible); registry records are **not** dual-written |
 | **Community Solid Server (CSS)** | [GitHub](https://github.com/CommunitySolidServer/CommunitySolidServer) | Reference Solid implementation CATs talks to (external) | No | Operator-run (not in Structure) |
 | **WebID** | [W3C Incubator](https://www.w3.org/2005/Incubator/webid/spec/) | Solid agent identity bridged from `did:key` | No | Yes |
@@ -104,8 +104,8 @@ Full contract, record shape, disk layout, and routes: [`BomRegistry.md`](BomRegi
 | **Linked Data Notifications (LDN)** | [W3C TR](https://www.w3.org/TR/ldn/) | Announce new provenance packages to Inboxes | No | Best-effort when Solid set (not the query index) |
 | **ActivityPub** | [W3C TR](https://www.w3.org/TR/activitypub/) | Richer HTTP federation (design option) | No | **Not** landed (LDN only) |
 | **RDF Dataset Canonicalization (RDFC-1.0)** | [W3C TR](https://www.w3.org/TR/rdf-canon/) | Design-doc integrity option alongside DI | No | **Not** used yet (JCS path instead) |
-| **Hashlink (`hl:`)** | [IETF draft / hashlink](https://datatracker.ietf.org/doc/html/draft-sporny-hashlink) | Design-doc CID analog for URI integrity | No | **Not** landed (`ni:` / digest used for CAS; `hl:` optional later / 2b) |
-| **Named Information (`ni:`)** | [RFC 6920](https://www.rfc-editor.org/rfc/rfc6920) | Digest address of record for CAS-over-HTTP | No | Yes (`ni:///sha-256;<base64url>`; hex on disk) |
+| **Hashlink (`hl:`)** | [IETF draft / hashlink](https://datatracker.ietf.org/doc/html/draft-sporny-hashlink) | Optional edge emit for handoff (hash ± URL hints) | No | Emit helpers (`to_hl` / `from_hl`); not required to verify |
+| **Named Information (`ni:`)** | [RFC 6920](https://www.rfc-editor.org/rfc/rfc6920) | Digest equality / lineage key; companion to `*_uri` | No | Yes (`ni:///sha-256;<base64url>`; hex on disk) |
 
 ### Supporting (not provenance standards, but used after verify)
 
