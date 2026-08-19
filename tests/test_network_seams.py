@@ -1,6 +1,7 @@
 """Feedback / identity Phase 1 seams (JSON-LD/PROV + DID).
 
-AddressStore (Phase 2a gateway reads) is covered in test_address_store_gateway.py.
+AddressStore CAS reads are covered in test_address_store_cas_only.py /
+test_cas_http.py (legacy gateway path retired §6s).
 """
 
 from cats.network.cas import ref_id

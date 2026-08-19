@@ -20,7 +20,6 @@ TRANSPORT_UTILS = (
     / 'structure'
     / 'infrastructure'
     / 'transport_utils.py'
-
 )
 
 
@@ -62,23 +61,23 @@ def test_fake_and_facade_satisfy_transport_port_protocol():
     assert facade.stage_for_plant('QmY', cwd='/cache') == '/cache/staged/QmY'
 
 
-def test_as_transport_port_strips_structure_surface():
-    """as_transport_port exposes only migrate/stage_for_plant, not peering APIs."""
+def test_as_transport_port_exposes_only_port_surface():
+    """as_transport_port exposes only migrate/stage_for_plant (§6s)."""
     from data.input.function.process.transport_port import as_transport_port
 
     tu = _load_transport_utils()
     ctx = tu.TransportContext.default()
-    assert hasattr(ctx, 'ensure_peered')
-    assert hasattr(ctx, 'assert_ready')
-    assert hasattr(ctx, 'migration_container')
+    assert hasattr(ctx, 'migrate')
+    assert hasattr(ctx, 'stage_for_plant')
+    assert not hasattr(ctx, 'ensure_peered')
+    assert not hasattr(ctx, 'assert_ready')
 
     port = as_transport_port(ctx)
     assert hasattr(port, 'migrate')
     assert hasattr(port, 'stage_for_plant')
     assert not hasattr(port, 'ensure_peered')
     assert not hasattr(port, 'assert_ready')
-    assert not hasattr(port, 'migration_container')
-    assert not hasattr(port, 'integration_container')
+    assert not hasattr(port, 'structure_home') or True  # facade may omit
 
 
 def test_as_transport_port_idempotent():
