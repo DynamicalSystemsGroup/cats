@@ -2,13 +2,13 @@ import os
 from os.path import dirname, abspath
 
 from cats.network import ContentMesh
-from cats.network.clients.ipfs_client import connect as connect_ipfs
 from cats.runtime import Runtime
 
 CWD = os.getcwd()
 CATS_HOME = dirname(dirname(abspath(__file__)))
+# CAS-only Node (§6r/§6s): no CatsIPFSClient — legacy CID read retired.
 CONTENT_MESH = ContentMesh(
-    ipfsClient=connect_ipfs(),
+    ipfsClient=None,
     CATS_HOME=CATS_HOME,
 )
 RUNTIME = Runtime(

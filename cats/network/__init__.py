@@ -3,16 +3,10 @@
 Public imports are stable; implementation lives in sibling modules.
 Plant CoD transport: ``cats.network.plant_transport.CoDTransport``.
 W3C Phase 1/1b seams: ``feedback`` (JSON-LD/PROV + Data Integrity) /
-``identity`` (DID + signing material). Phase 2a: ``AddressStore`` for
-gateway-first CID reads + pure UnixFS verify; ``ldp`` Node-hosted BOM control plane.
+``identity`` (DID + signing material). AddressStore: CAS ``ni:`` / ``hl:`` /
+HTTP reads (legacy CID retired §6s). ``ldp`` Node-hosted BOM control plane.
 """
-from cats.network.address_store import (
-    AddressStore,
-    CidIntegrityError,
-    GatewayError,
-    IpfsHttpGateway,
-    verify_bytes_match_cid,
-)
+from cats.network.address_store import AddressStore
 from cats.network.ldp import (
     BomLdpStore,
     LdpEnvelopeError,
@@ -60,10 +54,6 @@ from cats.network.plant_transport import CoDTransport
 __all__ = [
     'ContentMesh',
     'AddressStore',
-    'CidIntegrityError',
-    'GatewayError',
-    'IpfsHttpGateway',
-    'verify_bytes_match_cid',
     'BomLdpStore',
     'LdpEnvelopeError',
     'bom_ldp_path',

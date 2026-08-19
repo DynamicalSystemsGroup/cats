@@ -1,7 +1,7 @@
 """ContentMesh — content-store mesh API (Orders/BOMs/binds + Node submit).
 
-Reads (``cat`` / ``catObj``) use ``AddressStore`` (optional IPFS HTTP gateway +
-CID verify). Writes use ``CatsIPFSClient``. Plant CoD transport is
+Reads (``cat`` / ``catObj``) use ``AddressStore`` (CAS ``ni:`` / ``hl:`` / HTTP).
+Writes use CAS when ``CATS_HOME`` is set. Plant CoD transport is
 ``cats.network.plant_transport.CoDTransport``, not this class.
 """
 from __future__ import annotations
@@ -54,8 +54,7 @@ class ContentMesh(OrderOps):
         if CATS_HOME is not None:
             self.catStore(CATS_HOME)
         # Bootstrap ContentStore readiness is lazy (ensure_bootstrap_content_store),
-        # not at import — assert/soft-warn only, never Order-bound ensure.
-        # Order-submitted ensure is TF host_ipfs_daemon create; apply asserts.
+        # not at import — soft-warn only (§6r/§6s); never Order-bound ensure.
         self._bootstrap_content_store_ensured = False
 
         self.INGRESS_HOME = None
@@ -68,7 +67,7 @@ class ContentMesh(OrderOps):
         self.CAT_HOME = None
         self.CAR_HOME = None
         self.ipfsClient = ipfsClient
-        # Reads via AddressStore (CAS ni: or legacy CID); new writes prefer CAS.
+        # Reads via AddressStore (CAS ni: / hl: / HTTP; legacy CID fail closed §6s).
         self.addressStore = addressStore if addressStore is not None else AddressStore(
             ipfsClient,
             cats_home=CATS_HOME,
@@ -249,30 +248,25 @@ class ContentMesh(OrderOps):
 
     def put_dir(self, filepath: str):
         self.ensure_bootstrap_content_store()
+        if self.CATS_HOME is None:
+            raise RuntimeError(
+                'CATS_HOME is required for put_dir/put_file '
+                '(CAS-only; no Kubo add fallback)'
+            )
         name = filepath.split('/')[-1]
-        if self.CATS_HOME is not None:
-            dir_id = self.put_tree(filepath)
-            return dir_id, name
-        dir = self.ipfsClient.add(filepath, recursive=True)
-        if type(dir) is list:
-            dir_json = list(filter(lambda x: x['Name'] == name, dir))[-1]
-            dir_id = dir_json['Hash']
-            dir_name = dir_json['Name']
-            return dir_id, dir_name
-        else:
-            dir_id = dir['Hash']
-            return dir_id
+        dir_id = self.put_tree(filepath)
+        return dir_id, name
 
     def put_file(self, filepath):
         self.ensure_bootstrap_content_store()
+        if self.CATS_HOME is None:
+            raise RuntimeError(
+                'CATS_HOME is required for put_dir/put_file '
+                '(CAS-only; no Kubo add fallback)'
+            )
         file_name = os.path.basename(filepath)
-        if self.CATS_HOME is not None:
-            with open(filepath, 'rb') as handle:
-                file_id = self.put_bytes(handle.read())
-            return file_id, file_name
-        file_json = self.ipfsClient.add(filepath)
-        file_id = file_json['Hash']
-        file_name = file_json['Name']
+        with open(filepath, 'rb') as handle:
+            file_id = self.put_bytes(handle.read())
         return file_id, file_name
 
     def structure_pairing(self, structure_filepath) -> dict:
@@ -406,8 +400,8 @@ class ContentMesh(OrderOps):
     def linkData(self, content_id, subdir='outputs'):
         """Return content id of the link matching ``subdir`` (name fragment).
 
-        Legacy UnixFS ``ls`` for CIDs; CAS directory manifests match entry
-        prefixes / path fragments.
+        CAS directory manifests match entry prefixes / path fragments.
+        Legacy CIDs fail closed (§6s).
         """
         from cats.network.cas.digest import is_ni_or_digest
         from cats.network.cas.manifest import is_directory_manifest
@@ -416,27 +410,21 @@ class ContentMesh(OrderOps):
         needle = subdir.strip(' -/')
         if not needle:
             needle = 'outputs'
-        if is_ni_or_digest(content_id):
-            obj = json.loads(self.cat(content_id))
-            if not is_directory_manifest(obj):
-                raise RuntimeError(
-                    f'CAS content {content_id!r} is not a directory manifest'
-                )
-            for path, file_id in obj['entries'].items():
-                if needle in path or path.startswith(needle):
-                    return file_id
+        if not is_ni_or_digest(content_id):
             raise RuntimeError(
-                f'No manifest entry matching {needle!r} under {content_id!r}; '
-                f'paths={list(obj["entries"])}'
+                f'Legacy CID {content_id!r} is unsupported (§6s); remint to ni: / HTTP uri'
             )
-        links = self.ipfsClient.ls(content_id)
-        for link in links:
-            name = link.get('Name') or ''
-            if needle in name:
-                return link['Hash']
+        obj = json.loads(self.cat(content_id))
+        if not is_directory_manifest(obj):
+            raise RuntimeError(
+                f'CAS content {content_id!r} is not a directory manifest'
+            )
+        for path, file_id in obj['entries'].items():
+            if needle in path or path.startswith(needle):
+                return file_id
         raise RuntimeError(
-            f'No ls link matching {needle!r} under {content_id!r}; '
-            f'names={[link.get("Name") for link in links]}'
+            f'No manifest entry matching {needle!r} under {content_id!r}; '
+            f'paths={list(obj["entries"])}'
         )
 
     def get(self, content_id: str, filepath: str, output: str = None):
@@ -505,8 +493,9 @@ class ContentMesh(OrderOps):
         return target
 
     def getCar(self, cid: str, filepath: str):
-        self.ensure_bootstrap_content_store()
-        self.addressStore.dag_export(cid, filepath)
+        raise RuntimeError(
+            f'Legacy CID {cid!r} is unsupported (§6s); remint to ni: / HTTP uri'
+        )
 
     def convertBOMtoCAR(self, bom_id: str, filepath: str):
         from cats.network.cas.digest import is_ni_or_digest
@@ -520,16 +509,9 @@ class ContentMesh(OrderOps):
             with open(filepath, 'wb') as handle:
                 handle.write(raw)
             return bom_id, bom_id
-        self.getCar(bom_id, filepath)
-        car_bom_id = None
-        try:
-            car_bom_id = self.ipfsClient.add(filepath)['Hash']
-        except Exception:
-            for attrs in self.ipfsClient.add(filepath):
-                if attrs['Name'] == filepath:
-                    print(attrs)
-                    car_bom_id = attrs['Hash']
-        return car_bom_id, bom_id
+        raise RuntimeError(
+            f'Legacy CID {bom_id!r} is unsupported (§6s); remint to ni: / HTTP uri'
+        )
 
     def getEnhancedBom(self, bom_json_id: str, INPUT_HOME: str = None, OUTPUT_HOME: str = None):
         if INPUT_HOME is None:
