@@ -1,4 +1,4 @@
-"""AddressStore — content-addressed reads: CAS ``ni:``, HTTP URI, or legacy CID."""
+"""AddressStore — content-addressed reads: CAS ``ni:``, ``hl:``, HTTP URI, or legacy CID."""
 from __future__ import annotations
 
 import json
@@ -22,6 +22,7 @@ from cats.network.cas.digest import (
     sha256_hex,
     validate_digest_segment,
 )
+from cats.network.cas.hashlink import from_hl, is_hl
 from cats.network.cas.manifest import is_directory_manifest, materialize_tree
 
 _CAS_PATH = re.compile(r'^/ldp/cas/([0-9a-f]{64})$')
@@ -39,6 +40,8 @@ def _env_flag(name: str, default: bool = False) -> bool:
 class AddressStore:
     """Content-addressed reads.
 
+    * ``hl:`` — ``from_hl`` → GET hint URI(s) → sha256 verify (fail closed);
+      empty/failed hints fall through to ``ni:`` (CAS + LocatorIndex).
     * ``ni:`` / hex digests — locator index → HTTP GET → sha256 verify;
       local ``CasHttpStore`` when ``cats_home`` is set.
     * ``http(s)://`` — GET then verify when digest known (path parse / locator /
@@ -146,6 +149,12 @@ class AddressStore:
         with urlopen(req, timeout=self.timeout) as resp:
             return resp.read()
 
+    def _fetch_hint_uri(self, uri: str) -> bytes:
+        local = self._local_ldp_bytes(uri)
+        if local is not None:
+            return local[0]
+        return self._http_get_bytes(uri)
+
     def _resolve_expect_digest(
         self, uri: str, expect_digest: str | None
     ) -> str | None:
@@ -165,6 +174,24 @@ class AddressStore:
         return None
 
     def cat_bytes(self, cid: str, *, expect_digest: str | None = None) -> bytes:
+        if is_hl(cid):
+            ni, uris = from_hl(cid.strip())
+            digest = from_ni(ni)
+            for uri in uris:
+                if not is_http_uri(uri):
+                    continue
+                try:
+                    data = self._fetch_hint_uri(uri)
+                except Exception:
+                    continue
+                if sha256_hex(data) != digest:
+                    raise RuntimeError(
+                        f'hl: sha256 mismatch for {cid!r} via {uri}'
+                    )
+                return data
+            # No usable hint (or all GETs failed) — same path as bare ni:.
+            cid = ni
+
         if is_http_uri(cid):
             local = self._local_ldp_bytes(cid)
             if local is not None:
@@ -216,7 +243,7 @@ class AddressStore:
 
         Not used for CAS ``ni:`` blobs (fetch via ``cat_bytes`` / ``get``).
         """
-        if is_http_uri(cid) or is_ni_or_digest(cid):
+        if is_http_uri(cid) or is_ni_or_digest(cid) or is_hl(cid):
             raise ValueError(f'dag_export is for legacy CIDs only, got {cid!r}')
         if self.gateway is not None:
             try:
@@ -232,7 +259,7 @@ class AddressStore:
         CAS directory manifests expand to a tree; single CAS blobs write a file;
         HTTP URIs fetch then write/verify; legacy CIDs use gateway / Kubo.
         """
-        if is_http_uri(cid) or is_ni_or_digest(cid):
+        if is_http_uri(cid) or is_ni_or_digest(cid) or is_hl(cid):
             raw = self.cat_bytes(cid, expect_digest=expect_digest)
             try:
                 obj = json.loads(raw.decode('utf-8'))
@@ -240,6 +267,8 @@ class AddressStore:
                 obj = None
             if is_directory_manifest(obj):
                 manifest_id = expect_digest or cid
+                if is_hl(cid):
+                    manifest_id, _ = from_hl(cid.strip())
                 if is_http_uri(cid) and self.cats_home:
                     from cats.network.cas import LocatorIndex
 
