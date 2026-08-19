@@ -32,7 +32,7 @@ def main() -> None:
         raise FileNotFoundError('io_args.json')
     args = json.loads(args_path.read_text(encoding='utf-8'))
     direction = args['direction']
-    input_cid = args['input_cid']
+    input_id = args['input_id']
     num_partitions = int(args['num_partitions'])
 
     mesh_factory = os.environ.get('CATS_IO_MESH_FACTORY')
@@ -46,15 +46,15 @@ def main() -> None:
         mesh = _MeshFromEnv()
 
     if direction == 'ingress':
-        layout_cid, layout_name = run_partition_ingress(
-            mesh, input_cid, num_partitions=num_partitions
+        layout_id, layout_name = run_partition_ingress(
+            mesh, input_id, num_partitions=num_partitions
         )
-        payload = {'layout_cid': layout_cid, 'layout_name': layout_name}
+        payload = {'layout_id': layout_id, 'layout_name': layout_name}
     elif direction == 'egress':
-        data_cid = run_partition_egress(
-            mesh, input_cid, num_partitions=num_partitions
+        layout_id = run_partition_egress(
+            mesh, input_id, num_partitions=num_partitions
         )
-        payload = {'data_cid': data_cid, 'layout_cid': data_cid}
+        payload = {'layout_id': layout_id}
     else:
         raise ValueError(f'unknown I/O direction: {direction!r}')
 

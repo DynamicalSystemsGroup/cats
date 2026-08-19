@@ -15,16 +15,16 @@ class IoPort(Protocol):
     """Thin Process-facing partitioned I/O surface (Function-owned contract)."""
 
     def partition_ingress(
-        self, input_dir_cid: str, *, num_partitions: int
+        self, input_dir_id: str, *, num_partitions: int
     ) -> tuple[str, str]:
-        """Split input CID into a partition-layout dir CID.
+        """Split input id into a partition-layout dir id.
 
-        Returns ``(layout_cid, dirname)`` for Invoice / integration_cache.
+        Returns ``(layout_id, dirname)`` for Invoice / integration_cache.
         """
         ...
 
     def partition_egress(
-        self, input_dir_cid: str, *, num_partitions: int
+        self, input_dir_id: str, *, num_partitions: int
     ) -> str:
-        """Publish partition layout (or single CID) as Invoice ``data_cid`` root."""
+        """Publish partition layout (or single id) as Invoice ``data_id`` root."""
         ...

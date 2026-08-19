@@ -17,12 +17,12 @@ from typing import Protocol, runtime_checkable
 class TransportPort(Protocol):
     """Thin Process-facing transport surface (Function-owned contract)."""
 
-    def migrate(self, input_dir_cid: str):
-        """Migrate a CID via T&D peers; returns (cid, data_dir_name)."""
+    def migrate(self, input_dir_id: str):
+        """Migrate a content id via T&D peers; returns (id, data_dir_name)."""
         ...
 
-    def stage_for_plant(self, input_dir_cid: str, *, cwd, data_cache=None):
-        """Stage ingress CID onto Plant-facing integration cache; host path."""
+    def stage_for_plant(self, input_dir_id: str, *, cwd, data_cache=None):
+        """Stage ingress id onto Plant-facing integration cache; host path."""
         ...
 
 
@@ -34,12 +34,12 @@ class _TransportPortView:
     def __init__(self, inner):
         self._inner = inner
 
-    def migrate(self, input_dir_cid):
-        return self._inner.migrate(input_dir_cid)
+    def migrate(self, input_dir_id):
+        return self._inner.migrate(input_dir_id)
 
-    def stage_for_plant(self, input_dir_cid, *, cwd, data_cache=None):
+    def stage_for_plant(self, input_dir_id, *, cwd, data_cache=None):
         return self._inner.stage_for_plant(
-            input_dir_cid, cwd=cwd, data_cache=data_cache
+            input_dir_id, cwd=cwd, data_cache=data_cache
         )
 
 

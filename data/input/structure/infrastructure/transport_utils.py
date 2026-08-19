@@ -167,9 +167,9 @@ def _swarm_connect(container, multiaddr):
     _run(f"docker exec {container} ipfs swarm connect {multiaddr}")
 
 
-def _docker_ipfs_migrate_cmd(container, input_dir_cid, output_dir):
-    # Quote CID — unquoted ``ni:///sha-256;…`` is split by shell on ``;``.
-    cid_q = shlex.quote(input_dir_cid)
+def _docker_ipfs_migrate_cmd(container, input_dir_id, output_dir):
+    # Quote id — unquoted ``ni:///sha-256;…`` is split by shell on ``;``.
+    cid_q = shlex.quote(input_dir_id)
     out_q = shlex.quote(output_dir)
     inner = (
         f'ipfs get {cid_q} -o {out_q} && '
@@ -259,7 +259,7 @@ class TransportContext:
                 f'/ip4/{integration_ip}/tcp/{self.swarm_port}/p2p/{integration_peer}',
             )
 
-    def migrate(self, input_dir_cid):
+    def migrate(self, input_dir_id):
         """Fetch content id → remint for the next Process stage.
 
         * ``ni:`` / hex — CAS materialize + ``put_tree`` (no Docker Bitswap).
@@ -267,13 +267,13 @@ class TransportContext:
 
         Returns (cid, data_dir_name). Raises RuntimeError on failure.
         """
-        if _is_cas_content_id(input_dir_cid):
+        if _is_cas_content_id(input_dir_id):
             cats_home = _resolve_cats_home(self.structure_home)
             unix_ts = int(time.time())
             data_name = f'data_{unix_ts}'
             with tempfile.TemporaryDirectory(prefix='cats-cas-migrate-') as tmp:
                 dest = os.path.join(tmp, data_name)
-                _cas_materialize(input_dir_cid, dest, cats_home=cats_home)
+                _cas_materialize(input_dir_id, dest, cats_home=cats_home)
                 content_id = _cas_put_tree(dest, cats_home=cats_home)
             return content_id, data_name
 
@@ -281,7 +281,7 @@ class TransportContext:
         unix_ts = int(time.time())
         output_dir = f'/outputs/data_{unix_ts}'
         cmd = _docker_ipfs_migrate_cmd(
-            self.migration_container, input_dir_cid, output_dir
+            self.migration_container, input_dir_id, output_dir
         )
         try:
             result = _run(
@@ -292,7 +292,7 @@ class TransportContext:
         except subprocess.TimeoutExpired as e:
             raise RuntimeError(
                 f'Command timed out after {self.get_timeout}s fetching CID '
-                f'{input_dir_cid}. Ensure host ContentStore (Kubo) is up and '
+                f'{input_dir_id}. Ensure host ContentStore (Kubo) is up and '
                 'Structure transport peers are peered.'
             ) from e
 
@@ -306,7 +306,7 @@ class TransportContext:
                 return cid, f'data_{unix_ts}'
         raise RuntimeError('CID not found in the output.')
 
-    def stage_for_plant(self, input_dir_cid, *, cwd, data_cache=None):
+    def stage_for_plant(self, input_dir_id, *, cwd, data_cache=None):
         """Stage ingress content onto the Plant-facing integration cache mount.
 
         `cwd` is INTEGRATION_INPUT_CACHE; the Docker volume bind is
@@ -322,9 +322,9 @@ class TransportContext:
         host_path = os.path.join(data_cache, stage_name)
         print('Integration Cache:')
 
-        if _is_cas_content_id(input_dir_cid):
+        if _is_cas_content_id(input_dir_id):
             cats_home = _resolve_cats_home(self.structure_home)
-            _cas_materialize(input_dir_cid, host_path, cats_home=cats_home)
+            _cas_materialize(input_dir_id, host_path, cats_home=cats_home)
             if not os.path.isdir(host_path):
                 raise RuntimeError(
                     f'CAS staging failed; host path missing: {host_path}'
@@ -333,7 +333,7 @@ class TransportContext:
 
         self.assert_ready()
         container_out = f'/outputs/{stage_name}'
-        cid_q = shlex.quote(input_dir_cid)
+        cid_q = shlex.quote(input_dir_id)
         out_q = shlex.quote(container_out)
         inner = (
             f'ipfs get {cid_q} -o {out_q} && '
@@ -351,7 +351,7 @@ class TransportContext:
         except subprocess.TimeoutExpired as e:
             raise RuntimeError(
                 f'Command timed out after {self.get_timeout}s fetching CID '
-                f'{input_dir_cid}. Ensure host ContentStore (Kubo) is up and '
+                f'{input_dir_id}. Ensure host ContentStore (Kubo) is up and '
                 'Structure transport peers are peered.'
             ) from e
 

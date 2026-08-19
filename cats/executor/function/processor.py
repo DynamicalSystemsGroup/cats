@@ -101,7 +101,7 @@ class Processor:
             ingress_result = _call_transport_port(
                 self.infraFunction.ingress_subproc,
                 label='ingress',
-                input_dir_cid=self.ingress_input_data_id,
+                input_dir_id=self.ingress_input_data_id,
                 transport=transport,
                 io=io,
                 num_partitions=self.num_partitions,
@@ -113,7 +113,7 @@ class Processor:
             ingress_result = _call_transport_port(
                 self.infraFunction.ingress_subproc,
                 label='ingress',
-                input_dir_cid=self.ingress_input_data_id,
+                input_dir_id=self.ingress_input_data_id,
                 transport=transport,
             )
         if not isinstance(ingress_result, tuple):
@@ -130,7 +130,7 @@ class Processor:
         process_input = _call_transport_port(
             self.infraFunction.integration_cache_subproc,
             label='integration_cache',
-            input_dir_cid=self.ingress_data_id,
+            input_dir_id=self.ingress_data_id,
             cwd=self.infraFunction.runtime.INTEGRATION_INPUT_CACHE,
             data_cache=self.infraFunction.runtime.INTEGRATION_INPUT_DATA_CACHE,
             transport=transport,
@@ -168,7 +168,7 @@ class Processor:
             egress_result = _call_transport_port(
                 self.infraFunction.egress_subproc,
                 label='egress',
-                input_dir_cid=self.integration_data_id,
+                input_dir_id=self.integration_data_id,
                 transport=transport,
                 io=io,
                 num_partitions=self.num_partitions,
@@ -179,7 +179,7 @@ class Processor:
             egress_result = _call_transport_port(
                 self.infraFunction.egress_subproc,
                 label='egress',
-                input_dir_cid=self.integration_data_id,
+                input_dir_id=self.integration_data_id,
                 transport=transport,
             )
         if not isinstance(egress_result, str) or not egress_result:
