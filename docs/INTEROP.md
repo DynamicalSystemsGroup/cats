@@ -48,11 +48,11 @@ These seams are how interoperability is supposed to work without rewriting Funct
 
 | Port / API | Owner (Function) | Adapter (Structure) | Demo implementation |
 |------------|------------------|---------------------|---------------------|
-| **TransportPort** | Process ingress / egress / integration_cache (`n=1`) | `TransportContext` | **CAS** materialize/`put_tree` for `ni:` / HTTP URI; Docker Kubo peers + Bitswap for **legacy CID** only |
-| **IoPort** | Process ingress / egress when `num_partitions > 1` | `RayIoPort` (`plant/ray_io_utils.py`) | Partition CAR layout via ContentMesh / AddressStore (CAS manifests for new trees); optional Plant job (`CATS_IO_VIA_JOB`) |
+| **TransportPort** | Process ingress / egress / integration_cache (`n=1`); kwargs `input_dir_id` | `TransportContext` | **CAS** materialize/`put_tree` for `ni:` / HTTP URI; Docker Kubo peers + Bitswap for **legacy CID** only |
+| **IoPort** | Process ingress / egress when `num_partitions > 1`; kwargs `input_dir_id` | `RayIoPort` (`plant/ray_io_utils.py`) | Partition CAR layout via ContentMesh / AddressStore (CAS manifests for new trees); optional Plant job (`CATS_IO_VIA_JOB`) with `io_args`/`io_result` keys `input_id` / `layout_id` |
 | **ComputePort** | Process `process_*` hotF | `RayComputePort` (job working_dir) | Ray Data `map_batches`; `num_partitions` aligns blocks to `part-*` layout |
 | **PlantPort** | InfraFunction actuator | `RayPlantPort` | Ray Job Submission |
-| **JobHandle** / ObjectStore | InfraFunction scratch correlator; durable Entity Relationship façade | `begin_job` / `write_job_scratch`; `er_uri` / `promote_er` / `resolve_er` / `gc_er` | Scratch MinIO `cats-scratch` + durable MinIO `cats-durable` |
+| **JobHandle** / ObjectStore | InfraFunction scratch correlator; durable Entity Relationship façade (`structure_id`) | `begin_job` / `write_job_scratch`; `er_uri` / `promote_er` / `resolve_er` / `gc_er` | Scratch MinIO `cats-scratch` + durable MinIO `cats-durable` |
 
 **Partition I/O:** set `CATS_IO_PARTITIONS=n` (`n=1` default keeps TransportPort.migrate). For `n>1`, ingress/egress use IoPort and produce/consume a directory of `part-00000.car` … `part-{n-1:05d}.car` (stable shuffle keys; under CAS, CARs are opaque file blobs in a digest-keyed manifest). Invoice stage fields remain single root content ids (`ni:` or legacy CID) plus Phase 2b companion `*_uri` when minted. Invoice `seed_cid` now *records* the `num_partitions` observed for the run (plus a Process/NumPy-usable `rng_seed` int a second Plant's `ComputePort` may map to its own engine RNG); `CATS_IO_PARTITIONS` remains the demo-fallback *selector* of `n` until the Executor reads it from Seed instead ([#187](https://github.com/DynamicalSystemsGroup/cats/issues/187); see [`populate_invoice_seed_field`](../.cursor/plans/populate_invoice_seed_field_c499fe02.plan.md) plan).
 

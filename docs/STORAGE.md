@@ -87,8 +87,10 @@ via Function-owned **`PlantPort`** (`submit_job` / `wait`); Executor passes
 stages scratch MinIO config only. Scratch correlator is
 **`ObjectStore.begin_job()` → `JobHandle`** (BOM `object_store_result_uri`;
 `result_uri` / `download_job_result` are JobHandle-only). Durable Entity Relationship
-uses structure namespaces (`structures/<applied_structure_cid>/er/<name>/`) plus
-`er/current/<name>` pointers (`promote_er` / `resolve_er`); GC is `gc-er` (pointer roots).
+uses structure namespaces (`structures/<applied_structure_id>/er/<name>/`) plus
+`er/current/<name>` pointers (`promote_er` / `resolve_er`; pointer JSON key
+`structure_id`, with legacy `structure_cid` readable one cycle). GC is `gc-er`
+(pointer roots; CLI `--structure-id`).
 
 There is no separate Quantum label such as “ScratchStore” vs “ProvenanceStore.” Content-store,
 T&D scratch, and durable Entity Relationship are lifetime facets inside InfraStructure.
@@ -123,7 +125,7 @@ content-addressed record after the run.
 2. Plant stages entrypoint + **ComputePort** (`RayComputePort`) into the job working_dir;
    workers write CSV shards to MinIO (`cats-scratch/jobs/<uuid>/result/`) — genuinely distributed.
 3. The host downloads that **JobHandle** prefix into `…/integration/outputs/`.
-4. `cidDir` adds that directory to IPFS → `invoice.integration_data_cid` (and the BOM `log` mirror).
+4. `cidDir` / `put_tree` addresses that directory → `invoice.data_uri` (and the BOM `log` mirror).
 
 Post-run retrieval of integration outputs is via **IPFS** and that CID — not by reading scratch
 MinIO. `ObjectStore.snapshot()` records credential-free scratch **and** durable endpoints/buckets

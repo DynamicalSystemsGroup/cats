@@ -4,14 +4,27 @@
 
 - **Integration** — [`tests/test_provenance.py`](../tests/test_provenance.py): live Node + ContentStore.
   Submits CAT0 and CAT1 **once** (module-scoped fixture), then asserts full provenance
-  records (Order Function/Structure pairing, Invoice stage CIDs, BOM log + Plant /
-  InfraStructure snapshots) and CAT0/CAT1 `data_cid` lineage equality. Needs Session 1 below.
+  records (Order Function/Structure pairing, Invoice stage refs, BOM log + Plant /
+  InfraStructure snapshots) and CAT0/CAT1 data lineage equality (`ni:` / content id).
+  Needs Session 1 below.
   This is also the only live coverage of the ephemeral **Executor** path (Factory →
   Executor → Invoice/BOM); there is no dedicated `test_executor*.py` module.
   See [`BOM.md`](./BOM.md) and [`LineageOfProvenance.md`](./LineageOfProvenance.md).
 - **Unit** — the other `tests/test_*.py` modules: mocked / in-process / source guards
   (lineage helpers, named binds, ports, IaaS utils, ContentMesh RPC, Node CLI, etc.).
   No live Node required. [`tests/test_ipfs_client.py`](../tests/test_ipfs_client.py) is thin Kubo smoke (`@requires_kubo`; skips if `:5001` is down).
+  Control-plane Python (§6e) uses `*_id` / `put_dir`; minted JSON stays `*_uri` / `contentId` (§6d).
+  §6f `hl:` resolve/emit/intake: [`tests/test_hl_resolve.py`](../tests/test_hl_resolve.py).
+  §6i Structure marker `.applied-structure.id` (+ plant `applied_structure_id`):
+  [`tests/test_structure_root_cid.py`](../tests/test_structure_root_cid.py) /
+  [`tests/test_plant_utils.py`](../tests/test_plant_utils.py).
+  §6j Process/Plant/Ray Order ABI (`input_dir_id`, Ray `input_id`/`layout_id`,
+  obj_store `structure_id`): [`tests/test_transport_port.py`](../tests/test_transport_port.py) /
+  [`tests/test_infrastructure_transport_utils.py`](../tests/test_infrastructure_transport_utils.py) /
+  [`tests/test_infrastructure_obj_store_utils.py`](../tests/test_infrastructure_obj_store_utils.py) /
+  [`tests/test_ray_io_partitions.py`](../tests/test_ray_io_partitions.py).
+  For mesh-reachable LDP hints in `hl:`, set `CAT_NODE_HOST` to an address peers can open
+  (loopback only warns).
 
 1. **[Install CATs](https://github.com/DynamicalSystemsGroup/cats/tree/cats2?tab=readme-ov-file#get-started)** (`uv sync --extra ops --group dev` for mesh demos and tests; `dev` provides `pytest`)
   - **Root Dependency**: see [`NodeLifeCycle.md`](./NodeLifeCycle.md) — run `make content-store-ensure` before
@@ -37,7 +50,7 @@
 
   b. **Run integration tests** (provenance + data lineage):
   ```bash
-  # Live Node: CAT0/CAT1 once; full provenance records + data_cid lineage equality
+  # Live Node: CAT0/CAT1 once; full provenance records + data lineage equality
   uv run pytest -s tests/test_provenance.py
   ```
     - `pytest` also invokes cleanup via `tests/conftest.py` at session start (session autouse fixture).
@@ -76,15 +89,15 @@
   # ContentMesh.linkStructure — Structure lineage twin of linkProcess
   uv run pytest -s tests/test_link_structure.py
 
-  # BOM registry (before 2b) — Node-local data_cid→BOM / init / link*
+  # BOM registry — Node-local data→BOM / init / link* (§6d content_id / bom_ids)
   # Contract: docs/BomRegistry.md
   uv run pytest -s tests/test_bom_registry.py
 
   # CAS-over-HTTP — CasHttpStore, ni:/digest, manifests, locators, AddressStore
   uv run pytest -s tests/test_cas_http.py
 
-  # Phase 2b — URI address + ni: proof, Order/Invoice LDP, hl: emit
-  uv run pytest -s tests/test_phase2b_uri.py
+  # Phase 2b / §6f — URI address + ni:/hl: proof, Order/Invoice LDP, hl: resolve/emit
+  uv run pytest -s tests/test_phase2b_uri.py tests/test_hl_resolve.py
 
   # ContentMesh Kubo RPC + CAT_NODE_* endpoints (no ipfs CLI)
   uv run pytest -s tests/test_meshclient_rpc_surface.py

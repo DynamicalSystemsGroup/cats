@@ -3,14 +3,15 @@
 `BomRegistry` (`cats/network/registry/`) is the Node-local **query index** of verified
 [ExecutionBom](BOM.md#cat-node-http-bom-response) envelopes. It is how the
 [Control-Feedback Loop](ControlFeedbackLoop.md) discovers the next **Order** from a
-prior BOM (`bom_cid` → `order_cid`) and recovers *which* BOM produced a given
-output (`data_cid` → `[bom_cid, …]`) without a caller-held HTTP `cat_response`.
+prior BOM (`content_id` → Order equality id) and recovers *which* BOM produced a given
+output (`data` / `content_id` → `[bom_ids, …]`) without a caller-held HTTP `cat_response`.
 
-CID **or** digest/`ni:` remains the **equality / lineage key** for Invoice / Order / stage bytes;
-**new** mints also carry HTTP `*_uri` as the data-plane address of record
-([AddressStore](IPFS.md) / [CAS-over-HTTP](STORAGE.md) / Phase 2b). The registry is an append-only **projection** of those
-envelopes — not a second store of provenance payloads. `LocatorIndex` (`by-content/`) maps
-content ids to HTTP CAS / Order / Invoice locators. Index **keys** stay hash-based (`by-data` / `by-order`), not URL-based.
+Digest/`ni:` remains the **equality / lineage key** for Invoice / Order / stage bytes;
+**new** mints carry HTTP `*_uri` only as the data-plane address of record (§6d — no `*_cid`
+JSON keys). The registry is an append-only **projection** of those envelopes — not a second
+store of provenance payloads. `LocatorIndex` (`by-content/`) maps content ids to HTTP CAS /
+Order / Invoice locators. Index **keys** stay hash-based (`by-data` / `by-order`), not URL-based.
+HTTP projections use `project_record` (`content_id`, `order`, `data`, `*_uri` — no `*_cid`).
 
 | This is | This is not |
 | --- | --- |
@@ -21,25 +22,24 @@ content ids to HTTP CAS / Order / Invoice locators. Index **keys** stay hash-bas
 
 Always on (same policy as the Node LDP cache): no env gate. Index write failure
 fails `Runtime.execute`. Needed even if Kubo stays forever — lineage / `init` /
-`link*` still cannot find a BOM from `data_cid` alone without this index.
+`link*` still cannot find a BOM from data equality alone without this index.
 
 ## Why it exists
 
 The Control-Feedback Loop specifies that the next Order is consumed **from within
-a BOM** (`invoice.order_cid`) rather than only supplied out-of-band as
-`order_cid`. Lineage chains by carrying each CAT’s output `data_cid` into the
-next Invoice — a BOM’s own `bom_cid` is never written into IPFS-addressed
-content (it is response / LDP only).
+a BOM** (`invoice.order_uri` / equality id) rather than only supplied out-of-band.
+Lineage chains by carrying each CAT’s output data digest into the next Invoice —
+a BOM’s own `content_id` is never written into the signed envelope (it is response / LDP only).
 
 Without a registry:
 
-- `POST /cat/node/init` could only take a bootstrap `order_cid`.
+- `POST /cat/node/init` could only take a bootstrap Order locator.
 - `linkProcess` / `linkStructure` / `linkOrder` required a prior HTTP
   `cat_response` in the caller’s process.
 
-The registry closes those gaps **on one Node**. Remaining work is mesh
-federation of the index and Solid dual-write of registry records (Phase 2b
-URI + `ni:` dual-field and `content_id` → HTTP locators are landed). See [`W3C.md`](W3C.md).
+The registry closes those gaps **on one Node**. §6d hard-drop of `*_cid` names and
+§6f `hl:` handoff are **landed**; remaining work is mesh federation of the index
+(§6g–§6h). See [`W3C.md`](W3C.md).
 
 ```mermaid
 flowchart LR
@@ -55,10 +55,10 @@ flowchart LR
   Data[AddressStore CID reads]
 
   Runtime --> Sign --> Ldp --> Solid --> Reg
-  Init -->|"order_cid"| Data
-  Init -->|"bom_cid or data_cid"| Lookup
+  Init -->|"order_uri / content_id / hl"| Data
+  Init -->|"bom_uri or data_uri / hl:"| Lookup
   Link -->|"cat_response"| Flatten
-  Link -->|"bom_cid or data_cid"| Lookup
+  Link -->|"content_id / data_uri / bom_uri / hl"| Lookup
   Lookup --> Flatten --> Data
 ```
 
@@ -71,31 +71,33 @@ locators. Unsigned or tampered proofs raise `RegistryError`.
 
 ```text
 {
-  bom_cid, invoice_cid, order_cid, data_cid,
-  input_data_cid, node_did,
-  function_cid, structure_cid,
-  locators: { bom_ldp_uri, bom_solid_uri },
-  ingress_data_cid, integration_data_cid, seed_cid
+  content_id, invoice_uri, order, order_uri, data, data_uri,
+  input_data, node_did,
+  function, structure,
+  locators: { bom_ldp_uri, bom_solid_uri, invoice_uri, order_uri },
+  ingress_data / ingress_data_uri,
+  integration_data / integration_data_uri,
+  seed / seed_uri
 }
 ```
 
-`ingress_data_cid` / `integration_data_cid` / `seed_cid` are stored on the
-record but **not** reverse-indexed in this MVP. If the Order graph is only
-partially available, `build_record` still indexes BOM → Order / `data_cid` and
-leaves `function_cid` / `structure_cid` / `input_data_cid` unset.
+Stage equality ids / URIs are stored on the record but **not** reverse-indexed in
+this MVP. If the Order graph is only partially available, `build_record` still
+indexes BOM → Order / data and leaves `function` / `structure` / `input_data` unset.
+Legacy on-disk records with `*_cid` remain readable via `_record_*_id` helpers.
 
 ## Disk layout
 
 JSON under `{CATS_HOME}/.cats/registry/` (mirrors `BomLdpStore`; no SQLite).
 Path segments are CID- or digest-safe (`content_id_fs_key`). `put` is idempotent
-on `bom_cid`. Reverse-index files are append-if-absent lists, **newest first**.
+on `content_id`. Reverse-index files are append-if-absent lists, **newest first**.
 CAS locators live under `by-content/` (hex digest keys).
 
 ```text
 {CATS_HOME}/.cats/registry/
-├── boms/<bom_cid>.json          # record (bom_cid → fields above)
-├── by-data/<data_cid>.json      # [bom_cid, …]  (replay / re-execute)
-├── by-order/<order_cid>.json    # [bom_cid, …]  (many BOMs per Order)
+├── boms/<content_id>.json       # record (fields above)
+├── by-data/<data>.json          # [bom_ids, …]  (replay / re-execute)
+├── by-order/<order>.json        # [bom_ids, …]  (many BOMs per Order)
 └── by-content/<digest>.json     # { content_id, locators: [{ uri, … }] }
 ```
 
@@ -104,12 +106,12 @@ Python API (`cats.network.registry.BomRegistry`):
 | Method | Returns |
 | --- | --- |
 | `put(record)` | Writes record; appends reverse indexes if absent |
-| `get(bom_cid)` | Record dict or `None` |
-| `lookup_order(bom_cid)` | `order_cid` or `None` |
-| `lookup_bom(data_cid)` | `[bom_cid, …]` (newest first) |
-| `lookup_by_order(order_cid)` | `[bom_cid, …]` |
-| `resolve_unique_bom(data_cid)` | Sole `bom_cid`, else `RegistryError` / `AmbiguousBomError` |
-| `list_boms()` | `bom_cid` keys by mtime descending |
+| `get(content_id)` | Record dict or `None` (also accepts legacy path keys) |
+| `lookup_order(content_id)` | Order equality id or `None` |
+| `lookup_bom(data)` | `[bom_ids, …]` (newest first) |
+| `lookup_by_order(order)` | `[bom_ids, …]` |
+| `resolve_unique_bom(data)` | Sole BOM `content_id`, else `RegistryError` / `AmbiguousBomError` |
+| `list_boms()` | BOM `content_id` keys by mtime descending |
 
 ## Publish on execute
 
@@ -136,10 +138,10 @@ Registered from [`cats/node/app.py`](../cats/node/app.py) next to LDP
 
 | Route | Response |
 | --- | --- |
-| `GET /ldp/registry/` | LDP Basic Container listing newest `bom_cid` URIs |
-| `GET /ldp/registry/boms/<bom_cid>` | Registry record JSON; missing → 404; **PUT → 405** |
-| `GET /ldp/registry/by-data/<data_cid>` | `{data_cid, bom_cids: [...]}` (newest first) |
-| `GET /ldp/registry/by-order/<order_cid>` | `{order_cid, bom_cids: [...]}` |
+| `GET /ldp/registry/` | LDP Basic Container listing newest BOM content-id URIs |
+| `GET /ldp/registry/boms/<digest>` | Projected record JSON (`content_id` + `*_uri`); missing → 404; **PUT → 405** |
+| `GET /ldp/registry/by-data/<data>` | `{content_id, bom_ids: [...]}` (newest first) |
+| `GET /ldp/registry/by-order/<order>` | `{content_id, bom_ids: [...]}` |
 | `GET /ldp/registry/by-content/<digest>` | `{ content_id, locators: [...] }` (CAS locator index) |
 
 Invalid CID path segments → 400. `HEAD` / `OPTIONS` follow the LDP resource /
@@ -151,38 +153,39 @@ known `bom_cid`, LDN Announce. Those are locators / notifies; this is the
 
 ## `POST /cat/node/init` intake
 
-Body may identify the Order three ways. Prefer `order_cid` when several keys
-are sent so existing clients keep working.
+Body may identify the Order via §6d intake keys. Legacy `order_cid` / `bom_cid` /
+`data_cid` → **HTTP 400**.
 
 | Body | Resolution |
 | --- | --- |
-| `{order_cid}` | Unchanged bootstrap / `create_order_request` path |
-| `{bom_cid}` | `lookup_order` → load that Order via AddressStore → Factory |
-| `{data_cid}` | `lookup_bom`; 0 hits → **404**; 1 hit → treat as `bom_cid`; several → **409** `{bom_cids}` |
-| none of the above | **400** (`order_cid, bom_cid, or data_cid required`) |
+| `{order_uri}` | Resolve URI → Order equality id → Factory |
+| `{bom_uri}` / `{bom_ldp_uri}` / `{bom_solid_uri}` | Resolve URI → `lookup_order` → Factory |
+| `{content_id}` / `{data_uri}` | Data equality → unique BOM → Order; 0 → **404**; several → **409** `{bom_ids}` |
+| none of the above | **400** |
 
-`{bom_cid}` / unique `{data_cid}` execute **that** Order (consume the plan from
+Unique `{content_id}` / `{data_uri}` execute **that** Order (consume the plan from
 the indexed BOM). Forward chaining remains `link*`.
 
 ## `linkProcess` / `linkStructure` / `linkOrder`
 
 Each helper still accepts a prior HTTP `cat_response`. When that object is
-omitted, pass `bom_cid=` or `data_cid=` instead. Explicit `bom_cid` always
+omitted, pass `content_id=` / `data_uri=` / `bom_uri=` instead. Explicit `bom_uri` always
 wins if both are set.
 
 `OrderOps._response_from_registry` loads the registry record, then the signed
 envelope from local `BomLdpStore` (fallback `fetch_bom_envelope` via
-`bom_ldp_uri` / `bom_solid_uri`), and returns `{bom, bom_cid, bom_ldp_uri,
+`bom_ldp_uri` / `bom_solid_uri`), and returns `{bom, content_id, bom_ldp_uri,
 bom_solid_uri}` for the existing `flatten_bom` path. Same 404 / 409 rules as
-`init` for `data_cid` (`AmbiguousBomError`).
+`init` for ambiguous data (`AmbiguousBomError.bom_ids`). Passing `bom_cid=` or
+`data_cid=` raises `RuntimeError`.
 
 ## Ambiguous reverse lookup
 
-Replay can mint many BOMs per Order and many BOMs per `data_cid`.
+Replay can mint many BOMs per Order and many BOMs per data digest.
 `lookup_bom` / `lookup_by_order` therefore return **lists**. Intake that must
-pick a single producer (`init` / `link*` with only `data_cid`) succeeds only
-when the list has exactly one entry; otherwise **409** with the candidate
-`bom_cid`s. Pass `bom_cid` to disambiguate.
+pick a single producer (`init` / `link*` with only `content_id` / `data_uri`)
+succeeds only when the list has exactly one entry; otherwise **409** with the
+candidate `bom_ids`. Pass `bom_uri` / a specific BOM locator to disambiguate.
 
 A “downstream” pointer (who later consumed this output) is still deferred:
 no BOM can know at creation time who will consume it. That link is only
@@ -191,12 +194,12 @@ discoverable from the consuming CAT’s side, going forward — see
 
 ## Out of scope (later)
 
-Beyond Phase 2b MVP (URI + `ni:` dual-field is landed):
+Beyond Phase 2b / §6d / §6f (URI-only graph + `ni:` equality + `hl:` handoff landed):
 
 - Mesh federation of the index / Action Plane catalog filters
 - Solid PUT of registry records
 - Mesh-federated / Solid dual-write of CAS locator maps
-- Hard-drop of `*_cid` field names (URI-only graph slots)
+- Required Invoice `hl:` (§6i)
 - SPARQL over the index
 - Consumer-side downstream edges
 - Plant / MinIO / Ray
@@ -207,13 +210,14 @@ Beyond Phase 2b MVP (URI + `ni:` dual-field is landed):
 uv run pytest -s tests/test_bom_registry.py
 ```
 
-Covers store put/get, idempotent `bom_cid`, reverse-index append, CID path
-rejection, unsigned/tampered `build_record`, Invoice `data_cid` (not a lying
-hint), Flask GET / PUT 405, `init` `{bom_cid}` / `{data_cid}` / 409, and
-`linkProcess(bom_cid=…)` / `linkProcess(data_cid=…)`. Runtime execute
-indexing is asserted in [`tests/test_ldp_bom_control_plane.py`](../tests/test_ldp_bom_control_plane.py).
+Covers store put/get, idempotent `content_id`, reverse-index append, path
+rejection, unsigned/tampered `build_record`, Invoice `data` equality (not a lying
+hint), Flask GET / PUT 405, `init` legacy `*_cid` → 400 / `{content_id}` /
+`{data_uri}` / 409, and `linkProcess(content_id=…)` (rejects `bom_cid=` /
+`data_cid=`). Runtime execute indexing is asserted in
+[`tests/test_ldp_bom_control_plane.py`](../tests/test_ldp_bom_control_plane.py).
 CAS put/get/verify, manifests, and locators: [`tests/test_cas_http.py`](../tests/test_cas_http.py).
-Phase 2b URI dual-field: [`tests/test_phase2b_uri.py`](../tests/test_phase2b_uri.py).
+Phase 2b URI + §6d hard-drop: [`tests/test_phase2b_uri.py`](../tests/test_phase2b_uri.py).
 
 See also [`TEST.md`](TEST.md).
 

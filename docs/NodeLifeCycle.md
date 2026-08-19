@@ -80,16 +80,16 @@ make node-start
   and CAS-over-HTTP data plane (Solid dual-write is separate — see [`SOLID.md`](SOLID.md);
   registry: [`BomRegistry.md`](BomRegistry.md); storage: [`STORAGE.md`](STORAGE.md)):
   - `GET /ldp/boms/` — Basic Container listing published BOM URIs
-  - `GET /ldp/boms/<bom_cid>` — signed ExecutionBom JSON-LD (publish via `Runtime.execute` only; HTTP PUT → 405)
+  - `GET /ldp/boms/<content_id>` — signed ExecutionBom JSON-LD (publish via `Runtime.execute` only; HTTP PUT → 405)
   - `GET /ldp/registry/` — BOM registry container (Node-local index)
-  - `GET /ldp/registry/boms/<bom_cid>` — registry record JSON; PUT → 405
-  - `GET /ldp/registry/by-data/<data_cid>` — `{data_cid, bom_cids: [...]}`
-  - `GET /ldp/registry/by-order/<order_cid>` — `{order_cid, bom_cids: [...]}`
+  - `GET /ldp/registry/boms/<content_id>` — registry record JSON (`project_record`; no `*_cid`); PUT → 405
+  - `GET /ldp/registry/by-data/<data>` — `{content_id, bom_ids: [...]}`
+  - `GET /ldp/registry/by-order/<order>` — `{content_id, bom_ids: [...]}`
   - `GET /ldp/registry/by-content/<digest>` — CAS locator map `{ content_id, locators }`
   - `GET /ldp/cas/<digest>` — raw CAS blob bytes (sha256 identity); PUT → 405
   - `GET /ldp/invoices/<id>` — Invoice JSON (Phase 2b URI address); PUT → 405
   - `GET /ldp/orders/<id>` — Order JSON (Phase 2b URI address); PUT → 405
-  - `POST /cat/node/init` — body may use `order_cid` (bootstrap), or `bom_cid` / unique `data_cid` / `data_uri` via the registry (ambiguous `data_cid` → 409)
+  - `POST /cat/node/init` — body may use `order_uri`, or `bom_uri` / `bom_ldp_uri` / `bom_solid_uri` / unique `content_id` / `data_uri` / `hl` (values may be `hl:` / `ni:` / http) via the registry (legacy `order_cid` / `bom_cid` / `data_cid` → 400; ambiguous → 409 `{bom_ids}`). Set `CAT_NODE_HOST` to a peer-reachable address (or rely on Solid `bom_solid_uri` in `hl:` hints); `127.0.0.1` is not mesh-usable.
 ### Status
 
 ```bash
