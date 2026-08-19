@@ -5,7 +5,7 @@ from flask import Flask, Response, jsonify, request
 
 from cats.network.ldp.headers import apply_container_headers, apply_resource_headers
 from cats.network.node_http import _node_base_url
-from cats.network.registry.store import BomRegistry
+from cats.network.registry.store import BomRegistry, project_record
 
 
 def register_registry_routes(app: Flask, *, cats_home: str) -> None:
@@ -50,10 +50,10 @@ def register_registry_routes(app: Flask, *, cats_home: str) -> None:
         try:
             record = _registry().get(bom_cid)
         except ValueError:
-            return jsonify({'error': 'invalid bom_cid'}), 400
+            return jsonify({'error': 'invalid content_id'}), 400
         if record is None:
             return jsonify({'error': 'not found'}), 404
-        resp = jsonify(record)
+        resp = jsonify(project_record(record))
         apply_resource_headers(resp)
         return resp
 
@@ -67,10 +67,10 @@ def register_registry_routes(app: Flask, *, cats_home: str) -> None:
             apply_resource_headers(resp)
             return resp
         try:
-            bom_cids = _registry().lookup_bom(data_cid)
+            bom_ids = _registry().lookup_bom(data_cid)
         except ValueError:
-            return jsonify({'error': 'invalid data_cid'}), 400
-        resp = jsonify({'data_cid': data_cid, 'bom_cids': bom_cids})
+            return jsonify({'error': 'invalid content_id'}), 400
+        resp = jsonify({'content_id': data_cid, 'bom_ids': bom_ids})
         apply_resource_headers(resp)
         return resp
 
@@ -84,10 +84,10 @@ def register_registry_routes(app: Flask, *, cats_home: str) -> None:
             apply_resource_headers(resp)
             return resp
         try:
-            bom_cids = _registry().lookup_by_order(order_cid)
+            bom_ids = _registry().lookup_by_order(order_cid)
         except ValueError:
-            return jsonify({'error': 'invalid order_cid'}), 400
-        resp = jsonify({'order_cid': order_cid, 'bom_cids': bom_cids})
+            return jsonify({'error': 'invalid content_id'}), 400
+        resp = jsonify({'content_id': order_cid, 'bom_ids': bom_ids})
         apply_resource_headers(resp)
         return resp
 

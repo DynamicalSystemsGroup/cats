@@ -1,19 +1,19 @@
 """Structure half of the Architectural Quantum (PaaS + Plant/InfraStructure)."""
 from cats.executor.structure._tf import (
     modules_installed,
-    read_applied_structure_cid,
-    write_applied_structure_cid,
+    read_applied_structure_id,
+    write_applied_structure_id,
 )
 from cats.executor.structure.infrastructure import InfraStructure
 from cats.executor.structure.plant import Plant
 
 
 class Structure:
-    def __init__(self, runtime, structure_cid):
+    def __init__(self, runtime, structure_id):
         self.runtime = runtime
-        self.bom_json_cid = self.runtime.bom_json_cid
+        self.bom_json_id = self.runtime.bom_json_id
         self.infraStructure: InfraStructure = InfraStructure(
-            runtime=self.runtime, structure_cid=structure_cid
+            runtime=self.runtime, structure_id=structure_id
         )
         self.plant: Plant = self.infraStructure.compose()
 
@@ -39,7 +39,7 @@ class Structure:
 
     def reconcile(self):
         """Materialize this CAT's Structure, skipping the destructive
-        rebuild when the incoming (content-addressed) structure_cid
+        rebuild when the incoming (content-addressed) structure_id
         matches what's already applied.
 
         Structure is content-addressed like everything else in CATs.
@@ -54,16 +54,16 @@ class Structure:
         so callers can record what this Structure actually produced
         alongside Function's output in the CAT's BOM.
         """
-        structure_cid = self.infraStructure.structure_cid
+        structure_id = self.infraStructure.structure_id
         structure_home = self.infraStructure.INPUT_STRUCTURE_HOME
-        applied_cid = read_applied_structure_cid(structure_home)
-        if structure_cid and applied_cid == structure_cid:
-            print(f'Structure {structure_cid} already applied; reconciling in place.')
+        applied_id = read_applied_structure_id(structure_home)
+        if structure_id and applied_id == structure_id:
+            print(f'Structure {structure_id} already applied; reconciling in place.')
             self.deploy()
         else:
             self.redeploy()
-        if structure_cid:
-            write_applied_structure_cid(structure_home, structure_cid)
+        if structure_id:
+            write_applied_structure_id(structure_home, structure_id)
         return self.plant.snapshot()
 
 
@@ -72,6 +72,6 @@ __all__ = [
     'InfraStructure',
     'Plant',
     'modules_installed',
-    'read_applied_structure_cid',
-    'write_applied_structure_cid',
+    'read_applied_structure_id',
+    'write_applied_structure_id',
 ]

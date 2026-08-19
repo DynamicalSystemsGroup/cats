@@ -5,6 +5,7 @@ from cats.network.registry.store import (
     BomRegistry,
     RegistryError,
     build_record,
+    project_record,
 )
 
 __all__ = [
@@ -12,5 +13,6 @@ __all__ = [
     'BomRegistry',
     'RegistryError',
     'build_record',
+    'project_record',
     'register_registry_routes',
 ]

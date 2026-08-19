@@ -1,4 +1,4 @@
-"""Linked Data Notifications announce for Solid BOM publish (Phase 2a).
+"""Linked Data Notifications announce for Solid BOM publish (Phase 2a / §6f).
 
 After a successful Solid PUT, POST a minimal notification to configured
 Inbox URLs (``SOLID_LDN_INBOX_URLS``, comma-separated). Best-effort: log
@@ -37,30 +37,37 @@ def ldn_inbox_urls() -> list[str]:
 
 def build_bom_announcement(
     *,
-    bom_cid: str,
+    content_id: str,
     bom_solid_uri: str,
+    hl: str | None = None,
 ) -> dict[str, Any]:
-    """Minimal JSON-LD Activity/Notification (no stage payloads)."""
-    return {
-        '@context': [
-            'https://www.w3.org/ns/activitystreams',
-            {
-                'bom_cid': 'https://w3id.org/cats#bomCid',
-                'bom_solid_uri': 'https://w3id.org/cats#bomSolidUri',
-            },
-        ],
+    """Minimal JSON-LD Activity/Notification (``content_id`` + optional ``hl``)."""
+    context: list[Any] = [
+        'https://www.w3.org/ns/activitystreams',
+        {
+            'content_id': 'https://w3id.org/cats#contentId',
+            'bom_solid_uri': 'https://w3id.org/cats#bomSolidUri',
+            'hl': 'https://w3id.org/cats#hl',
+        },
+    ]
+    note: dict[str, Any] = {
+        '@context': context,
         '@type': 'Announce',
         'object': {'@id': bom_solid_uri},
-        'bom_cid': bom_cid,
+        'content_id': content_id,
         'bom_solid_uri': bom_solid_uri,
     }
+    if hl:
+        note['hl'] = hl
+    return note
 
 
 def announce_bom(
     inbox_urls: list[str] | None,
-    bom_cid: str,
+    content_id: str,
     bom_solid_uri: str,
     *,
+    hl: str | None = None,
     timeout: float = 30.0,
     session: requests.Session | None = None,
 ) -> list[str]:
@@ -72,8 +79,9 @@ def announce_bom(
     if not targets:
         return []
     body = build_bom_announcement(
-        bom_cid=bom_cid,
+        content_id=content_id,
         bom_solid_uri=bom_solid_uri,
+        hl=hl,
     )
     payload = json.dumps(body, indent=2, sort_keys=True) + '\n'
     http = session or requests.Session()
@@ -101,5 +109,5 @@ def announce_bom(
             )
             continue
         ok.append(inbox)
-        logger.info('LDN announced bom_cid=%s to %s', bom_cid, inbox)
+        logger.info('LDN announced content_id=%s to %s', content_id, inbox)
     return ok

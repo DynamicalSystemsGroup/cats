@@ -18,9 +18,9 @@ from cats.executor.structure.plant import Plant
 
 
 class InfraStructure:
-    def __init__(self, runtime, structure_cid):
+    def __init__(self, runtime, structure_id):
         self.runtime = runtime
-        self.structure_cid = structure_cid
+        self.structure_id = structure_id
         self.INPUT_STRUCTURE_HOME = self.runtime.INPUT_STRUCTURE_HOME
         configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
         ensure_integration_cache_env(self.runtime)
@@ -32,16 +32,18 @@ class InfraStructure:
     def compose(self):
         return Plant(self)
 
-    def snapshot(self, *, object_store_as_executed_cid: str) -> dict:
-        """Infra as-executed pairing (CID refs; widen later beyond ObjectStore).
+    def snapshot(self, *, object_store_as_executed_id: str) -> dict:
+        """Infra as-executed pairing (uri-only refs; widen later beyond ObjectStore).
 
-        Parallel to as-Code ``infrastructure_cid``. Currently records only the
+        Parallel to as-Code ``infrastructure`` ref. Currently records only the
         ObjectStore facet; transport / ContentStore keys may be added later.
-        Minted by Executor as ``infrastructure_as_executed_cid``.
+        Minted by Executor as ``infrastructure_as_executed``.
         """
-        return {
-            'object_store_as_executed_cid': object_store_as_executed_cid,
-        }
+        from cats.network.cas import set_ref
+
+        out = {}
+        set_ref(out, 'object_store_as_executed', object_store_as_executed_id)
+        return out
 
     def _load_obj_store_module(self):
         """Load Order-submitted infrastructure object-store utils."""

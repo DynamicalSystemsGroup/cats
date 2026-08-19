@@ -49,13 +49,13 @@ class Runtime:
         self.INTEGRATION_HOME = None
         self.EGRESS_HOME = None
 
-        self.init_bom_json_cid = None
-        self.bom_json_cid = None
-        self.init_bom_car_cid = None
+        self.init_bom_json_id = None
+        self.bom_json_id = None
+        self.init_bom_car_id = None
         self.enhanced_init_bom = None
         self.enhanced_bom = None
 
-        self.order_cid = None
+        self.order_id = None
         self.subproc_run = lambda cmd: subproc_run(cmd, cwd=self.CATS_HOME)
         self.executeCMD = executeCMD
 
@@ -77,102 +77,117 @@ class Runtime:
         return factory, order_request
 
     def initBOMcar(self,
-        function_cid, init_data_cid, init_bom_filename,
-        structure_cid=None, structure_filepath=None, order_cid=None
+        function_id, init_data_id, init_bom_filename,
+        structure_id=None, structure_filepath=None, order_id=None
     ):
         if init_bom_filename is None:
             init_bom_filename = self.contentMesh.CAR_HOME
 
-        self.init_bom_car_cid, self.init_bom_json_cid = self.contentMesh.initBOMcar(
-            structure_cid=structure_cid,
+        self.init_bom_car_id, self.init_bom_json_id = self.contentMesh.initBOMcar(
+            structure_id=structure_id,
             structure_filepath=structure_filepath,
-            function_cid=function_cid,
-            init_data_cid=init_data_cid,
+            function_id=function_id,
+            init_data_id=init_data_id,
             init_bom_filename=init_bom_filename,
-            order_cid=order_cid,
+            order_id=order_id,
         )
         self.enhanced_bom, init_bom = self.contentMesh.getEnhancedBom(
-            bom_json_cid=self.init_bom_json_cid,
+            bom_json_id=self.init_bom_json_id,
             INPUT_HOME=self.INPUT_HOME,
             OUTPUT_HOME=self.OUTPUT_HOME
         )
 
-        self.order_cid = self.enhanced_bom['invoice']['order_cid']
-        self.bom_json_cid = self.init_bom_json_cid = self.enhanced_bom['bom_json_cid']
-        return self.init_bom_car_cid, self.bom_json_cid
+        from cats.network.cas import ref_id
+
+        self.order_id = ref_id(
+            self.enhanced_bom['invoice'], 'order', cats_home=self.CATS_HOME
+        )
+        self.bom_json_id = self.init_bom_json_id = self.enhanced_bom['bom_json_id']
+        return self.init_bom_car_id, self.bom_json_id
 
     def execute(self, catFactory, order_request):
         executor = catFactory.produce()
-        # invoice_cid (and structure_as_executed nesting / order_cid
+        # invoice content id (and structure_as_executed nesting / order
         # backfill) is produced by Executor.execute() — Runtime.execute()
-        # wraps invoice_cid + log_cid + node_did, signs (Phase 1b), then
-        # mints bom_cid over the signed object.
-        enhanced_bom, invoice_cid = executor.execute(order_request)
+        # wraps invoice + log + node_did, signs (Phase 1b), then
+        # mints bom over the signed object.
+        enhanced_bom, invoice_id = executor.execute(order_request)
+
+        from cats.network.cas import ref_id, ref_uri
 
         # Structure as-executed nesting is on the Invoice (Executor-minted).
-        # Stage CIDs feed signed PROV wasDerivedFrom edges (intra-run lineage).
+        # Stage refs feed signed PROV wasDerivedFrom edges (intra-run lineage).
         invoice = enhanced_bom.get('invoice') or {}
         order = enhanced_bom.get('order') or {}
-        order_cid = (
-            invoice.get('order_cid')
-            or order_request.get('order_cid')
-            or order.get('order_cid')
+        order_id = (
+            ref_id(invoice, 'order', cats_home=self.CATS_HOME)
+            or order_request.get('order_id')
+            or ref_id(order, 'order', cats_home=self.CATS_HOME)
         )
-        input_data_cid = None
-        input_invoice_cid = order.get('invoice_cid')
-        if input_invoice_cid:
+        input_data_id = None
+        input_invoice_locator = ref_uri(order, 'invoice') or ref_id(
+            order, 'invoice', cats_home=self.CATS_HOME
+        )
+        if input_invoice_locator:
             try:
                 input_invoice = json.loads(
-                    self.contentMesh.cat(input_invoice_cid)
+                    self.contentMesh.cat(input_invoice_locator)
                 )
-                input_data_cid = input_invoice.get('data_cid')
+                input_data_id = ref_id(
+                    input_invoice, 'data', cats_home=self.CATS_HOME
+                )
             except Exception:
-                input_data_cid = None
+                input_data_id = None
 
+        log_id = ref_id(enhanced_bom, 'log', cats_home=self.CATS_HOME)
         bom = build_execution_bom(
-            log_cid=enhanced_bom['log_cid'],
-            invoice_cid=invoice_cid,
+            log_id=log_id,
+            invoice_id=invoice_id,
             node_did=resolve_node_did(cats_home=self.CATS_HOME),
-            order_cid=order_cid,
-            input_data_cid=input_data_cid,
-            ingress_data_cid=invoice.get('ingress_data_cid'),
-            integration_data_cid=invoice.get('integration_data_cid'),
-            data_cid=invoice.get('data_cid'),
-            structure_as_executed_cid=invoice.get('structure_as_executed_cid'),
+            order_id=order_id,
+            input_data_id=input_data_id,
+            ingress_data_id=ref_id(invoice, 'ingress_data', cats_home=self.CATS_HOME),
+            integration_data_id=ref_id(
+                invoice, 'integration_data', cats_home=self.CATS_HOME
+            ),
+            data_id=ref_id(invoice, 'data', cats_home=self.CATS_HOME),
+            structure_as_executed_id=ref_id(
+                invoice, 'structure_as_executed', cats_home=self.CATS_HOME
+            ),
             invoice_uri=enhanced_bom.get('invoice_uri') or invoice.get('invoice_uri'),
-            log_uri=enhanced_bom.get('log_uri'),
-            order_uri=invoice.get('order_uri'),
-            ingress_data_uri=invoice.get('ingress_data_uri'),
-            integration_data_uri=invoice.get('integration_data_uri'),
-            data_uri=invoice.get('data_uri'),
-            structure_as_executed_uri=invoice.get('structure_as_executed_uri'),
+            log_uri=enhanced_bom.get('log_uri') or ref_uri(enhanced_bom, 'log'),
+            order_uri=ref_uri(invoice, 'order'),
+            ingress_data_uri=ref_uri(invoice, 'ingress_data'),
+            integration_data_uri=ref_uri(invoice, 'integration_data'),
+            data_uri=ref_uri(invoice, 'data'),
+            structure_as_executed_uri=ref_uri(invoice, 'structure_as_executed'),
         )
         bom = sign_execution_bom(bom, cats_home=self.CATS_HOME)
         # CAS-over-HTTP: mint signed BOM bytes as ni: (Kubo write not used).
-        bom_cid = self.contentMesh.put_json(bom)
+        bom_id = self.contentMesh.put_json(bom)
         # Phase 2a control plane: local Node LDP cache + optional Solid dual-write.
-        BomLdpStore(self.CATS_HOME).put(bom_cid, bom)
+        BomLdpStore(self.CATS_HOME).put(bom_id, bom)
         # Phase 2b: ensure Order LDP resource exists for order_uri discovery.
-        if order_cid:
+        if order_id:
             try:
-                order_obj = json.loads(self.contentMesh.cat(order_cid))
+                order_obj = json.loads(self.contentMesh.cat(order_id))
                 from cats.network.cas import LocatorIndex
                 from cats.network.ldp import OrderLdpStore, order_ldp_uri
 
-                OrderLdpStore(self.CATS_HOME).put(order_cid, order_obj)
-                order_uri = order_ldp_uri(order_cid)
+                OrderLdpStore(self.CATS_HOME).put(order_id, order_obj)
+                order_uri = order_ldp_uri(order_id)
                 LocatorIndex(self.CATS_HOME).put(
-                    order_cid, uri=order_uri, media_type='application/json'
+                    order_id, uri=order_uri, media_type='application/json'
                 )
             except Exception as exc:  # pragma: no cover - defensive
-                logger.warning('Order LDP publish skipped for %s: %s', order_cid, exc)
+                logger.warning('Order LDP publish skipped for %s: %s', order_id, exc)
                 order_uri = None
         else:
             order_uri = None
         bom_response = {
             'bom': bom,
-            'bom_cid': bom_cid,
-            'bom_ldp_uri': bom_ldp_uri(bom_cid),
+            'content_id': bom_id,
+            'bom_ldp_uri': bom_ldp_uri(bom_id),
             'bom_solid_uri': None,
             'invoice_uri': enhanced_bom.get('invoice_uri'),
             'order_uri': order_uri,
@@ -180,14 +195,43 @@ class Runtime:
         if solid_configured():
             # Fail Runtime when Solid is configured and PUT fails (dual-write
             # consistency). LDN announce is best-effort and never fails execute.
-            bom_solid_uri = SolidBomPublisher().publish(bom_cid, bom)
+            bom_solid_uri = SolidBomPublisher().publish(bom_id, bom)
             bom_response['bom_solid_uri'] = bom_solid_uri
+
+        # §6f: emit BOM hl: when digest + best locator exist.
+        from urllib.parse import urlparse
+
+        from cats.network.cas.digest import is_ni_or_digest
+        from cats.network.cas.hashlink import to_hl
+        from cats.network.node_http import _node_base_url
+
+        hint = bom_response.get('bom_solid_uri') or bom_response.get('bom_ldp_uri')
+        if is_ni_or_digest(bom_id) and hint:
+            bom_response['hl'] = to_hl(bom_id, hint)
+            host = urlparse(_node_base_url()).hostname or ''
+            if (
+                host in ('127.0.0.1', 'localhost', '::1')
+                and not bom_response.get('bom_solid_uri')
+            ):
+                logger.warning(
+                    'CAT_NODE_HOST=%s is loopback; bom_ldp_uri in hl: is not '
+                    'mesh-reachable — set CAT_NODE_HOST to a peer-reachable '
+                    'address or rely on Solid bom_solid_uri',
+                    host,
+                )
+
+        if solid_configured():
             try:
-                announce_bom(None, bom_cid, bom_solid_uri)
+                announce_bom(
+                    None,
+                    bom_id,
+                    bom_response['bom_solid_uri'],
+                    hl=bom_response.get('hl'),
+                )
             except Exception as exc:  # pragma: no cover - defensive
                 logger.warning(
                     'LDN announce unexpected error for %s: %s',
-                    bom_cid,
+                    bom_id,
                     exc,
                 )
         # Control-Feedback registry index (before 2b): fail closed on put error.
@@ -195,27 +239,25 @@ class Runtime:
 
         loc_index = LocatorIndex(self.CATS_HOME)
         for stage_id in (
-            invoice_cid,
-            order_cid,
-            invoice.get('data_cid'),
-            invoice.get('ingress_data_cid'),
-            invoice.get('integration_data_cid'),
-            invoice.get('seed_cid'),
-            invoice.get('structure_as_executed_cid'),
-            enhanced_bom.get('log_cid'),
-            bom_cid,
+            invoice_id,
+            order_id,
+            ref_id(invoice, 'data', cats_home=self.CATS_HOME),
+            ref_id(invoice, 'ingress_data', cats_home=self.CATS_HOME),
+            ref_id(invoice, 'integration_data', cats_home=self.CATS_HOME),
+            ref_id(invoice, 'seed', cats_home=self.CATS_HOME),
+            ref_id(invoice, 'structure_as_executed', cats_home=self.CATS_HOME),
+            log_id,
+            bom_id,
         ):
             if not stage_id:
                 continue
-            from cats.network.cas.digest import is_ni_or_digest
-
             if is_ni_or_digest(stage_id):
                 loc_index.put_cas_node_locator(stage_id)
 
         BomRegistry(self.CATS_HOME).put(
             build_record(
                 bom,
-                bom_cid,
+                content_id=bom_id,
                 content_mesh=self.contentMesh,
                 locators={
                     'bom_ldp_uri': bom_response['bom_ldp_uri'],

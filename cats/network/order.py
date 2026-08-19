@@ -7,6 +7,16 @@ import shutil
 import tempfile
 from copy import deepcopy
 
+from cats.network.cas import (
+    LocatorIndex,
+    is_hl,
+    is_http_uri,
+    is_ni_or_digest,
+    ref_id,
+    ref_uri,
+    resolve_intake_ref,
+    set_ref,
+)
 from cats.network.ldp import BomLdpStore, fetch_bom_envelope
 from cats.network.node_http import _node_init_endpoint
 from cats.network.packaging import (
@@ -19,81 +29,147 @@ from cats.network.registry import AmbiguousBomError, BomRegistry, RegistryError
 class OrderOps:
     """Mixin for ContentMesh: create_order_request + linkProcess/Structure/Order."""
 
+    def _cats_home(self):
+        return getattr(self, 'CATS_HOME', None)
+
+    def _stem_id(self, obj, stem):
+        """Equality id from ``*_uri`` or legacy ``*_cid``."""
+        return ref_id(obj, stem, cats_home=self._cats_home())
+
+    def _cat_stem(self, obj, stem):
+        """Fetch JSON for a stem via ``*_uri`` or equality id (AddressStore)."""
+        locator = ref_uri(obj, stem) or self._stem_id(obj, stem)
+        if not locator:
+            raise RuntimeError(f'missing {stem}_uri / {stem}_cid on object')
+        return json.loads(self.cat(locator))
+
+    def _reject_legacy_link_kwargs(self, kwargs):
+        bad = [k for k in ('bom_cid', 'data_cid') if k in kwargs and kwargs[k] is not None]
+        if bad:
+            raise RuntimeError(
+                f'{", ".join(bad)} no longer accepted; use content_id, data_uri, '
+                'or bom_uri / bom_ldp_uri / bom_solid_uri'
+            )
+
     def _response_from_registry(
             self,
             *,
-            bom_cid: str | None = None,
-            data_cid: str | None = None,
+            content_id: str | None = None,
             data_uri: str | None = None,
+            bom_uri: str | None = None,
+            bom_ldp_uri: str | None = None,
+            bom_solid_uri: str | None = None,
+            hl: str | None = None,
+            **kwargs,
     ):
-        """Load a BOM response shell from the Node-local registry + LDP cache."""
-        if bom_cid is None and data_cid is None and data_uri is None:
+        """Load a BOM response shell from the Node-local registry + LDP cache.
+
+        Intake: ``content_id`` / ``hl`` (data equality → by-data), ``data_uri``,
+        or ``bom_uri`` / ``bom_ldp_uri`` / ``bom_solid_uri``. Values may be
+        ``hl:``, ``ni:``, or ``http(s)://``. Legacy ``bom_cid`` / ``data_cid``
+        kwargs are rejected.
+        """
+        self._reject_legacy_link_kwargs(kwargs)
+        bom_locator = bom_uri or bom_ldp_uri or bom_solid_uri
+        if (
+            content_id is None
+            and hl is None
+            and data_uri is None
+            and bom_locator is None
+        ):
             raise RuntimeError(
-                'bom_cid, data_cid, or data_uri required when cat_response is omitted'
+                'content_id, hl, data_uri, or bom_uri required when '
+                'cat_response is omitted'
             )
-        if bom_cid is not None and (data_cid is not None or data_uri is not None):
-            # Explicit bom_cid always wins (same as init preference when both set
-            # after order_cid); ignore data_cid for resolution.
-            data_cid = None
-            data_uri = None
 
-        if data_uri and not data_cid:
-            from cats.network.cas import LocatorIndex
-            from cats.network.cas.content_ref import is_http_uri
+        cats_home = self._cats_home()
+        bom_id = None
+        data_id = content_id or hl
 
-            if not is_http_uri(data_uri):
-                raise RuntimeError(f'invalid data_uri={data_uri!r}')
-            found = LocatorIndex(self.CATS_HOME).find_content_id_for_uri(data_uri)
+        def _resolve(value: str, *, label: str) -> str:
+            if not (
+                is_hl(value)
+                or is_http_uri(value)
+                or is_ni_or_digest(value)
+            ):
+                raise RuntimeError(f'invalid {label}={value!r}')
+            try:
+                found = resolve_intake_ref(value, cats_home=cats_home)
+            except ValueError as exc:
+                raise RuntimeError(f'invalid {label}={value!r}') from exc
             if found is None:
-                raise RuntimeError(f'no content id for data_uri={data_uri!r}')
-            data_cid = found
+                raise RuntimeError(f'no content id for {label}={value!r}')
+            return found
+
+        if bom_locator is not None:
+            # Explicit BOM locator always wins (same preference as prior bom_cid).
+            data_id = None
+            data_uri = None
+            bom_id = _resolve(bom_locator, label='bom_uri')
+
+        if data_uri and not data_id:
+            data_id = _resolve(data_uri, label='data_uri')
+
+        if data_id and (is_hl(data_id) or is_http_uri(data_id)):
+            data_id = _resolve(data_id, label='content_id')
 
         registry = BomRegistry(self.CATS_HOME)
-        if bom_cid is None:
+        if bom_id is None:
             try:
-                bom_cid = registry.resolve_unique_bom(data_cid)
+                bom_id = registry.resolve_unique_bom(data_id)
             except AmbiguousBomError:
                 raise
             except RegistryError as exc:
                 raise RuntimeError(str(exc)) from exc
 
-        record = registry.get(bom_cid)
+        record = registry.get(bom_id)
         if record is None:
-            raise RuntimeError(f'no registry record for bom_cid={bom_cid!r}')
+            raise RuntimeError(f'no registry record for content_id={bom_id!r}')
 
-        bom = BomLdpStore(self.CATS_HOME).get(bom_cid)
+        bom = BomLdpStore(self.CATS_HOME).get(bom_id)
         if bom is None:
             locators = record.get('locators') or {}
             uri = locators.get('bom_ldp_uri') or locators.get('bom_solid_uri')
             if not uri:
                 raise RuntimeError(
                     f'BOM envelope not in local LDP store and no locator for '
-                    f'bom_cid={bom_cid!r}'
+                    f'content_id={bom_id!r}'
                 )
             bom = fetch_bom_envelope(uri)
 
+        locators = record.get('locators') or {}
         return {
             'bom': bom,
-            'bom_cid': bom_cid,
-            'bom_ldp_uri': (record.get('locators') or {}).get('bom_ldp_uri'),
-            'bom_solid_uri': (record.get('locators') or {}).get('bom_solid_uri'),
+            'content_id': bom_id,
+            'bom_ldp_uri': locators.get('bom_ldp_uri'),
+            'bom_solid_uri': locators.get('bom_solid_uri'),
         }
 
     def _cat_response_for_link(
             self,
             cat_response=None,
             *,
-            bom_cid: str | None = None,
-            data_cid: str | None = None,
+            content_id: str | None = None,
             data_uri: str | None = None,
+            bom_uri: str | None = None,
+            bom_ldp_uri: str | None = None,
+            bom_solid_uri: str | None = None,
+            hl: str | None = None,
+            **kwargs,
     ):
+        self._reject_legacy_link_kwargs(kwargs)
         if cat_response is not None:
             return cat_response
         return self._response_from_registry(
-            bom_cid=bom_cid, data_cid=data_cid, data_uri=data_uri
+            content_id=content_id,
+            data_uri=data_uri,
+            bom_uri=bom_uri,
+            bom_ldp_uri=bom_ldp_uri,
+            bom_solid_uri=bom_solid_uri,
+            hl=hl,
         )
 
-    def _rebuild_function_cid(
+    def _rebuild_function(
             self,
             prev_function,
             *,
@@ -103,109 +179,137 @@ class OrderOps:
             integration_cache_subproc=None,
             infrafunction_subproc=None,
     ):
-        """Rebuild function_cid from prior pairing + optional slot replacements."""
-        process_source_cid = prev_function.get('process_source_cid')
-        infrafunction_source_cid = prev_function.get('infrafunction_source_cid')
-        if not process_source_cid or not infrafunction_source_cid:
+        """Rebuild function pairing from prior + optional slot replacements.
+
+        Emits uri-only Function / Process / InfraFunction JSON (no ``*_cid``).
+        """
+        cats_home = self._cats_home()
+        process_source_id = ref_id(
+            prev_function, 'process_source', cats_home=cats_home
+        )
+        infrafunction_source_id = ref_id(
+            prev_function, 'infrafunction_source', cats_home=cats_home
+        )
+        if not process_source_id or not infrafunction_source_id:
             raise RuntimeError(
-                'function_cid is missing process_source_cid / '
-                'infrafunction_source_cid; recreate the Order with '
+                'function pairing is missing process_source_cid / '
+                'infrafunction_source_cid (or *_uri); recreate the Order with '
                 'create_order_request after hybrid Function source CIDs.'
             )
-        prev_process = json.loads(self.cat(prev_function['process_cid']))
-        prev_infrafunction = json.loads(self.cat(prev_function['infrafunction_cid']))
+        prev_process = self._cat_stem(prev_function, 'process')
+        prev_infrafunction = self._cat_stem(prev_function, 'infrafunction')
 
         process = {}
-        if ingress_subproc is not None:
-            process['ingress_subproc_cid'] = self.bind_subproc(
-                ingress_subproc, process_source_cid
-            )
-        else:
-            process['ingress_subproc_cid'] = prev_process['ingress_subproc_cid']
-        if integrated_subproc is not None:
-            process['integrated_subproc_cid'] = self.bind_subproc(
-                integrated_subproc, process_source_cid
-            )
-        else:
-            process['integrated_subproc_cid'] = prev_process['integrated_subproc_cid']
-        if egress_subproc is not None:
-            process['egress_subproc_cid'] = self.bind_subproc(
-                egress_subproc, process_source_cid
-            )
-        else:
-            process['egress_subproc_cid'] = prev_process['egress_subproc_cid']
-        if integration_cache_subproc is not None:
-            process['integration_cache_subproc_cid'] = self.bind_subproc(
-                integration_cache_subproc, process_source_cid
-            )
-        else:
-            process['integration_cache_subproc_cid'] = prev_process[
-                'integration_cache_subproc_cid'
-            ]
+        slot_specs = (
+            ('ingress_subproc', ingress_subproc, process_source_id),
+            ('integrated_subproc', integrated_subproc, process_source_id),
+            ('egress_subproc', egress_subproc, process_source_id),
+            (
+                'integration_cache_subproc',
+                integration_cache_subproc,
+                process_source_id,
+            ),
+        )
+        for stem, replacement, source_id in slot_specs:
+            if replacement is not None:
+                set_ref(process, stem, self.bind_subproc(replacement, source_id))
+            else:
+                prior = ref_id(prev_process, stem, cats_home=cats_home)
+                if not prior:
+                    raise RuntimeError(
+                        f'prior process pairing is missing {stem}_uri / '
+                        f'{stem}_cid'
+                    )
+                set_ref(process, stem, prior)
 
         infrafunction = {}
         if infrafunction_subproc is not None:
-            infrafunction['infrafunction_subproc_cid'] = self.bind_subproc(
-                infrafunction_subproc, infrafunction_source_cid
+            set_ref(
+                infrafunction,
+                'infrafunction_subproc',
+                self.bind_subproc(infrafunction_subproc, infrafunction_source_id),
             )
         else:
-            infrafunction['infrafunction_subproc_cid'] = prev_infrafunction[
-                'infrafunction_subproc_cid'
-            ]
+            prior = ref_id(
+                prev_infrafunction, 'infrafunction_subproc', cats_home=cats_home
+            )
+            if not prior:
+                raise RuntimeError(
+                    'prior infrafunction pairing is missing '
+                    'infrafunction_subproc_uri / infrafunction_subproc_cid'
+                )
+            set_ref(infrafunction, 'infrafunction_subproc', prior)
 
-        return self.put_json({
-            'process_cid': self.put_json(process),
-            'infrafunction_cid': self.put_json(infrafunction),
-            'process_source_cid': process_source_cid,
-            'infrafunction_source_cid': infrafunction_source_cid,
-        })
+        function = {}
+        set_ref(function, 'process', self.put_json(process))
+        set_ref(function, 'infrafunction', self.put_json(infrafunction))
+        set_ref(function, 'process_source', process_source_id)
+        set_ref(function, 'infrafunction_source', infrafunction_source_id)
+        return self.put_json(function)
 
     def _resolve_structure_pairing(
             self,
             prev_structure,
             *,
             structure_filepath=None,
-            root_cid=None,
-            plant_cid=None,
-            infrastructure_cid=None,
+            root_id=None,
+            plant_id=None,
+            infrastructure_id=None,
             require_change_request=True,
     ):
-        """Resolve a new Structure pairing; fail if unchanged when requested."""
-        for key in ('root_cid', 'plant_cid', 'infrastructure_cid'):
-            if not prev_structure.get(key):
+        """Resolve a new Structure pairing; fail if unchanged when requested.
+
+        Parameter names ``root_id`` / ``plant_id`` / ``infrastructure_id``
+        are content-id overrides (values are ``ni:`` / CID). Minted JSON
+        uses ``root_uri`` / ``plant_uri`` / ``infrastructure_uri`` only.
+        """
+        cats_home = self._cats_home()
+        prev_ids = {}
+        for stem in ('root', 'plant', 'infrastructure'):
+            value = ref_id(prev_structure, stem, cats_home=cats_home)
+            if not value:
                 raise RuntimeError(
-                    f'prior structure_cid is missing {key}; recreate the Order '
-                    'with create_order_request after apply-complete Structure '
-                    'pairing ({root_cid, plant_cid, infrastructure_cid}).'
+                    f'prior structure_cid is missing {stem}_cid / {stem}_uri; '
+                    'recreate the Order with create_order_request after '
+                    'apply-complete Structure pairing '
+                    '({root_uri, plant_uri, infrastructure_uri}).'
                 )
+            prev_ids[stem] = value
 
         if require_change_request and structure_filepath is None and all(
-            v is None for v in (root_cid, plant_cid, infrastructure_cid)
+            v is None for v in (root_id, plant_id, infrastructure_id)
         ):
             raise RuntimeError(
                 'structure mutation requires structure_filepath and/or at least '
-                'one of root_cid, plant_cid, infrastructure_cid'
+                'one of root_id, plant_id, infrastructure_id'
             )
 
-        pairing = {
-            'root_cid': prev_structure['root_cid'],
-            'plant_cid': prev_structure['plant_cid'],
-            'infrastructure_cid': prev_structure['infrastructure_cid'],
-        }
         if structure_filepath is not None:
-            pairing = self.cid_structure_pairing(structure_filepath)
-        if root_cid is not None:
-            pairing['root_cid'] = root_cid
-        if plant_cid is not None:
-            pairing['plant_cid'] = plant_cid
-        if infrastructure_cid is not None:
-            pairing['infrastructure_cid'] = infrastructure_cid
+            pairing = self.structure_pairing(structure_filepath)
+        else:
+            pairing = {}
+            set_ref(pairing, 'root', prev_ids['root'])
+            set_ref(pairing, 'plant', prev_ids['plant'])
+            set_ref(pairing, 'infrastructure', prev_ids['infrastructure'])
 
-        if pairing == {
-            'root_cid': prev_structure['root_cid'],
-            'plant_cid': prev_structure['plant_cid'],
-            'infrastructure_cid': prev_structure['infrastructure_cid'],
-        }:
+        # Convert any legacy *_cid keys from structure_pairing into uri-only.
+        for stem in ('root', 'plant', 'infrastructure'):
+            current = ref_id(pairing, stem, cats_home=cats_home)
+            if current:
+                set_ref(pairing, stem, current)
+
+        if root_id is not None:
+            set_ref(pairing, 'root', root_id)
+        if plant_id is not None:
+            set_ref(pairing, 'plant', plant_id)
+        if infrastructure_id is not None:
+            set_ref(pairing, 'infrastructure', infrastructure_id)
+
+        new_ids = {
+            stem: ref_id(pairing, stem, cats_home=cats_home)
+            for stem in ('root', 'plant', 'infrastructure')
+        }
+        if new_ids == prev_ids:
             raise RuntimeError(
                 'structure mutation produced an unchanged structure pairing; '
                 'pass a different structure_filepath or nested CID override'
@@ -216,23 +320,50 @@ class OrderOps:
             self,
             order,
             *,
-            function_cid,
-            structure_cid,
-            data_cid,
+            function_id,
+            structure_id,
+            data_id,
             structure_filepath=None,
     ):
-        """Mint Invoice + order_request from a prior Order shell."""
-        input_invoice = {'data_cid': data_cid}
-        prev_invoice_cid = self.put_json(input_invoice)
+        """Mint Invoice + order_request from a prior Order shell (uri-only JSON)."""
+        from cats.network.ldp import (
+            InvoiceLdpStore,
+            OrderLdpStore,
+            invoice_ldp_uri,
+            order_ldp_uri,
+        )
+
+        invoice = {}
+        set_ref(invoice, 'data', data_id)
+        invoice_id = self.put_json(invoice)
+
         order = deepcopy(order)
         order.pop('flat', None)
-        order['function_cid'] = function_cid
-        order['structure_cid'] = structure_cid
-        order['invoice_cid'] = prev_invoice_cid
+        set_ref(order, 'function', function_id)
+        set_ref(order, 'structure', structure_id)
+        set_ref(order, 'invoice', invoice_id)
         if structure_filepath is not None:
             order['structure_filepath'] = structure_filepath
         order['endpoint'] = _node_init_endpoint()
-        return {'order_cid': self.put_json(order)}
+        order_id = self.put_json(order)
+
+        cats_home = self._cats_home()
+        order_uri = None
+        inv_uri = None
+        if cats_home:
+            InvoiceLdpStore(cats_home).put(invoice_id, invoice)
+            OrderLdpStore(cats_home).put(order_id, order)
+            loc = LocatorIndex(cats_home)
+            inv_uri = invoice_ldp_uri(invoice_id)
+            order_uri = order_ldp_uri(order_id)
+            loc.put(invoice_id, uri=inv_uri, media_type='application/json')
+            loc.put(order_id, uri=order_uri, media_type='application/json')
+
+        return {
+            'content_id': order_id,
+            'order_uri': order_uri,
+            'invoice_uri': inv_uri,
+        }
 
     def linkProcess(
             self,
@@ -243,20 +374,31 @@ class OrderOps:
             integration_cache_subproc=None,
             infrafunction_subproc=None,
             *,
-            bom_cid=None,
-            data_cid=None,
+            content_id=None,
             data_uri=None,
+            bom_uri=None,
+            bom_ldp_uri=None,
+            bom_solid_uri=None,
+            hl=None,
+            **kwargs,
     ):
-        """Rebuild Order function_cid; carry structure_cid and Invoice data_cid."""
+        """Rebuild Order function pairing; carry structure and Invoice data refs."""
         cat_response = self._cat_response_for_link(
-            cat_response, bom_cid=bom_cid, data_cid=data_cid, data_uri=data_uri
+            cat_response,
+            content_id=content_id,
+            data_uri=data_uri,
+            bom_uri=bom_uri,
+            bom_ldp_uri=bom_ldp_uri,
+            bom_solid_uri=bom_solid_uri,
+            hl=hl,
+            **kwargs,
         )
         flattened_bom = self.flatten_bom(cat_response)
         flat_bom = deepcopy(flattened_bom['flat_bom'])
         invoice = flat_bom['invoice']
         order = invoice['order']
         prev_function = order['flat']['function']
-        new_function_cid = self._rebuild_function_cid(
+        new_function_id = self._rebuild_function(
             prev_function,
             ingress_subproc=ingress_subproc,
             integrated_subproc=integrated_subproc,
@@ -264,11 +406,18 @@ class OrderOps:
             integration_cache_subproc=integration_cache_subproc,
             infrafunction_subproc=infrafunction_subproc,
         )
+        data_id = self._stem_id(invoice, 'data')
+        structure_id = self._stem_id(order, 'structure')
+        if not data_id or not structure_id:
+            raise RuntimeError(
+                'prior Invoice/Order missing data or structure ref '
+                '(data_uri/data_cid, structure_uri/structure_cid)'
+            )
         return self._order_request_from_prior(
             order,
-            function_cid=new_function_cid,
-            structure_cid=order['structure_cid'],
-            data_cid=invoice['data_cid'],
+            function_id=new_function_id,
+            structure_id=structure_id,
+            data_id=data_id,
         )
 
     def linkStructure(
@@ -276,22 +425,35 @@ class OrderOps:
             cat_response=None,
             *,
             structure_filepath=None,
-            root_cid=None,
-            plant_cid=None,
-            infrastructure_cid=None,
+            root_id=None,
+            plant_id=None,
+            infrastructure_id=None,
             structure_filepath_name=None,
-            bom_cid=None,
-            data_cid=None,
+            content_id=None,
             data_uri=None,
+            bom_uri=None,
+            bom_ldp_uri=None,
+            bom_solid_uri=None,
+            hl=None,
+            **kwargs,
     ):
-        """Rebuild Order structure_cid; carry function_cid and Invoice data_cid.
+        """Rebuild Order structure pairing; carry function and Invoice data refs.
 
         Structure twin of ``linkProcess``. Provide ``structure_filepath`` to
         re-CID root/plant/infra from disk, and/or override individual nested
-        CIDs. Fails if the resulting pairing is unchanged.
+        content ids via ``root_id`` / ``plant_id`` / ``infrastructure_id``
+        (Python API names; minted JSON uses ``*_uri`` only). Fails if the
+        resulting pairing is unchanged.
         """
         cat_response = self._cat_response_for_link(
-            cat_response, bom_cid=bom_cid, data_cid=data_cid, data_uri=data_uri
+            cat_response,
+            content_id=content_id,
+            data_uri=data_uri,
+            bom_uri=bom_uri,
+            bom_ldp_uri=bom_ldp_uri,
+            bom_solid_uri=bom_solid_uri,
+            hl=hl,
+            **kwargs,
         )
         flattened_bom = self.flatten_bom(cat_response)
         flat_bom = deepcopy(flattened_bom['flat_bom'])
@@ -301,12 +463,12 @@ class OrderOps:
         pairing = self._resolve_structure_pairing(
             prev_structure,
             structure_filepath=structure_filepath,
-            root_cid=root_cid,
-            plant_cid=plant_cid,
-            infrastructure_cid=infrastructure_cid,
+            root_id=root_id,
+            plant_id=plant_id,
+            infrastructure_id=infrastructure_id,
             require_change_request=True,
         )
-        new_structure_cid = self.put_json(pairing)
+        new_structure_id = self.put_json(pairing)
 
         if structure_filepath_name is not None:
             structure_name = structure_filepath_name
@@ -315,11 +477,18 @@ class OrderOps:
         else:
             structure_name = order['structure_filepath']
 
+        data_id = self._stem_id(invoice, 'data')
+        function_id = self._stem_id(order, 'function')
+        if not data_id or not function_id:
+            raise RuntimeError(
+                'prior Invoice/Order missing data or function ref '
+                '(data_uri/data_cid, function_uri/function_cid)'
+            )
         return self._order_request_from_prior(
             order,
-            function_cid=order['function_cid'],
-            structure_cid=new_structure_cid,
-            data_cid=invoice['data_cid'],
+            function_id=function_id,
+            structure_id=new_structure_id,
+            data_id=data_id,
             structure_filepath=structure_name,
         )
 
@@ -333,13 +502,17 @@ class OrderOps:
             integration_cache_subproc=None,
             infrafunction_subproc=None,
             structure_filepath=None,
-            root_cid=None,
-            plant_cid=None,
-            infrastructure_cid=None,
+            root_id=None,
+            plant_id=None,
+            infrastructure_id=None,
             structure_filepath_name=None,
-            bom_cid=None,
-            data_cid=None,
+            content_id=None,
             data_uri=None,
+            bom_uri=None,
+            bom_ldp_uri=None,
+            bom_solid_uri=None,
+            hl=None,
+            **kwargs,
     ):
         """Rebuild Function and/or Structure in one lineage step.
 
@@ -355,9 +528,9 @@ class OrderOps:
         }
         structure_requested = (
             structure_filepath is not None
-            or root_cid is not None
-            or plant_cid is not None
-            or infrastructure_cid is not None
+            or root_id is not None
+            or plant_id is not None
+            or infrastructure_id is not None
         )
         function_requested = any(v is not None for v in function_kwargs.values())
         if not function_requested and not structure_requested:
@@ -367,31 +540,46 @@ class OrderOps:
             )
 
         cat_response = self._cat_response_for_link(
-            cat_response, bom_cid=bom_cid, data_cid=data_cid, data_uri=data_uri
+            cat_response,
+            content_id=content_id,
+            data_uri=data_uri,
+            bom_uri=bom_uri,
+            bom_ldp_uri=bom_ldp_uri,
+            bom_solid_uri=bom_solid_uri,
+            hl=hl,
+            **kwargs,
         )
         flattened_bom = self.flatten_bom(cat_response)
         flat_bom = deepcopy(flattened_bom['flat_bom'])
         invoice = flat_bom['invoice']
         order = invoice['order']
 
-        function_cid = order['function_cid']
+        function_id = self._stem_id(order, 'function')
+        if not function_id:
+            raise RuntimeError(
+                'prior Order missing function_uri / function_cid'
+            )
         if function_requested:
-            function_cid = self._rebuild_function_cid(
+            function_id = self._rebuild_function(
                 order['flat']['function'], **function_kwargs
             )
 
-        structure_cid = order['structure_cid']
+        structure_id = self._stem_id(order, 'structure')
+        if not structure_id:
+            raise RuntimeError(
+                'prior Order missing structure_uri / structure_cid'
+            )
         structure_name = None
         if structure_requested:
             pairing = self._resolve_structure_pairing(
                 order['flat']['structure'],
                 structure_filepath=structure_filepath,
-                root_cid=root_cid,
-                plant_cid=plant_cid,
-                infrastructure_cid=infrastructure_cid,
+                root_id=root_id,
+                plant_id=plant_id,
+                infrastructure_id=infrastructure_id,
                 require_change_request=True,
             )
-            structure_cid = self.put_json(pairing)
+            structure_id = self.put_json(pairing)
             if structure_filepath_name is not None:
                 structure_name = structure_filepath_name
             elif structure_filepath is not None:
@@ -399,11 +587,14 @@ class OrderOps:
             else:
                 structure_name = order['structure_filepath']
 
+        data_id = self._stem_id(invoice, 'data')
+        if not data_id:
+            raise RuntimeError('prior Invoice missing data_uri / data_cid')
         return self._order_request_from_prior(
             order,
-            function_cid=function_cid,
-            structure_cid=structure_cid,
-            data_cid=invoice['data_cid'],
+            function_id=function_id,
+            structure_id=structure_id,
+            data_id=data_id,
             structure_filepath=structure_name,
         )
 
@@ -418,13 +609,25 @@ class OrderOps:
             structure_filepath,
             endpoint=None,
     ):
+        from cats.network.ldp import (
+            InvoiceLdpStore,
+            OrderLdpStore,
+            invoice_ldp_uri,
+            order_ldp_uri,
+        )
+
         if endpoint is None:
             endpoint = _node_init_endpoint()
         self.ensure_bootstrap_content_store()
         structure_name = os.path.basename(structure_filepath.rstrip('/'))
-        pairing = self.cid_structure_pairing(structure_filepath)
-        structure_cid = self.put_json(pairing)
-        data_cid, dir_name = self.cidDir(data_dirpath)
+        pairing = self.structure_pairing(structure_filepath)
+        # Ensure uri-only Structure pairing (convert any legacy *_cid keys).
+        for stem in ('root', 'plant', 'infrastructure'):
+            current = ref_id(pairing, stem, cats_home=self._cats_home())
+            if current:
+                set_ref(pairing, stem, current)
+        structure_id = self.put_json(pairing)
+        data_id, dir_name = self.put_dir(data_dirpath)
         # Function source packages (directory CIDs) — sibling of structure/
         # under input/function/{process,infrafunction}. Stock callables bind
         # by name into those packages; non-stock still pickle.
@@ -441,87 +644,84 @@ class OrderOps:
                 staging_parent=staging_parent,
                 basename='infrafunction',
             )
-            process_source_cid, _ = self.cidDir(process_staging)
-            infrafunction_source_cid, _ = self.cidDir(infrafunction_staging)
+            process_source_id, _ = self.put_dir(process_staging)
+            infrafunction_source_id, _ = self.put_dir(infrafunction_staging)
         finally:
             shutil.rmtree(staging_parent, ignore_errors=True)
         # Process [Composed Function]: transport callables (ingress,
         # integration_cache, egress) plus the hotF (integrated_subproc —
         # input→output data transform). Process is the composition, not a hotF.
-        process = {
-            'ingress_subproc_cid': self.bind_subproc(
-                ingress_subproc, process_source_cid
-            ),
-            'integrated_subproc_cid': self.bind_subproc(
-                integrated_subproc, process_source_cid
-            ),
-            'egress_subproc_cid': self.bind_subproc(
-                egress_subproc, process_source_cid
-            ),
-            'integration_cache_subproc_cid': self.bind_subproc(
-                integration_cache_subproc, process_source_cid
-            ),
-        }
+        process = {}
+        set_ref(
+            process,
+            'ingress_subproc',
+            self.bind_subproc(ingress_subproc, process_source_id),
+        )
+        set_ref(
+            process,
+            'integrated_subproc',
+            self.bind_subproc(integrated_subproc, process_source_id),
+        )
+        set_ref(
+            process,
+            'egress_subproc',
+            self.bind_subproc(egress_subproc, process_source_id),
+        )
+        set_ref(
+            process,
+            'integration_cache_subproc',
+            self.bind_subproc(integration_cache_subproc, process_source_id),
+        )
         # InfraFunction [Actuator]: dispatches the hotF (integrated_subproc)
         # onto the Plant (see Processor.Integration() in
         # cats/executor/function/__init__.py). Transport callables are not
         # Plant jobs.
-        infrafunction = {
-            'infrafunction_subproc_cid': self.bind_subproc(
-                infrafunction_subproc, infrafunction_source_cid
-            ),
-        }
-        function = {
-            'process_cid': self.put_json(process),
-            'infrafunction_cid': self.put_json(infrafunction),
-            'process_source_cid': process_source_cid,
-            'infrafunction_source_cid': infrafunction_source_cid,
-        }
-        from cats.network.cas import LocatorIndex, set_cid_uri
-        from cats.network.ldp import (
-            InvoiceLdpStore,
-            OrderLdpStore,
-            invoice_ldp_uri,
-            order_ldp_uri,
+        infrafunction = {}
+        set_ref(
+            infrafunction,
+            'infrafunction_subproc',
+            self.bind_subproc(infrafunction_subproc, infrafunction_source_id),
         )
-
-        set_cid_uri(function, 'process_cid', function['process_cid'])
-        set_cid_uri(function, 'infrafunction_cid', function['infrafunction_cid'])
-        set_cid_uri(function, 'process_source_cid', process_source_cid)
-        set_cid_uri(function, 'infrafunction_source_cid', infrafunction_source_cid)
-        function_cid = self.put_json(function)
+        function = {}
+        set_ref(function, 'process', self.put_json(process))
+        set_ref(function, 'infrafunction', self.put_json(infrafunction))
+        set_ref(function, 'process_source', process_source_id)
+        set_ref(function, 'infrafunction_source', infrafunction_source_id)
+        function_id = self.put_json(function)
         invoice = {}
-        set_cid_uri(invoice, 'data_cid', data_cid)
-        invoice_cid = self.put_json(invoice)
+        set_ref(invoice, 'data', data_id)
+        invoice_id = self.put_json(invoice)
         order = {
-            "structure_filepath": structure_name,
-            "JOB_HOME": self.JOB_HOME,
-            "endpoint": endpoint
+            'structure_filepath': structure_name,
+            'JOB_HOME': self.JOB_HOME,
+            'endpoint': endpoint,
         }
-        set_cid_uri(order, 'function_cid', function_cid)
-        set_cid_uri(order, 'structure_cid', structure_cid)
-        set_cid_uri(order, 'invoice_cid', invoice_cid)
-        order_cid = self.put_json(order)
+        set_ref(order, 'function', function_id)
+        set_ref(order, 'structure', structure_id)
+        set_ref(order, 'invoice', invoice_id)
+        order_id = self.put_json(order)
         # Phase 2b: publish Order/Invoice LDP URIs (address of record).
-        cats_home = getattr(self, 'CATS_HOME', None)
+        cats_home = self._cats_home()
+        order_uri = None
+        inv_uri = None
         if cats_home:
-            InvoiceLdpStore(cats_home).put(invoice_cid, invoice)
-            OrderLdpStore(cats_home).put(order_cid, order)
+            InvoiceLdpStore(cats_home).put(invoice_id, invoice)
+            OrderLdpStore(cats_home).put(order_id, order)
             loc = LocatorIndex(cats_home)
+            inv_uri = invoice_ldp_uri(invoice_id)
+            order_uri = order_ldp_uri(order_id)
             loc.put(
-                invoice_cid,
-                uri=invoice_ldp_uri(invoice_cid),
+                invoice_id,
+                uri=inv_uri,
                 media_type='application/json',
             )
             loc.put(
-                order_cid,
-                uri=order_ldp_uri(order_cid),
+                order_id,
+                uri=order_uri,
                 media_type='application/json',
             )
-        order_request = {
-            'order_cid': order_cid,
-            'order_uri': order_ldp_uri(order_cid) if cats_home else None,
-            'invoice_cid': invoice_cid,
-            'invoice_uri': invoice_ldp_uri(invoice_cid) if cats_home else None,
+        return {
+            'content_id': order_id,
+            'order_uri': order_uri,
+            'invoice_uri': inv_uri,
         }
-        return order_request

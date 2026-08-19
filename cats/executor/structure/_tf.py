@@ -33,8 +33,8 @@ def _applied_structure_marker_path(structure_home):
     return os.path.join(structure_home, APPLIED_STRUCTURE_MARKER)
 
 
-def read_applied_structure_cid(structure_home):
-    """Return the structure_cid this Structure's Terraform state currently
+def read_applied_structure_id(structure_home):
+    """Return the structure id this Structure's Terraform state currently
     reflects, or None if nothing has been successfully applied yet."""
     marker_path = _applied_structure_marker_path(structure_home)
     if not os.path.isfile(marker_path):
@@ -43,12 +43,12 @@ def read_applied_structure_cid(structure_home):
         return marker_file.read().strip() or None
 
 
-def write_applied_structure_cid(structure_home, structure_cid):
-    """Record the structure_cid Terraform state now reflects, so a later
+def write_applied_structure_id(structure_home, structure_id):
+    """Record the structure id Terraform state now reflects, so a later
     CAT execution with an unchanged (content-addressed) Structure can
     reconcile in place instead of destroying and rebuilding the Plant."""
     with open(_applied_structure_marker_path(structure_home), 'w', encoding='utf-8') as marker_file:
-        marker_file.write(structure_cid or '')
+        marker_file.write(structure_id or '')
 
 
 def terraform_bin(runtime):

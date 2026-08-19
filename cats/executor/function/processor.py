@@ -39,16 +39,23 @@ def _io_partitions() -> int:
 class Processor:
     def __init__(self, infraFunction):
         self.infraFunction = infraFunction
-        self.invoice_data_cid = None
+        self.invoice_data_id = None
         self.object_store_result_uri = None
         # Durable Entity Relationship correlators (set when promote path is used).
         self.durable_er_uri = None
         self.durable_er_pointer = None
 
-        self.ingress_input_data_cid = self.infraFunction.enhanced_bom['init_data_cid']
-        self.ingress_data_cid = None
-        self.integration_data_cid = None
-        self.egress_data_cid = None
+        from cats.network.cas import ref_id
+
+        cats_home = getattr(self.infraFunction.runtime, 'CATS_HOME', None)
+        self.ingress_input_data_id = ref_id(
+            self.infraFunction.enhanced_bom, 'init_data', cats_home=cats_home
+        )
+        if not self.ingress_input_data_id:
+            raise RuntimeError('BOM missing init_data_uri / init_data_cid')
+        self.ingress_data_id = None
+        self.integration_data_id = None
+        self.egress_data_id = None
         self.num_partitions = _io_partitions()
 
     def _load_plant_utils(self):
@@ -94,7 +101,7 @@ class Processor:
             ingress_result = _call_transport_port(
                 self.infraFunction.ingress_subproc,
                 label='ingress',
-                input_dir_cid=self.ingress_input_data_cid,
+                input_dir_cid=self.ingress_input_data_id,
                 transport=transport,
                 io=io,
                 num_partitions=self.num_partitions,
@@ -106,14 +113,14 @@ class Processor:
             ingress_result = _call_transport_port(
                 self.infraFunction.ingress_subproc,
                 label='ingress',
-                input_dir_cid=self.ingress_input_data_cid,
+                input_dir_cid=self.ingress_input_data_id,
                 transport=transport,
             )
         if not isinstance(ingress_result, tuple):
             # Older pickled ingress may still return an error string.
             raise RuntimeError(f"Ingress failed: {ingress_result}")
-        self.ingress_data_cid, _ingress_data_dir = ingress_result
-        return self.ingress_data_cid
+        self.ingress_data_id, _ingress_data_dir = ingress_result
+        return self.ingress_data_id
 
     def Integration(self, object_store, plant, transport):
         self.infraFunction.runtime.INTEGRATION_HOME = \
@@ -123,7 +130,7 @@ class Processor:
         process_input = _call_transport_port(
             self.infraFunction.integration_cache_subproc,
             label='integration_cache',
-            input_dir_cid=self.ingress_data_cid,
+            input_dir_cid=self.ingress_data_id,
             cwd=self.infraFunction.runtime.INTEGRATION_INPUT_CACHE,
             data_cache=self.infraFunction.runtime.INTEGRATION_INPUT_DATA_CACHE,
             transport=transport,
@@ -152,16 +159,16 @@ class Processor:
             object_store.result_uri(job_handle) if job_handle else None
         )
         wait_for_directory(self.infraFunction.runtime.INTEGRATION_HOME, check_interval=1)
-        self.integration_data_cid, _ = \
-            self.infraFunction.runtime.contentMesh.cidDir(self.infraFunction.runtime.INTEGRATION_HOME)
-        return self.integration_data_cid
+        self.integration_data_id, _ = \
+            self.infraFunction.runtime.contentMesh.put_dir(self.infraFunction.runtime.INTEGRATION_HOME)
+        return self.integration_data_id
 
     def Egress(self, transport, *, io=None):
         try:
             egress_result = _call_transport_port(
                 self.infraFunction.egress_subproc,
                 label='egress',
-                input_dir_cid=self.integration_data_cid,
+                input_dir_cid=self.integration_data_id,
                 transport=transport,
                 io=io,
                 num_partitions=self.num_partitions,
@@ -172,14 +179,14 @@ class Processor:
             egress_result = _call_transport_port(
                 self.infraFunction.egress_subproc,
                 label='egress',
-                input_dir_cid=self.integration_data_cid,
+                input_dir_cid=self.integration_data_id,
                 transport=transport,
             )
         if not isinstance(egress_result, str) or not egress_result:
             raise RuntimeError(f"Egress failed: {egress_result}")
         self.infraFunction.runtime.contentMesh.EGRESS_HOME = \
-            self.egress_data_cid = self.invoice_data_cid = egress_result
-        return self.egress_data_cid
+            self.egress_data_id = self.invoice_data_id = egress_result
+        return self.egress_data_id
 
     def process(self, object_store, plant, transport):
         # Narrow InfraStructure TransportContext to Function TransportPort
@@ -188,18 +195,18 @@ class Processor:
         io = self._io_port(plant)
         print("CAT Executing")
         print("CAT Ingress")
-        self.ingress_data_cid = self.Ingress(transport=transport, io=io)
+        self.ingress_data_id = self.Ingress(transport=transport, io=io)
         print("CAT Integration")
-        self.integration_data_cid = self.Integration(
+        self.integration_data_id = self.Integration(
             object_store=object_store,
             plant=plant,
             transport=transport,
         )
         print("CAT Egress")
-        self.egress_data_cid = self.Egress(transport=transport, io=io)
+        self.egress_data_id = self.Egress(transport=transport, io=io)
         print("...")
-        print(self.ingress_data_cid)
-        print(self.integration_data_cid)
-        print(self.egress_data_cid)
+        print(self.ingress_data_id)
+        print(self.integration_data_id)
+        print(self.egress_data_id)
         print("CAT Executed")
-        return self.ingress_data_cid, self.integration_data_cid, self.egress_data_cid
+        return self.ingress_data_id, self.integration_data_id, self.egress_data_id

@@ -4,7 +4,7 @@ import sys
 
 from cats.executor.structure._tf import (
     _terraform_output,
-    read_applied_structure_cid,
+    read_applied_structure_id,
 )
 
 
@@ -65,7 +65,7 @@ class Plant:
         Executor.execute() in cats/executor/executor.py)."""
         return self.context().snapshot(
             rebuilt=self.rebuilt,
-            applied_structure_cid=read_applied_structure_cid(
+            applied_structure_cid=read_applied_structure_id(
                 self.infraStructure.INPUT_STRUCTURE_HOME
             ),
         )

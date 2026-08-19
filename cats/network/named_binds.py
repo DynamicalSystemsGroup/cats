@@ -2,8 +2,10 @@
 import json
 import types
 
-# Function package dirs CIDed as function_cid.process_source_cid /
-# infrafunction_source_cid (sibling of structure/ under input/).
+from cats.network.cas.content_ref import content_uri, equality_id, is_ni_or_digest
+
+# Function package dirs addressed as process_source / infrafunction_source
+# (sibling of structure/ under input/).
 FUNCTION_PACKAGE_NAMES = ('process', 'infrafunction')
 
 # Stock Order-slot public names (auto named-bind). Not slots: function_0/1.
@@ -35,12 +37,39 @@ def is_stock_function_callable(obj) -> bool:
     )
 
 
-def named_bind_payload(source_cid: str, module: str, qualname: str) -> dict:
-    return {
-        'source_cid': source_cid,
+def named_bind_payload(source_content_id: str, module: str, qualname: str) -> dict:
+    """Named-bind leaf: ``contentId`` + optional ``source_uri`` (no ``source_cid``)."""
+    eid = (
+        equality_id(source_content_id)
+        if is_ni_or_digest(source_content_id)
+        else source_content_id.strip()
+    )
+    payload = {
+        'contentId': eid,
         'module': module,
         'qualname': qualname,
     }
+    uri = content_uri(eid)
+    if uri:
+        payload['source_uri'] = uri
+    return payload
+
+
+def named_bind_source_id(spec: dict) -> str | None:
+    """Equality id from a named-bind leaf (new ``contentId`` or legacy ``source_cid``)."""
+    if not isinstance(spec, dict):
+        return None
+    for key in ('contentId', 'source_cid'):
+        value = spec.get(key)
+        if isinstance(value, str) and value.strip():
+            value = value.strip()
+            return equality_id(value) if is_ni_or_digest(value) else value
+    uri = spec.get('source_uri')
+    if isinstance(uri, str) and uri.strip():
+        from cats.network.cas.content_ref import content_id_from_uri
+
+        return content_id_from_uri(uri.strip())
+    return None
 
 
 def parse_named_bind_leaf(raw: bytes):
@@ -52,10 +81,10 @@ def parse_named_bind_leaf(raw: bytes):
         return None
     if not isinstance(spec, dict):
         return None
-    if not all(k in spec for k in ('source_cid', 'module', 'qualname')):
+    if not isinstance(spec.get('module'), str) or not spec['module']:
         return None
-    if not all(isinstance(spec[k], str) and spec[k] for k in (
-        'source_cid', 'module', 'qualname',
-    )):
+    if not isinstance(spec.get('qualname'), str) or not spec['qualname']:
+        return None
+    if named_bind_source_id(spec) is None:
         return None
     return spec
