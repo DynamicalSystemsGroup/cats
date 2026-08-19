@@ -1,21 +1,13 @@
-"""InfraStructure [IaaS] content-store helpers (host Kubo) for durable CIDs.
+"""InfraStructure [IaaS] optional host Kubo helpers (operator tooling).
 
-Ships inside `infrastructure/` so it is part of `infrastructure_cid`
-(directory model). Owns host Kubo readiness: HTTP API probe, stale repo.lock
-heal, and idempotent `ipfs daemon` start. This is the long-lived
-**content-store facet** of InfraStructure — durable provenance / Order /
-Invoice / BOM addressing — not torn down with Structure T&D (Docker transport
-peers, MinIO) or Plant.
+Ships inside `infrastructure/` (directory model). Owns optional host Kubo
+readiness: HTTP API probe, stale repo.lock heal, and idempotent `ipfs daemon`
+start. Live Orders use Node CAS (§6s); this module is **not** required for
+Structure apply or Process transport.
 
-The **repo** copy under ``data/input/structure/.../content_store_utils.py`` is
-the source of truth; Order-submitted trees are the same file after Structure
-CID materialize (republish lag until re-CID). Keep ``ContentStore.ensure``
-thin: probe + heal + start only.
-
-ContentMesh does not call ensure (readiness soft-warn only). Terraform
-``shell_script.host_ipfs_daemon`` create and operator CLI / ``node ensure``
-call ``ContentStore.ensure()``. The CAT Node process must not shut down this
-daemon on exit.
+ContentMesh does not call ensure (readiness soft-warn only). Operator CLI /
+``node ensure`` call ``ContentStore.ensure()``. The CAT Node process must not
+shut down this daemon on exit.
 
 See docs/IPFS.md and docs/STORAGE.md.
 """

@@ -52,9 +52,8 @@ provider "helm" {
   }
 }
 
-# InfraStructure (IaaS): supports the provisioning of dynamically scaled
-# infrastructure for maintaining a Plant - the IPFS/Docker transport layer
-# used to move content-addressed data in and out of the Plant.
+# InfraStructure (IaaS): MinIO scratch/durable facets that support Plant.
+# Docker Kubo T&D peers and host_ipfs_daemon TF are retired (§6s).
 module "infrastructure" {
   source = "./infrastructure"
 }
@@ -73,7 +72,7 @@ module "plant" {
   # calling with depends_on. Threading this otherwise-unused output through
   # as an input variable creates the same ordering via normal data-flow
   # dependency instead.
-  infrastructure_ready = module.infrastructure.docker_compose_ipfs_transport_id
+  infrastructure_ready = module.infrastructure.docker_compose_minio_scratch_id
 }
 
 # module.infrastructure's MinIO publishes its S3 port straight to the
@@ -90,18 +89,33 @@ data "docker_network" "kind" {
   depends_on = [module.plant]
 }
 
+# Drop retired IPFS peer / host daemon resources from state on next apply (§6s).
+removed {
+  from = module.infrastructure.shell_script.host_ipfs_daemon
+
+  lifecycle {
+    destroy = true
+  }
+}
+
+removed {
+  from = module.infrastructure.shell_script.docker_compose_ipfs_transport
+
+  lifecycle {
+    destroy = true
+  }
+}
+
+removed {
+  from = module.infrastructure.shell_script.ipfs_transport_peering
+
+  lifecycle {
+    destroy = true
+  }
+}
+
 # Preserves existing Terraform state (no destroy/recreate) for anyone who
 # already applied this Structure before it was split into modules.
-moved {
-  from = shell_script.host_ipfs_daemon
-  to   = module.infrastructure.shell_script.host_ipfs_daemon
-}
-
-moved {
-  from = shell_script.docker_compose_ipfs_transport
-  to   = module.infrastructure.shell_script.docker_compose_ipfs_transport
-}
-
 moved {
   from = kind_cluster.default
   to   = module.plant.kind_cluster.default
