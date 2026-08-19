@@ -25,8 +25,31 @@ def _write_structure_fixture(structure: Path, *, with_noise=True):
     if with_noise:
         (structure / 'terraform.tfstate').write_text('{}')
         (structure / '.applied-structure.cid').write_text('QmOld')
+        (structure / '.applied-structure.id').write_text('QmNew')
         (structure / '.terraform-data').mkdir()
         (structure / '.terraform-data' / 'x').write_text('y')
+
+
+def test_applied_structure_marker_prefers_new_and_falls_back(tmp_path):
+    """read prefers .applied-structure.id; falls back to legacy .cid."""
+    from cats.executor.structure._tf import (
+        APPLIED_STRUCTURE_MARKER,
+        LEGACY_APPLIED_STRUCTURE_MARKER,
+        read_applied_structure_id,
+        write_applied_structure_id,
+    )
+
+    home = tmp_path / 'structure'
+    home.mkdir()
+    assert read_applied_structure_id(str(home)) is None
+
+    (home / LEGACY_APPLIED_STRUCTURE_MARKER).write_text('ni:///sha-256;legacy\n')
+    assert read_applied_structure_id(str(home)) == 'ni:///sha-256;legacy'
+
+    write_applied_structure_id(str(home), 'ni:///sha-256;new')
+    assert (home / APPLIED_STRUCTURE_MARKER).read_text() == 'ni:///sha-256;new'
+    assert not (home / LEGACY_APPLIED_STRUCTURE_MARKER).exists()
+    assert read_applied_structure_id(str(home)) == 'ni:///sha-256;new'
 
 
 def test_stage_structure_root_copies_allowlist_only(tmp_path):

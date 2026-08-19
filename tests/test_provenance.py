@@ -45,7 +45,7 @@ FUNCTION_PAIRING_KEYS = (
 )
 STRUCTURE_PAIRING_KEYS = ('root', 'plant', 'infrastructure')
 PLANT_SNAPSHOT_KEYS = (
-    'applied_structure_cid',
+    'applied_structure_id',
     'kind_cluster_name',
     'kubeconfig_context',
     'ray_dashboard_address',
@@ -272,8 +272,8 @@ def assert_provenance_record(bom_response, order_request):
     assert plant is not None
     for key in PLANT_SNAPSHOT_KEYS:
         assert key in plant, f'plant as-executed missing {key}'
-    assert plant['applied_structure_cid'] == ref_id(order, 'structure'), (
-        'plant.applied_structure_cid must equal order.structure content id'
+    assert plant['applied_structure_id'] == ref_id(order, 'structure'), (
+        'plant.applied_structure_id must equal order.structure content id'
     )
     assert isinstance(plant['rebuilt'], bool)
 

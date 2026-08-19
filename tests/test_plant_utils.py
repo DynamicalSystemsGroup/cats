@@ -74,13 +74,13 @@ def test_plant_context_snapshot_shape():
         ray_release_name='raycluster',
         ray_dashboard_address='http://127.0.0.1:8265',
     )
-    snap = ctx.snapshot(rebuilt=False, applied_structure_cid='QmTest')
+    snap = ctx.snapshot(rebuilt=False, applied_structure_id='QmTest')
     assert snap == {
         'kind_cluster_name': 'cats',
         'kubeconfig_context': 'kind-cats',
         'ray_release_name': 'raycluster',
         'ray_dashboard_address': 'http://127.0.0.1:8265',
-        'applied_structure_cid': 'QmTest',
+        'applied_structure_id': 'QmTest',
         'rebuilt': False,
     }
 
