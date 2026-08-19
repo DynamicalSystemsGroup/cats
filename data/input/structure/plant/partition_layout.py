@@ -1,8 +1,12 @@
-"""Stable CAR-per-partition layout helpers (Plant I/O; no Ray import).
+"""Stable partition layout helpers (Plant I/O; no Ray import).
 
-Layout: a directory of ``part-00000.car`` … ``part-{n-1:05d}.car`` files
-(each file body is CARv1 bytes). Used by RayIoPort / ray_io_entrypoint and
+New layouts (§6p): a directory of opaque ``part-00000`` … ``part-{n-1:05d}``
+entries — each a **file** (byte shard) or **directory** (file bag / CSV tree).
+No CARv1 mint; no Kubo/CID. Used by RayIoPort / ray_io_entrypoint and
 RayComputePort alignment.
+
+Legacy layouts may still contain ``part-*.car`` (historical); helpers keep
+read support for one cycle without minting new CARs.
 """
 from __future__ import annotations
 
@@ -11,29 +15,38 @@ import shutil
 from pathlib import Path
 
 
+def part_name(index: int) -> str:
+    """Stable opaque partition shuffle key (file or directory name)."""
+    if index < 0:
+        raise ValueError(f'partition index must be >= 0, got {index}')
+    return f'part-{index:05d}'
+
+
 def part_car_name(index: int) -> str:
-    """Stable partition CAR filename (shuffle key)."""
+    """Legacy partition CAR filename (historical layouts only)."""
     if index < 0:
         raise ValueError(f'partition index must be >= 0, got {index}')
     return f'part-{index:05d}.car'
 
 
 def part_shard_name(index: int) -> str:
-    """Stable partition shard stem / directory name (pre-CAR)."""
-    if index < 0:
-        raise ValueError(f'partition index must be >= 0, got {index}')
-    return f'part-{index:05d}'
+    """Alias for :func:`part_name` (opaque shard stem / directory)."""
+    return part_name(index)
+
+
+def list_part_layout(directory: str | Path) -> list[Path]:
+    """Sorted opaque ``part-*`` files/dirs (non-``.car``) under ``directory``."""
+    return list_part_shards(directory)
 
 
 def list_part_cars(directory: str | Path) -> list[Path]:
-    """Sorted ``part-*.car`` paths under ``directory``."""
+    """Sorted legacy ``part-*.car`` paths under ``directory``."""
     root = Path(directory)
-    parts = sorted(root.glob('part-*.car'))
-    return parts
+    return sorted(root.glob('part-*.car'))
 
 
 def list_part_shards(directory: str | Path) -> list[Path]:
-    """Sorted non-CAR ``part-*`` files/dirs (hotF CSV outputs)."""
+    """Sorted non-CAR ``part-*`` files/dirs (opaque layout / hotF outputs)."""
     root = Path(directory)
     return sorted(
         p for p in root.glob('part-*')

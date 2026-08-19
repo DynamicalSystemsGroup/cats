@@ -1,9 +1,12 @@
-"""Plant Ray IoPort adapter — partitioned CAR ingress/egress.
+"""Plant Ray IoPort adapter — partitioned opaque-shard ingress/egress (§6p).
 
-Ships inside ``plant/`` (``plant_cid``). Process callables depend only on
+Ships inside ``plant/`` (``plant_id``). Process callables depend only on
 Function-owned ``IoPort``; this adapter performs partition layout I/O via
 ContentMesh / AddressStore on the Executor (or inside ``ray_io_entrypoint``
 when submitted as a Plant job).
+
+Layouts are opaque ``part-NNNNN`` files/dirs under CAS ``put_dir`` (``ni:``).
+No Kubo ``add`` / ``getCar`` / ``dag_export``.
 """
 from __future__ import annotations
 
@@ -18,7 +21,7 @@ try:
         collect_input_files,
         list_part_cars,
         list_part_shards,
-        part_car_name,
+        part_name,
         round_robin_paths,
         split_file_bytes,
         write_shard_tree,
@@ -28,15 +31,29 @@ except ImportError:  # repo import when not in job working_dir
         collect_input_files,
         list_part_cars,
         list_part_shards,
-        part_car_name,
+        part_name,
         round_robin_paths,
         split_file_bytes,
         write_shard_tree,
     )
 
 
+def _require_cas_put_dir(mesh, layout_dir: str):
+    """``put_dir`` layout via CAS; refuse Kubo fallback when ``CATS_HOME`` unset."""
+    cats_home = getattr(mesh, 'CATS_HOME', None)
+    if not cats_home:
+        raise RuntimeError(
+            'partition I/O requires ContentMesh.CATS_HOME for CAS put_dir '
+            '(§6p); Kubo fallback is not used for partition layouts'
+        )
+    result = mesh.put_dir(layout_dir)
+    if isinstance(result, tuple):
+        return result
+    return result, Path(layout_dir).name
+
+
 def run_partition_ingress(mesh, input_dir_id: str, *, num_partitions: int) -> tuple[str, str]:
-    """Fetch ``input_dir_id``, split into ``n`` CAR parts, return layout via ``put_dir``."""
+    """Fetch ``input_dir_id``, split into ``n`` opaque parts, return layout via ``put_dir``."""
     if num_partitions < 2:
         raise ValueError('partition_ingress requires num_partitions >= 2')
 
@@ -59,34 +76,27 @@ def run_partition_ingress(mesh, input_dir_id: str, *, num_partitions: int) -> tu
         if len(files) == 1 and files[0].is_file() and (
             source.is_file() or files[0].parent == source or source.is_dir()
         ):
-            # Single-file input → equal byte shards.
+            # Single-file input → equal byte shards as opaque part files.
             data = files[0].read_bytes()
             shards = split_file_bytes(data, num_partitions)
             for i, shard in enumerate(shards):
-                shard_path = tmp_path / f'shard-{i:05d}.bin'
-                shard_path.write_bytes(shard)
-                _write_part_car(mesh, shard_path, layout_dir / part_car_name(i))
+                (layout_dir / part_name(i)).write_bytes(shard)
         else:
             bags = round_robin_paths(files, num_partitions)
             root_for_rel = source if source.is_dir() else source.parent
             for i, bag in enumerate(bags):
-                bag_dir = tmp_path / f'bag-{i:05d}'
-                write_shard_tree(bag, bag_dir, source_root=root_for_rel)
-                _write_part_car(mesh, bag_dir, layout_dir / part_car_name(i))
+                write_shard_tree(
+                    bag, layout_dir / part_name(i), source_root=root_for_rel
+                )
 
-        result = mesh.put_dir(str(layout_dir))
-        if isinstance(result, tuple):
-            layout_id, layout_name = result
-        else:
-            layout_id, layout_name = result, layout_dir.name
-        return layout_id, layout_name
+        return _require_cas_put_dir(mesh, str(layout_dir))
 
 
 def run_partition_egress(mesh, input_dir_id: str, *, num_partitions: int) -> str:
     """Materialize partition layout and publish partition-dir id for Invoice.
 
-    Prefer an existing ``part-*.car`` layout. Else CAR-wrap ``part-*`` CSV/dir
-    shards 1:1. Else ``put_dir`` the whole tree (single root).
+    Prefer opaque ``part-*`` shards (no wrap). Else legacy ``part-*.car``
+    count == n → ``put_dir`` as-is. Else ``put_dir`` the whole tree.
     """
     if num_partitions < 2:
         raise ValueError('partition_egress requires num_partitions >= 2')
@@ -96,63 +106,24 @@ def run_partition_egress(mesh, input_dir_id: str, *, num_partitions: int) -> str
         mesh.get(content_id=input_dir_id, filepath='input', output=str(tmp_path))
         source = tmp_path / 'input'
         if source.is_dir():
+            shards = list_part_shards(source)
+            if len(shards) == num_partitions:
+                layout_id, _ = _require_cas_put_dir(mesh, str(source))
+                return layout_id
             cars = list_part_cars(source)
             if len(cars) == num_partitions:
-                result = mesh.put_dir(str(source))
-            else:
-                shards = list_part_shards(source)
-                if len(shards) == num_partitions:
-                    layout_dir = tmp_path / 'layout'
-                    layout_dir.mkdir()
-                    for i, shard in enumerate(shards):
-                        _write_part_car(
-                            mesh, shard, layout_dir / part_car_name(i)
-                        )
-                    result = mesh.put_dir(str(layout_dir))
-                else:
-                    result = mesh.put_dir(str(source))
-        else:
-            result = mesh.put_dir(str(source.parent if source.is_file() else tmp_path))
-        if isinstance(result, tuple):
-            return result[0]
-        return result
-
-
-def _write_part_car(mesh, content_path: Path, dest_car: Path) -> None:
-    """Add ``content_path`` to the mesh, export CAR bytes to ``dest_car``."""
-    dest_car.parent.mkdir(parents=True, exist_ok=True)
-    if content_path.is_dir():
-        added = mesh.ipfsClient.add(str(content_path), recursive=True)
-        if isinstance(added, list):
-            name = content_path.name
-            entry = [x for x in added if x.get('Name') == name]
-            if not entry:
-                entry = [added[-1]]
-            cid = entry[0]['Hash']
-        else:
-            cid = added['Hash']
-    else:
-        cid = mesh.ipfsClient.add_bytes(
-            content_path.read_bytes(), filename=content_path.name
-        )
-    # Prefer AddressStore / ContentMesh getCar when present.
-    get_car = getattr(mesh, 'getCar', None)
-    if get_car is not None:
-        get_car(cid, str(dest_car))
-        return
-    dag_export = getattr(getattr(mesh, 'addressStore', None), 'dag_export', None)
-    if dag_export is not None:
-        dag_export(cid, str(dest_car))
-        return
-    ipfs_export = getattr(mesh.ipfsClient, 'dag_export', None)
-    if ipfs_export is not None:
-        ipfs_export(cid, str(dest_car))
-        return
-    raise RuntimeError('mesh cannot dag_export / getCar for partition CAR')
+                # Historical CAR layout: store as opaque blobs, do not remint.
+                layout_id, _ = _require_cas_put_dir(mesh, str(source))
+                return layout_id
+            layout_id, _ = _require_cas_put_dir(mesh, str(source))
+            return layout_id
+        parent = source.parent if source.is_file() else tmp_path
+        layout_id, _ = _require_cas_put_dir(mesh, str(parent))
+        return layout_id
 
 
 class RayIoPort:
-    """IoPort adapter: partitioned CAR layout via ContentMesh (+ optional Plant job)."""
+    """IoPort adapter: opaque partition layout via ContentMesh (+ optional Plant job)."""
 
     def __init__(
         self,
