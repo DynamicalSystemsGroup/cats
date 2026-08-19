@@ -8,7 +8,8 @@ import sys
 from cats.utils import subproc_run
 
 DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE = "module.infrastructure.shell_script.docker_compose_ipfs_transport"
-APPLIED_STRUCTURE_MARKER = '.applied-structure.cid'
+APPLIED_STRUCTURE_MARKER = '.applied-structure.id'
+LEGACY_APPLIED_STRUCTURE_MARKER = '.applied-structure.cid'
 TF_STATE_LOCK_INFO = '.terraform.tfstate.lock.info'
 
 
@@ -33,22 +34,47 @@ def _applied_structure_marker_path(structure_home):
     return os.path.join(structure_home, APPLIED_STRUCTURE_MARKER)
 
 
+def _legacy_applied_structure_marker_path(structure_home):
+    return os.path.join(structure_home, LEGACY_APPLIED_STRUCTURE_MARKER)
+
+
+def _read_marker_file(path):
+    if not os.path.isfile(path):
+        return None
+    with open(path, encoding='utf-8') as marker_file:
+        return marker_file.read().strip() or None
+
+
 def read_applied_structure_id(structure_home):
     """Return the structure id this Structure's Terraform state currently
-    reflects, or None if nothing has been successfully applied yet."""
-    marker_path = _applied_structure_marker_path(structure_home)
-    if not os.path.isfile(marker_path):
-        return None
-    with open(marker_path, encoding='utf-8') as marker_file:
-        return marker_file.read().strip() or None
+    reflects, or None if nothing has been successfully applied yet.
+
+    Prefers ``.applied-structure.id``; falls back to legacy
+    ``.applied-structure.cid`` for one migration cycle.
+    """
+    value = _read_marker_file(_applied_structure_marker_path(structure_home))
+    if value is not None:
+        return value
+    return _read_marker_file(_legacy_applied_structure_marker_path(structure_home))
 
 
 def write_applied_structure_id(structure_home, structure_id):
     """Record the structure id Terraform state now reflects, so a later
     CAT execution with an unchanged (content-addressed) Structure can
-    reconcile in place instead of destroying and rebuilding the Plant."""
-    with open(_applied_structure_marker_path(structure_home), 'w', encoding='utf-8') as marker_file:
+    reconcile in place instead of destroying and rebuilding the Plant.
+
+    Writes only ``.applied-structure.id``; removes legacy
+    ``.applied-structure.cid`` when present.
+    """
+    with open(
+        _applied_structure_marker_path(structure_home), 'w', encoding='utf-8'
+    ) as marker_file:
         marker_file.write(structure_id or '')
+    legacy = _legacy_applied_structure_marker_path(structure_home)
+    try:
+        os.remove(legacy)
+    except FileNotFoundError:
+        pass
 
 
 def terraform_bin(runtime):

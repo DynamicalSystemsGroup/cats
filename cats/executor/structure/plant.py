@@ -65,7 +65,7 @@ class Plant:
         Executor.execute() in cats/executor/executor.py)."""
         return self.context().snapshot(
             rebuilt=self.rebuilt,
-            applied_structure_cid=read_applied_structure_id(
+            applied_structure_id=read_applied_structure_id(
                 self.infraStructure.INPUT_STRUCTURE_HOME
             ),
         )
