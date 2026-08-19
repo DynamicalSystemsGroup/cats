@@ -54,7 +54,7 @@ def test_add_json_and_pyobj():
 
 
 @requires_kubo
-def test_add_directory_recursive_names_match_cidDir():
+def test_add_directory_recursive_names_match_put_dir():
     """Smoke: recursive add returns named entries including the root directory CID."""
     client = connect()
     with tempfile.TemporaryDirectory() as tmp:

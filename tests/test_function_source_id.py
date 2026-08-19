@@ -1,4 +1,4 @@
-"""Function source directory CIDs + pickle bind hybrid on function_cid."""
+"""Function source directory ids + pickle bind hybrid on function_id."""
 import json
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -160,7 +160,7 @@ def test_get_enhanced_bom_requires_function_source_cids(monkeypatch, tmp_path):
         'infrafunction_cid': 'QmIfrBind',
     }
 
-    def _get(cid, filepath, output=None):
+    def _get(content_id, filepath, output=None):
         dest_root = Path(output or tmp_path)
         path = dest_root / filepath
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -179,10 +179,10 @@ def test_get_enhanced_bom_requires_function_source_cids(monkeypatch, tmp_path):
             path.mkdir(parents=True, exist_ok=True)
         return filepath
 
-    def _cat(cid):
-        if cid == 'QmStruct':
+    def _cat(content_id):
+        if content_id == 'QmStruct':
             return json.dumps(structure)
-        if cid == 'QmFn':
+        if content_id == 'QmFn':
             return json.dumps(function)
         return '{}'
 
@@ -227,8 +227,8 @@ def test_get_enhanced_bom_materializes_function_sources(monkeypatch, tmp_path):
     }
     gets = []
 
-    def _get(cid, filepath, output=None):
-        gets.append((cid, filepath))
+    def _get(content_id, filepath, output=None):
+        gets.append((content_id, filepath))
         dest_root = Path(output or tmp_path)
         path = dest_root / filepath
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -253,10 +253,10 @@ def test_get_enhanced_bom_materializes_function_sources(monkeypatch, tmp_path):
             (path / 'actuator.py').write_text('# from-order\n')
         return filepath
 
-    def _cat(cid):
-        if cid == 'QmStruct':
+    def _cat(content_id):
+        if content_id == 'QmStruct':
             return json.dumps(structure)
-        if cid == 'QmFn':
+        if content_id == 'QmFn':
             return json.dumps(function)
         return '{}'
 

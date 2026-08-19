@@ -1,4 +1,4 @@
-"""Structure root_cid staging and apply-complete getEnhancedBom materialize."""
+"""Structure root_id staging and apply-complete getEnhancedBom materialize."""
 import json
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -118,7 +118,7 @@ def test_get_enhanced_bom_requires_root_cid(monkeypatch, tmp_path):
         'infrastructure_cid': 'QmInfra',
     }
 
-    def _get(cid, filepath, output=None):
+    def _get(content_id, filepath, output=None):
         dest_root = Path(output or tmp_path)
         path = dest_root / filepath
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -137,10 +137,10 @@ def test_get_enhanced_bom_requires_root_cid(monkeypatch, tmp_path):
         'infrafunction_source_cid': 'QmIfrSrc',
     }
 
-    def _cat(cid):
-        if cid == 'QmStruct':
+    def _cat(content_id):
+        if content_id == 'QmStruct':
             return json.dumps(structure)
-        if cid == 'QmFn':
+        if content_id == 'QmFn':
             return json.dumps(function)
         return '{}'
 
@@ -185,8 +185,8 @@ def test_get_enhanced_bom_materializes_root_then_modules(monkeypatch, tmp_path):
     }
     gets = []
 
-    def _get(cid, filepath, output=None):
-        gets.append((cid, filepath, output))
+    def _get(content_id, filepath, output=None):
+        gets.append((content_id, filepath, output))
         dest_root = Path(output or tmp_path)
         path = dest_root / filepath
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -215,10 +215,10 @@ def test_get_enhanced_bom_materializes_root_then_modules(monkeypatch, tmp_path):
             (path / '__init__.py').write_text('# ifr\n')
         return filepath
 
-    def _cat(cid):
-        if cid == 'QmStruct':
+    def _cat(content_id):
+        if content_id == 'QmStruct':
             return json.dumps(structure)
-        if cid == 'QmFn':
+        if content_id == 'QmFn':
             return json.dumps(function)
         return '{}'
 

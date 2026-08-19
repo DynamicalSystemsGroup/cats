@@ -35,11 +35,11 @@ from cats.network.ldp.headers import LDP_RESOURCE
 
 
 class _NoIpfs:
-    def cat_bytes(self, cid):
-        raise AssertionError(f'unexpected IPFS cat: {cid}')
+    def cat_bytes(self, content_id):
+        raise AssertionError(f'unexpected IPFS cat: {content_id}')
 
-    def get(self, cid, dest_path):
-        raise AssertionError(f'unexpected IPFS get: {cid}')
+    def get(self, content_id, dest_path):
+        raise AssertionError(f'unexpected IPFS get: {content_id}')
 
     def dag_export(self, cid, filepath):
         raise AssertionError(f'unexpected IPFS dag_export: {cid}')
