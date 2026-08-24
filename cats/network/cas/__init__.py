@@ -37,6 +37,10 @@ from cats.network.cas.manifest import (
     materialize_tree,
     put_tree,
 )
+from cats.network.cas.manifest_equiv import (
+    assert_directory_manifest_equiv,
+    assert_stage_lineage_payload_equiv,
+)
 from cats.network.cas.routes import register_cas_routes
 from cats.network.cas.store import CasHttpStore, cas_ldp_path, cas_ldp_uri
 
@@ -44,7 +48,9 @@ __all__ = [
     'MANIFEST_TYPE',
     'CasHttpStore',
     'LocatorIndex',
+    'assert_directory_manifest_equiv',
     'assert_egressed_matches_data',
+    'assert_stage_lineage_payload_equiv',
     'build_content_ref',
     'build_manifest_entries',
     'cas_ldp_path',
