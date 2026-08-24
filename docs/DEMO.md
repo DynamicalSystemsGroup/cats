@@ -52,7 +52,8 @@ uv run marimo edit notebooks/new_cats_demo.py
 After CAT0 `catSubmit`, [`new_cats_demo.py`](../notebooks/new_cats_demo.py) runs the same
 library helpers as the unit suites: registry **index parity**, **handoff projection**
 completeness, **claims reachability**, then **control-plane handoff coherence**,
-then **content equivalence** (`assert_*_content_equiv` before flatten) — not
-“all HTTP content ∈ registry.”
+then **content equivalence** (`assert_*_content_equiv` before flatten), then
+**stageLineage directory-manifest** hops (`assert_directory_manifest_equiv` /
+`assert_stage_lineage_payload_equiv`) — not “all HTTP content ∈ registry.”
 
 Cells re-run reactively as dependencies change; work through the notebook top to bottom. See [`BomRegistry.md`](BomRegistry.md) for the Python registry guide.

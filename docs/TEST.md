@@ -44,7 +44,9 @@
   envelope content equivalence (mesh ≡ HTTP per subcomponent)
   [`tests/test_content_equiv_bom.py`](../tests/test_content_equiv_bom.py) /
   [`tests/test_content_equiv_invoice.py`](../tests/test_content_equiv_invoice.py) /
-  [`tests/test_content_equiv_order.py`](../tests/test_content_equiv_order.py).
+  [`tests/test_content_equiv_order.py`](../tests/test_content_equiv_order.py);
+  stageLineage directory-manifest hops
+  [`tests/test_manifest_equiv.py`](../tests/test_manifest_equiv.py).
   These do **not** assert that all HTTP content lives in the registry.
   For mesh-reachable LDP hints in `hl:`, set `CAT_NODE_HOST` to an address peers can open
   (loopback only warns).
