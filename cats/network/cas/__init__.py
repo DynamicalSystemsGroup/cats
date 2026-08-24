@@ -24,6 +24,11 @@ from cats.network.cas.digest import (
     validate_digest_segment,
 )
 from cats.network.cas.hashlink import from_hl, is_hl, to_hl
+from cats.network.cas.flatten_refs import flatten_uri_dict
+from cats.network.cas.invoice_stages import (
+    assert_egressed_matches_data,
+    resolve_invoice_data_stages,
+)
 from cats.network.cas.locators import LocatorIndex
 from cats.network.cas.manifest import (
     MANIFEST_TYPE,
@@ -39,6 +44,7 @@ __all__ = [
     'MANIFEST_TYPE',
     'CasHttpStore',
     'LocatorIndex',
+    'assert_egressed_matches_data',
     'build_content_ref',
     'build_manifest_entries',
     'cas_ldp_path',
@@ -48,6 +54,7 @@ __all__ = [
     'content_id_fs_key',
     'content_uri',
     'equality_id',
+    'flatten_uri_dict',
     'from_hl',
     'from_ni',
     'is_directory_manifest',
@@ -62,6 +69,7 @@ __all__ = [
     'ref_uri',
     'register_cas_routes',
     'resolve_intake_ref',
+    'resolve_invoice_data_stages',
     'set_cid_uri',
     'set_ref',
     'sha256_hex',
