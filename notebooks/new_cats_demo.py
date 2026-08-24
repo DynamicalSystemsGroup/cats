@@ -40,7 +40,15 @@ def _():
     from cats.network.node_http import _node_base_url
     from cats.network.registry import (
         BomRegistry,
+        assert_bom_content_equiv,
         assert_control_plane_handoff_coherence,
+        assert_handoff_projection_complete,
+        assert_input_invoice_slots,
+        assert_invoice_content_equiv,
+        assert_order_content_equiv,
+        assert_order_function_slots,
+        assert_order_structure_slots,
+        assert_registry_claims_reachable,
         assert_registry_index_parity,
     )
 
@@ -55,13 +63,30 @@ def _():
         resp.raise_for_status()
         return resp.json()
 
+    def http_get(path):
+        """GET Node path → raw bytes (opaque data_uri / stage payloads)."""
+        url = path if path.startswith("http") else f"{node_base}{path}"
+        resp = requests.get(url, timeout=60)
+        resp.raise_for_status()
+        return resp.content
+
     return (
+        CATS_HOME,
         INPUT_DATA_HOME,
         INPUT_STRUCTURE_HOME,
+        assert_bom_content_equiv,
         assert_control_plane_handoff_coherence,
+        assert_handoff_projection_complete,
+        assert_input_invoice_slots,
+        assert_invoice_content_equiv,
+        assert_order_content_equiv,
+        assert_order_function_slots,
+        assert_order_structure_slots,
+        assert_registry_claims_reachable,
         assert_registry_index_parity,
         contentMesh,
         flatten_uri_dict,
+        http_get,
         http_get_json,
         locator_index,
         pprint,
@@ -107,11 +132,20 @@ def _(mo):
 
 @app.cell
 def cat0_create_order(
+    CATS_HOME,
     INPUT_DATA_HOME,
     INPUT_STRUCTURE_HOME,
     contentMesh,
     pprint,
 ):
+    # Order Function sources live under repo-root data/, not the installed cats
+    # package. Marimo cwd is notebooks/ — put CATS_HOME on sys.path so
+    # `import data` resolves (do not put this path hack in cats/).
+    import sys
+
+    if CATS_HOME not in sys.path:
+        sys.path.insert(0, CATS_HOME)
+
     from data.input.function.process import (
         egress,
         ingress,
@@ -165,43 +199,39 @@ def _(cat_invoiced_response_0):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ##### Registry index parity (CAT0 → CAT1)
+    ##### Registry post-execute checks (CAT0 → CAT1)
 
-    **Parity** = the same registry *index* facts agree on two paths: Python
-    `BomRegistry` / `LocatorIndex` on disk, and `GET /ldp/registry/…` on the
-    live Node. Goal: discovery used by `init` / `link*` is trustworthy whether
-    you call the Python API or HTTP.
+    After `catSubmit`, the same library helpers as unit tests:
 
-    `assert_registry_index_parity` (same helpers as
-    `tests/test_registry_parity.py`) checks, for this BOM's `data` / `order`:
+    1. **Index parity** — `BomRegistry` / `LocatorIndex` ≡ `GET /ldp/registry/…`
+       (`assert_registry_index_parity`)
+    2. **Projection complete** — required record fields, by-data / by-order,
+       stage LocatorIndex URIs (`assert_handoff_projection_complete`)
+    3. **Claims reachable** — record locators / `*_uri` resolve over HTTP
+       (`assert_registry_claims_reachable`)
 
-    1. projected record ↔ `/boms/…`
-    2. by-data list ↔ `/by-data/…`
-    3. by-order list ↔ `/by-order/…`
-    4. locator URIs ↔ `/by-content/…`
-
-    This is **not** an Invoice/envelope correctness check — only index
-    consistency. `allow_ambiguous=True` so re-runs with many BOMs per data
-    digest still pass as long as *this* BOM is listed. Envelope / lineage
-    asserts live in the named inspect cells below.
+    Not “all HTTP content ∈ registry.” Envelope / lineage asserts continue in
+    named inspect cells below. `allow_ambiguous=True` so re-runs with many BOMs
+    per data digest still pass as long as *this* BOM is listed.
     """)
     return
 
 
 @app.cell
 def registry_index_parity(
+    assert_handoff_projection_complete,
+    assert_registry_claims_reachable,
     assert_registry_index_parity,
     bom_id_0,
     bom_ldp_uri_0,
     hl_0,
+    http_get,
     http_get_json,
     locator_index,
     pprint,
     registry,
 ):
-    # Parity: disk BomRegistry/LocatorIndex ≡ live Node GET /ldp/registry/…
-    # (same facts two ways — not Invoice/envelope validation).
-    # allow_ambiguous: re-runs often leave many BOMs per data digest.
+    # 1) Index parity: disk BomRegistry/LocatorIndex ≡ GET /ldp/registry/…
     _parity = assert_registry_index_parity(
         registry=registry,
         locator_index=locator_index,
@@ -211,6 +241,19 @@ def registry_index_parity(
     )
     record_0 = _parity["record"]
     data_id_0 = _parity["data_id"]
+
+    # 2) Projection complete: required fields + reverse indexes + stage locators.
+    assert_handoff_projection_complete(
+        registry,
+        locator_index,
+        bom_id=bom_id_0,
+        require_stage_locators=True,
+    )
+
+    # 3) Claims reachable: record locators / *_uri resolve on the live Node.
+    assert_registry_claims_reachable(
+        record_0, http_get_json=http_get_json, http_get=http_get
+    )
 
     # Hand off data_id_0 (+ record_0) to CAT1 / named inspect cells.
     pprint(
@@ -247,8 +290,10 @@ def _(mo):
 
     Asserts use **`assert_control_plane_handoff_coherence`** (control-plane
     handoff invariants): response → registry → LDP BOM → Invoice → Order —
-    distinct from registry index parity above. Then **`flatten_uri_dict`**
-    builds `flat_order0` / `flat_invoice0` (assert and flatten stay separate).
+    distinct from registry index parity above. Then **content equivalence**
+    (`assert_*_content_equiv`: mesh.cat ≡ HTTP GET per allowlisted
+    subcomponent). Then **`flatten_uri_dict`** builds `flat_order0` /
+    `flat_invoice0` (assert and flatten stay separate).
     """)
     return
 
@@ -287,6 +332,56 @@ def cat0_cp_handoff(
         raw_invoice0,
         raw_order0,
     )
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Content equivalence (mesh ≡ HTTP)
+
+    Same helpers as `tests/test_content_equiv_*.py`: for each allowlisted
+    BOM / Invoice / Order subcomponent, `contentMesh.cat` ≡ HTTP GET of
+    `*_uri` (plus registry digest agreement when the record cites that
+    stem). Distinct from handoff coherence above and from flatten below.
+    """)
+    return
+
+
+@app.cell
+def cat0_content_equiv(
+    assert_bom_content_equiv,
+    assert_invoice_content_equiv,
+    assert_order_content_equiv,
+    bom0,
+    contentMesh,
+    http_get,
+    http_get_json,
+    raw_invoice0,
+    raw_order0,
+    record_0,
+):
+    assert_bom_content_equiv(
+        bom0,
+        content_mesh=contentMesh,
+        http_get_json=http_get_json,
+        http_get=http_get,
+        record=record_0,
+    )
+    assert_invoice_content_equiv(
+        raw_invoice0,
+        content_mesh=contentMesh,
+        http_get_json=http_get_json,
+        http_get=http_get,
+        record=record_0,
+    )
+    assert_order_content_equiv(
+        raw_order0,
+        content_mesh=contentMesh,
+        http_get_json=http_get_json,
+        http_get=http_get,
+        record=record_0,
+    )
+    return
 
 
 @app.cell
@@ -349,21 +444,16 @@ def _(mo):
 
 
 @app.cell
-def cat0_ordered_function(order0_function_uri, pprint, requests):
+def cat0_ordered_function(
+    assert_order_function_slots, order0_function_uri, pprint, requests
+):
     raw_function0 = requests.get(order0_function_uri, timeout=60).json()
+    assert_order_function_slots(raw_function0)
 
     infrafunction_source_uri = raw_function0["infrafunction_source_uri"]
     infrafunction_uri = raw_function0["infrafunction_uri"]
     process_source_uri = raw_function0["process_source_uri"]
     process_uri = raw_function0["process_uri"]
-    assert all(
-        [
-            infrafunction_source_uri,
-            infrafunction_uri,
-            process_source_uri,
-            process_uri,
-        ]
-    )
 
     flat_function0 = {
         "infrafunction_source": requests.get(infrafunction_source_uri, timeout=60).json(),
@@ -391,13 +481,15 @@ def _(mo):
 
 
 @app.cell
-def cat0_ordered_structure(order0_structure_uri, pprint, requests):
+def cat0_ordered_structure(
+    assert_order_structure_slots, order0_structure_uri, pprint, requests
+):
     raw_structure0 = requests.get(order0_structure_uri, timeout=60).json()
+    assert_order_structure_slots(raw_structure0)
 
     infrastructure_uri = raw_structure0["infrastructure_uri"]
     plant_uri = raw_structure0["plant_uri"]
     root_uri = raw_structure0["root_uri"]
-    assert infrastructure_uri and plant_uri and root_uri
 
     flat_structure0 = {
         "infrastructure": requests.get(infrastructure_uri, timeout=60).json(),
@@ -424,10 +516,12 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def cat0_ordered_invoice(order0_invoice_uri, pprint, requests):
+def cat0_ordered_invoice(
+    assert_input_invoice_slots, order0_invoice_uri, pprint, requests
+):
     raw_ordered_invoice0 = requests.get(order0_invoice_uri, timeout=60).json()
+    assert_input_invoice_slots(raw_ordered_invoice0)
     _ordered_invoice_data_uri = raw_ordered_invoice0["data_uri"]
-    assert _ordered_invoice_data_uri
     flat_ordered_invoice0 = {
         "data": requests.get(_ordered_invoice_data_uri, timeout=60).json()
     }
@@ -674,9 +768,12 @@ def _(mo):
 
 @app.cell
 def _(
+    assert_handoff_projection_complete,
+    assert_registry_claims_reachable,
     assert_registry_index_parity,
     cat_order_request_1,
     contentMesh,
+    http_get,
     http_get_json,
     locator_index,
     pprint,
@@ -688,7 +785,7 @@ def _(
     pprint(flat_cat_invoiced_response_1)
 
     bom_id_1 = cat_invoiced_response_1.get("content_id")
-    # Same Python ↔ HTTP registry index parity as CAT0 (anchored at CAT1 BOM).
+    # Same registry post-execute checks as CAT0 (parity → projection → reachability).
     _parity_1 = assert_registry_index_parity(
         registry=registry,
         locator_index=locator_index,
@@ -698,6 +795,15 @@ def _(
     )
     record_1 = _parity_1["record"]
     data_id_1 = _parity_1["data_id"]
+    assert_handoff_projection_complete(
+        registry,
+        locator_index,
+        bom_id=bom_id_1,
+        require_stage_locators=True,
+    )
+    assert_registry_claims_reachable(
+        record_1, http_get_json=http_get_json, http_get=http_get
+    )
 
     pprint(
         {
