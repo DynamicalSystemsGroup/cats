@@ -212,14 +212,34 @@ def assert_provenance_record(bom_response, order_request):
         f'{sorted(k for k in structure if k.endswith("_cid"))}'
     )
 
-    # --- Invoice: data + stage refs; Seed (#187) ---
+    # --- Invoice: data + data_stages nest; Seed (#187) ---
     data_id = ref_id(invoice, 'data')
-    ingress_id = ref_id(invoice, 'ingress_data')
-    integration_id = ref_id(invoice, 'integration_data')
+    data_stages = invoice.get('data_stages')
+    if isinstance(data_stages, dict):
+        ingress_id = ref_id(data_stages, 'ingressed_data')
+        integration_id = ref_id(data_stages, 'integrated_data')
+        egressed_id = ref_id(data_stages, 'egressed_data')
+    else:
+        # Pre-change flat Invoice siblings.
+        ingress_id = ref_id(invoice, 'ingress_data')
+        integration_id = ref_id(invoice, 'integration_data')
+        egressed_id = data_id
     seed_id = ref_id(invoice, 'seed')
     assert data_id, 'invoice.data should be set'
-    assert ingress_id, 'invoice.ingress_data should be set'
-    assert integration_id, 'invoice.integration_data should be set'
+    assert ref_id(invoice, 'data_stages') or (
+        ingress_id and integration_id
+    ), 'invoice.data_stages (or flat ingress/integration) should be set'
+    assert ingress_id, 'ingressed/ingress stage should be set'
+    assert integration_id, 'integrated/integration stage should be set'
+    if egressed_id and data_id:
+        from cats.network.cas.digest import from_ni, is_ni_or_digest
+
+        def _key(cid):
+            return from_ni(cid) if is_ni_or_digest(cid) else cid
+
+        assert _key(egressed_id) == _key(data_id), (
+            'data_stages.egressed_data must match invoice.data'
+        )
     assert seed_id, 'invoice.seed should be a real content id, not null'
     seed = invoice.get('seed')
     assert seed is not None, (

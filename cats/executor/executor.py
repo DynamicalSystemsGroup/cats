@@ -108,9 +108,21 @@ class Executor:
         # Invoice feedback (Seed deferred / #187): stage refs on Invoice until
         # Seed holds the Process replay dictionary.
         invoice = self.enhanced_bom['invoice']
+        # Egress equality for link*/registry (unchanged).
         set_ref(invoice, 'data', self.function.invoice_data_id)
-        set_ref(invoice, 'ingress_data', self.ingress_data_id)
-        set_ref(invoice, 'integration_data', self.integration_data_id)
+        # Nested stage URIs (egressed / integrated / ingressed); no flat
+        # ingress_data / integration_data siblings on new Invoices.
+        data_stages: dict = {}
+        set_ref(data_stages, 'egressed_data', self.function.invoice_data_id)
+        set_ref(data_stages, 'integrated_data', self.integration_data_id)
+        set_ref(data_stages, 'ingressed_data', self.ingress_data_id)
+        from cats.network.cas.invoice_stages import assert_egressed_matches_data
+
+        assert_egressed_matches_data(
+            invoice, data_stages, cats_home=cats_home
+        )
+        data_stages_id = mesh.put_json(data_stages)
+        set_ref(invoice, 'data_stages', data_stages_id)
         set_ref(invoice, 'structure_as_executed', structure_as_executed_id)
         log_id = mesh.put_json(self.enhanced_bom['log'])
         set_ref(self.enhanced_bom, 'log', log_id)

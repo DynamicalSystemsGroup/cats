@@ -315,6 +315,9 @@ class ContentMesh(OrderOps):
         seed = self._fetch_ref(invoice, 'seed')
         if seed is not None:
             invoice['seed'] = seed
+        data_stages = self._fetch_ref(invoice, 'data_stages')
+        if data_stages is not None:
+            invoice['data_stages'] = data_stages
         order = invoice['order']
         order['flat'] = {
             'function': self._fetch_ref(order, 'function'),
@@ -338,6 +341,7 @@ class ContentMesh(OrderOps):
         log = self._fetch_ref(bom, 'log')
         bom_response["flat_bom"] = {
             'invoice': invoice,
+            'data_stages': data_stages,
             'log': log,
             'structure_as_executed': structure_as_executed,
             'plant': plant,
