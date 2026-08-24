@@ -44,8 +44,8 @@ make node-down               # node-stop then ipfs shutdown (full local teardown
 
 **Why keep them separate**
 
-- **AQ ownership:** InfraStructure / the operator heal the content-store facet; the Node client soft-probes and does not own Kubo lifecycle.
-- **Ops flexibility:** Skip ensure for CAS-only Orders, or ensure when legacy CID read / T&D need Kubo. Use `node-up` for the common “bring the node online” path. Use `node-stop` when Kubo should keep serving CIDs; use `node-down` for full local teardown.
+- **AQ ownership:** InfraStructure / the operator heal optional host Kubo tooling; the Node client soft-probes and does not own Kubo lifecycle.
+- **Ops flexibility:** Skip ensure for CAS-only Orders (default). Use `node-up` when you also want Kubo tooling online. Use `node-stop` when Kubo should keep running; use `node-down` for full local teardown.
 
 Details: [`STORAGE.md`](./STORAGE.md#node-up-vs-content-store-ensure-and-node-start). Content-store phases and heal behavior: [`IPFS.md`](./IPFS.md).
 
@@ -53,9 +53,8 @@ Details: [`STORAGE.md`](./STORAGE.md#node-up-vs-content-store-ensure-and-node-st
 
 ### Ensure ContentStore (host Kubo)
 
-Optional for CAS-only Orders (§6r). Run **before** legacy CID read / T&D if the ContentStore
-HTTP API (`:5001` by default) is down. `node-start` soft-warns when Kubo is not ready; it does
-not fail.
+Optional operator tooling (§6r/§6s). Live Orders use Node CAS and do not require Kubo.
+`node-start` soft-warns when Kubo is not ready; it does not fail.
 
 ```bash
 make content-store-ensure
@@ -121,7 +120,8 @@ make node-stop
 # or: uv run python -m cats.node stop
 ```
 
-Stops the Flask Node process only. Host Kubo stays up on purpose (mesh CIDs / ContentMesh outlive Structure destroy and Node exit).
+Stops the Flask Node process only. Host Kubo stays up on purpose when you started it
+(optional operator tooling outlives Structure destroy and Node exit).
 
 ### Down (Flask + host Kubo)
 
@@ -130,7 +130,7 @@ make node-down
 # equivalent: make node-stop && ipfs shutdown
 ```
 
-Make-only convenience: runs `node-stop`, then `ipfs shutdown`. Does **not** live in `python -m cats.node stop` — the Node CLI remains a ContentStore client and must not shut down host Kubo. Prefer `node-stop` when you still want BOM / CID inspection or the next session to reuse Kubo; use `node-down` when you intend to tear down the local daemon too. `ipfs shutdown` is best-effort (ignored if the API is already down).
+Make-only convenience: runs `node-stop`, then `ipfs shutdown`. Does **not** live in `python -m cats.node stop` — the Node CLI remains a ContentStore client and must not shut down host Kubo. Prefer `node-stop` when Kubo should keep running for the next session; use `node-down` when you intend to tear down the local daemon too. `ipfs shutdown` is best-effort (ignored if the API is already down).
 
 ## Related docs
 
@@ -139,5 +139,5 @@ Make-only convenience: runs `node-stop`, then `ipfs shutdown`. Does **not** live
 - [`TEST.md`](./TEST.md) — integration tests that need a live Node
 - [`BomRegistry.md`](./BomRegistry.md) — Node-local BOM query index (`GET /ldp/registry/…`)
 - [`STORAGE.md`](./STORAGE.md) — content-store vs scratch ownership; why ensure ≠ start
-- [`IPFS.md`](./IPFS.md) — host Kubo facet, two-phase ensure, peering
+- [`IPFS.md`](./IPFS.md) — optional host Kubo facet, two-phase ensure (no Docker peers §6s)
 - [`DASHBOARDS.md`](./DASHBOARDS.md) — Ray / MinIO / IPFS WebUI once Structure is deployed

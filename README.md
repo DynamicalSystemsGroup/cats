@@ -47,20 +47,22 @@ make deps-uv-sync
   - See [ENV.md](./docs/ENV.md) for the full environment workflow, including the `ops` and `mac` extras.
 #### 1. Installation:
 `make deps-all` - Runs on macOS or Linux (see the [Makefile](./Makefile) and `make help`), or follow [DEPS.md](./docs/DEPS.md) to install each dependency manually.
-#### 2. [Storage](./docs/STORAGE.md) — content-store init (one-time):
-Before first `node-up`, initialize the host content-store if it does not already exist:
+#### 2. [Storage](./docs/STORAGE.md) — content-store (CAS + optional Kubo):
+Live Orders use Node **CAS-over-HTTP**. Host Kubo is **optional** operator tooling (§6s).
+If you still want Kubo locally:
 ```bash
-make content-store-init   # idempotent: creates the local content-store when missing
+make content-store-init   # idempotent: creates the local Kubo repo when missing
 ```
-Does **not** start the content-store service — that is `content-store-ensure` / `node-up`. After you finish using CAT Node, shut the content-store down (`make content-store-shutdown`, or `make node-down` to stop Flask and the content-store together). Details: [STORAGE.md](./docs/STORAGE.md).
+Does **not** start Kubo — that is `content-store-ensure` / `node-up`. Details: [STORAGE.md](./docs/STORAGE.md) / [IPFS.md](./docs/IPFS.md).
 #### 3. [Node Lifecycle](./docs/NodeLifeCycle.md) — start / status / stop:
 ```bash
-make node-up     # content-store-ensure && node-start
+make node-start  # soft-probes ContentStore; Kubo not required for CAS-only
+# or: make node-up     # content-store-ensure && node-start (brings optional Kubo up too)
 make node-status # flask=up|down + content_store=ready|not_ready
-make node-stop   # Flask only — host content-store left running
+make node-stop   # Flask only — leave Kubo running if you started it
 ```
 *Optional:* `make node-down` = `make node-stop` + `make content-store-shutdown`
-Full command reference, exit codes, and why ensure ≠ start: [NodeLifeCycle.md](./docs/NodeLifeCycle.md).
+Full command reference: [NodeLifeCycle.md](./docs/NodeLifeCycle.md).
 #### 4. [Demonstration](./docs/DEMO.md):
 CAT Node is shipped with *Techncal Use-Case CAT Workload Specifications ( Templates / "Recipies")* as *CAT **Orders*** for which proccess will be executed and **Invoiced**. This repository will feature a Scalable Scientific Computing application **Ordered** as a 2 CATs. This **Order** is specified to utilize [Ray](https://www.ray.io/) as an execution middleware framework **Plant (SaaS)** deployed on **[Kubernetes](https://kubernetes.io/)** for interoperable & parallelized distributed computing applications / Big Data processing with Scientific Computing enabled [ecosystem integrations](https://docs.ray.io/en/latest/ray-overview/ray-libraries.html) such as [Apache Spark](https://spark.apache.org/), and [PyTorch](https://pytorch.org/).
 #### 5. [Testing:](./docs/TEST.md) *CAT Node Integration & Unit Tests*

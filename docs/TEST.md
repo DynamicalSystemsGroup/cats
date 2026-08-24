@@ -92,7 +92,7 @@
   # InfraStructure transport_utils / TransportContext
   uv run pytest -s tests/test_infrastructure_transport_utils.py
 
-  # CatsIPFSClient Kubo RPC (smoke skips if :5001 down)
+  # Optional CatsIPFSClient Kubo RPC smoke (skips if :5001 down; not required for CAS)
   uv run pytest -s tests/test_ipfs_client.py
 
   # ContentMesh.linkOrder — combined Function/Structure lineage helper
@@ -106,12 +106,12 @@
   uv run pytest -s tests/test_bom_registry.py
 
   # CAS-over-HTTP — CasHttpStore, ni:/digest, manifests, locators, AddressStore
-  uv run pytest -s tests/test_cas_http.py
+  uv run pytest -s tests/test_cas_http.py tests/test_address_store_cas_only.py
 
   # Phase 2b / §6f — URI address + ni:/hl: proof, Order/Invoice LDP, hl: resolve/emit
   uv run pytest -s tests/test_phase2b_uri.py tests/test_hl_resolve.py
 
-  # ContentMesh Kubo RPC + CAT_NODE_* endpoints (no ipfs CLI)
+  # ContentMesh CAS + CAT_NODE_* endpoints (no ipfs CLI / legacy CID)
   uv run pytest -s tests/test_meshclient_rpc_surface.py
 
   # Named-bind JSON leaves vs pickle for Function Order slots

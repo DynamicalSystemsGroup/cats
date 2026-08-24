@@ -183,6 +183,6 @@ Treat remaining soft edges (`job_endpoint` shape) as cleanup with the first non-
 - [`BOM.md`](./BOM.md) — Order Function/Structure CIDs; named Process imports
 - [`BomRegistry.md`](./BomRegistry.md) — Node-local BOM index; `link*` without a caller-held `cat_response`
 - [`LineageOfProvenance.md`](./LineageOfProvenance.md) — `linkProcess` / `linkStructure` / `linkOrder` Order lineage; **2f** still needs second Plant adapters
-- [`IPFS.md`](./IPFS.md) — host Kubo content-store; transport peering
+- [`IPFS.md`](./IPFS.md) — optional host Kubo; CAS-only transport (§6s)
 - [`MinIO.md`](./MinIO.md) — dual MinIO (scratch + durable Entity Relationship) / JobHandle / `gc-er`
 - [`DESIGN.md`](./DESIGN.md) — AQ as content-addressed CIDs
