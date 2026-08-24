@@ -39,7 +39,7 @@ directly into the project's `.venv` and isn't part of `pyproject.toml`/`uv.lock`
 and not a package extra of `cats`. `uv run` (below) uses this `.venv` automatically — no manual activation
 needed.
 
-##### 3. Configure API keys *in the repo root* (`.env` is gitignored):
+##### 3. Configure API keys *in the repo root* (`.env` is gitignored; same file `cats` loads on import — see [`ENV.md`](../../docs/ENV.md)):
 
 ```bash
 OPENAI_API_KEY=sk-...
