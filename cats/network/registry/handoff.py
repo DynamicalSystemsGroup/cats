@@ -214,3 +214,55 @@ def assert_control_plane_handoff_coherence(
             http_get_json=http_get_json,
         )
     return out
+
+
+def _require_str_slots(obj: dict[str, Any], *keys: str, label: str) -> None:
+    missing = [
+        key
+        for key in keys
+        if not (isinstance(obj.get(key), str) and str(obj.get(key)).strip())
+    ]
+    if missing:
+        raise AssertionError(
+            f'{label} missing required URI slots {missing}: {obj!r}'
+        )
+
+
+def assert_order_function_slots(function: dict[str, Any]) -> None:
+    """Assert Order Function envelope has infrafunction/process (+ source) URIs."""
+    if not isinstance(function, dict):
+        raise AssertionError(
+            f'Function payload is not a JSON object: {type(function).__name__}'
+        )
+    _require_str_slots(
+        function,
+        'infrafunction_source_uri',
+        'infrafunction_uri',
+        'process_source_uri',
+        'process_uri',
+        label='Function',
+    )
+
+
+def assert_order_structure_slots(structure: dict[str, Any]) -> None:
+    """Assert Order Structure envelope has infrastructure/plant/root URIs."""
+    if not isinstance(structure, dict):
+        raise AssertionError(
+            f'Structure payload is not a JSON object: {type(structure).__name__}'
+        )
+    _require_str_slots(
+        structure,
+        'infrastructure_uri',
+        'plant_uri',
+        'root_uri',
+        label='Structure',
+    )
+
+
+def assert_input_invoice_slots(invoice: dict[str, Any]) -> None:
+    """Assert Order's input Invoice has ``data_uri``."""
+    if not isinstance(invoice, dict):
+        raise AssertionError(
+            f'Invoice payload is not a JSON object: {type(invoice).__name__}'
+        )
+    _require_str_slots(invoice, 'data_uri', label='input Invoice')

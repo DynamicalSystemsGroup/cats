@@ -8,6 +8,9 @@ import pytest
 
 from cats.network.registry import (
     assert_control_plane_handoff_coherence,
+    assert_input_invoice_slots,
+    assert_order_function_slots,
+    assert_order_structure_slots,
     make_content_fetch_ref,
     resolve_handoff_invoice_uri,
 )
@@ -148,3 +151,32 @@ def test_make_content_fetch_ref_mismatch_raises():
     )
     with pytest.raises(AssertionError, match='must match'):
         fetch('data', 'http://n/d')
+
+
+def test_assert_order_function_slots_ok_and_fail():
+    ok = {
+        'infrafunction_source_uri': 'http://n/ifs',
+        'infrafunction_uri': 'http://n/if',
+        'process_source_uri': 'http://n/ps',
+        'process_uri': 'http://n/p',
+    }
+    assert_order_function_slots(ok)
+    with pytest.raises(AssertionError, match='Function missing'):
+        assert_order_function_slots({'infrafunction_uri': 'http://n/if'})
+
+
+def test_assert_order_structure_slots_ok_and_fail():
+    ok = {
+        'infrastructure_uri': 'http://n/i',
+        'plant_uri': 'http://n/p',
+        'root_uri': 'http://n/r',
+    }
+    assert_order_structure_slots(ok)
+    with pytest.raises(AssertionError, match='Structure missing'):
+        assert_order_structure_slots({'plant_uri': 'http://n/p'})
+
+
+def test_assert_input_invoice_slots_ok_and_fail():
+    assert_input_invoice_slots({'data_uri': 'http://n/d'})
+    with pytest.raises(AssertionError, match='input Invoice missing'):
+        assert_input_invoice_slots({})
