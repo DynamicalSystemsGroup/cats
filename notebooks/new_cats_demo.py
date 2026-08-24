@@ -37,6 +37,10 @@ def _():
     from cats import CATS_HOME, CONTENT_MESH as contentMesh
     from cats import INPUT_STRUCTURE_HOME, INPUT_DATA_HOME
     from cats.network.cas import LocatorIndex, flatten_uri_dict
+    from cats.network.cas import (
+        assert_directory_manifest_equiv,
+        assert_stage_lineage_payload_equiv,
+    )
     from cats.network.node_http import _node_base_url
     from cats.network.registry import (
         BomRegistry,
@@ -76,6 +80,7 @@ def _():
         INPUT_STRUCTURE_HOME,
         assert_bom_content_equiv,
         assert_control_plane_handoff_coherence,
+        assert_directory_manifest_equiv,
         assert_handoff_projection_complete,
         assert_input_invoice_slots,
         assert_invoice_content_equiv,
@@ -84,6 +89,7 @@ def _():
         assert_order_structure_slots,
         assert_registry_claims_reachable,
         assert_registry_index_parity,
+        assert_stage_lineage_payload_equiv,
         contentMesh,
         flatten_uri_dict,
         http_get,
@@ -93,30 +99,6 @@ def _():
         registry,
         requests,
     )
-
-
-@app.cell
-def content_address_equivalence(requests):
-    def content_address_uri_equivalence(manafest_uri, dataset_uri):
-        return manafest_uri == dataset_uri
-
-    datasets = lambda xs: sorted(
-        e["entries"] for e in (xs if isinstance(xs, list) else [xs])
-    )
-
-    def content_address_named_entry_equivalence(manafest_uri, dataset_uri):
-        manafest = requests.get(manafest_uri).json()
-        dataset = requests.get(dataset_uri).json()
-        return datasets(manafest) == datasets(dataset)
-
-    def content_address_equivalence(manafest_uri, dataset_uri):
-        uri_equivalence = content_address_uri_equivalence(manafest_uri, dataset_uri)
-        named_entry_equivalence = content_address_named_entry_equivalence(
-            manafest_uri, dataset_uri
-        )
-        return uri_equivalence & named_entry_equivalence
-
-    return (content_address_equivalence,)
 
 
 @app.cell(hide_code=True)
@@ -542,6 +524,12 @@ def _(mo):
     `stageLineage`: ingress ← input; integration ← ingress; data ← integration;
     then `structure_as_executed` (not on the payload chain). `prov:used` is
     Order then Invoice.
+
+    Payload hops use **`assert_directory_manifest_equiv`** /
+    **`assert_stage_lineage_payload_equiv`** (same helpers as
+    `tests/test_manifest_equiv.py`): URI equal **or** directory-manifest
+    `entries` equal — distinct from mesh≡HTTP content_equiv and from
+    provenance DataFrame endpoint checks.
     """)
     return
 
@@ -581,7 +569,15 @@ def cat0_used_order(executor, requests):
 
 
 @app.cell
-def cat0_stage0_ingress(bom0, content_address_equivalence, requests):
+def cat0_stage_lineage_payload_equiv(assert_stage_lineage_payload_equiv, bom0, http_get_json):
+    # Shared helper (same as tests/test_manifest_equiv.py): ingress ≡ input;
+    # later hops — wasDerivedFrom ≡ prior stage (pointer coherence).
+    assert_stage_lineage_payload_equiv(bom0, http_get_json=http_get_json)
+    return
+
+
+@app.cell
+def cat0_stage0_ingress(assert_directory_manifest_equiv, bom0, http_get_json, requests):
     # stageLineage[0]: ingress_data ← input Invoice data
     ingress_stage = bom0["stageLineage"][0]
     ingress_uri = ingress_stage["@id"]
@@ -592,25 +588,19 @@ def cat0_stage0_ingress(bom0, content_address_equivalence, requests):
     input_data = requests.get(input_data_uri, timeout=60).json()
     assert ingress_data is not None and input_data is not None
 
-    ingress_input_equivalence = content_address_equivalence(
-        ingress_uri,
-        input_data_uri,
+    assert_directory_manifest_equiv(
+        ingress_uri, input_data_uri, http_get_json=http_get_json
     )
-    assert ingress_input_equivalence, (
-        "ingress_data must content-address-match input Invoice data"
-    )
-    print(
-        "ingress_data wasDerivedFrom input_data:",
-        ingress_input_equivalence,
-    )
+    print("ingress_data wasDerivedFrom input_data: ok")
     input_data
     return (ingress_uri,)
 
 
 @app.cell
 def cat0_stage1_integration(
+    assert_directory_manifest_equiv,
     bom0,
-    content_address_equivalence,
+    http_get_json,
     ingress_uri,
     requests,
 ):
@@ -626,25 +616,21 @@ def cat0_stage1_integration(
     ).json()
     assert integration_data is not None and _integration_derived_from_data is not None
 
-    integration_ingress_equivalence = content_address_equivalence(
+    assert_directory_manifest_equiv(
         _integration_derived_from_uri,
         ingress_uri,
+        http_get_json=http_get_json,
     )
-    assert integration_ingress_equivalence, (
-        "integration_data wasDerivedFrom must content-address-match ingress_data"
-    )
-    print(
-        "integration_data wasDerivedFrom ingress_data:",
-        integration_ingress_equivalence,
-    )
+    print("integration_data wasDerivedFrom ingress_data: ok")
     integration_data
     return (integration_uri,)
 
 
 @app.cell
 def cat0_stage2_egress(
+    assert_directory_manifest_equiv,
     bom0,
-    content_address_equivalence,
+    http_get_json,
     integration_uri,
     requests,
 ):
@@ -660,17 +646,12 @@ def cat0_stage2_egress(
     ).json()
     assert egressed_data is not None and _egressed_derived_from_data is not None
 
-    egressed_integration_equivalence = content_address_equivalence(
+    assert_directory_manifest_equiv(
         _egressed_derived_from_uri,
         integration_uri,
+        http_get_json=http_get_json,
     )
-    assert egressed_integration_equivalence, (
-        "egressed data wasDerivedFrom must content-address-match integration_data"
-    )
-    print(
-        "data wasDerivedFrom integration_data:",
-        egressed_integration_equivalence,
-    )
+    print("data wasDerivedFrom integration_data: ok")
     egressed_data
     return
 
