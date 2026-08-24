@@ -65,6 +65,20 @@ CAT_INPUT_PATH = f'{DATA_HOME}/testing/cat_input'
 CAT_OUTPUT_PATH = f'{DATA_HOME}/testing/cat_output'
 
 
+def _docker_up() -> bool:
+    from cats.executor.structure.infrastructure import docker_daemon_ready
+
+    return docker_daemon_ready()
+
+
+requires_docker = pytest.mark.skipif(
+    not _docker_up(),
+    reason=(
+        'Docker daemon not running (Structure MinIO/Plant; see docs/DEMO.md)'
+    ),
+)
+
+
 def files_to_pandasDF(output, format):
     files = glob.glob(os.path.join(output, format))
     dfs = list(pd.read_csv(f).assign(filename=f) for f in files)
@@ -414,6 +428,7 @@ def cat_runs():
     return SimpleNamespace(cat0=cat0, cat1=cat1)
 
 
+@requires_docker
 class TestProvenanceCATs:
     """Live Node provenance + data lineage (one CAT0 + one CAT1 submit)."""
 

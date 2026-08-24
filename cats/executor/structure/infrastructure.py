@@ -1,5 +1,7 @@
 import importlib.util
 import os
+import shutil
+import subprocess
 import sys
 
 from cats.executor.structure._tf import (
@@ -14,6 +16,33 @@ from cats.executor.structure._tf import (
     terraform_bin,
 )
 from cats.executor.structure.plant import Plant
+
+_DOCKER_REQUIRED = (
+    'Docker daemon is not running; Structure apply/destroy needs it for '
+    'MinIO scratch and Plant / KubeRay (start Docker Desktop, then retry). '
+    'See docs/DEMO.md.'
+)
+
+
+def docker_daemon_ready() -> bool:
+    """True when ``docker info`` can reach a running daemon."""
+    if shutil.which('docker') is None:
+        return False
+    try:
+        proc = subprocess.run(
+            ['docker', 'info'],
+            capture_output=True,
+            timeout=8,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return proc.returncode == 0
+
+
+def require_docker_daemon() -> None:
+    """Raise if Structure Terraform cannot ping Docker (MinIO / kind)."""
+    if not docker_daemon_ready():
+        raise RuntimeError(_DOCKER_REQUIRED)
 
 
 class InfraStructure:
@@ -161,6 +190,7 @@ class InfraStructure:
         print('Destroy Structure!')
         configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
         ensure_integration_cache_env(self.runtime)
+        require_docker_daemon()
         self._cleanup_stale_structure_state()
         self.runtime.executeCMD(
             f'{terraform_bin(self.runtime)} destroy --auto-approve',
@@ -203,6 +233,7 @@ class InfraStructure:
         print('Apply Structure!')
         configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
         ensure_integration_cache_env(self.runtime)
+        require_docker_daemon()
         # Host Kubo TF ensure + Docker peer assert retired (§6s). Soft-probe
         # ContentStore only; Process transport is CAS-only.
         self._cleanup_stale_structure_state()

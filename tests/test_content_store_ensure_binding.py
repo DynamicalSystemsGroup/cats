@@ -222,6 +222,10 @@ def test_apply_soft_probes_content_store_not_transport(tmp_path, monkeypatch):
         'cats.executor.structure.infrastructure.terraform_bin',
         lambda *_a, **_k: 'terraform',
     )
+    monkeypatch.setattr(
+        'cats.executor.structure.infrastructure.require_docker_daemon',
+        lambda: None,
+    )
 
     plant_utils = SimpleNamespace(
         cleanup_stale_plant_state=lambda *_a, **_k: None,
@@ -279,12 +283,42 @@ def test_destroy_runs_stale_structure_cleanup(tmp_path, monkeypatch):
         'cats.executor.structure.infrastructure.terraform_bin',
         lambda *_a, **_k: 'terraform',
     )
+    monkeypatch.setattr(
+        'cats.executor.structure.infrastructure.require_docker_daemon',
+        lambda: None,
+    )
 
     infra.destroy()
 
     assert cleanup_calls == ['cleanup']
     infra.runtime.executeCMD.assert_called()
     assert 'destroy' in infra.runtime.executeCMD.call_args.args[0]
+
+
+def test_apply_raises_when_docker_daemon_down(tmp_path, monkeypatch):
+    """apply fails closed with a clear error when Docker is not running."""
+    structure_home = tmp_path / 'order_structure'
+    utils_path = (
+        structure_home
+        / 'infrastructure'
+        / 'content_store_utils.py'
+    )
+    _write_fake_content_store_utils(utils_path, 'order-submitted', ready=True)
+    infra = _infra_with_structure_home(structure_home, tmp_path / 'cats_home')
+    monkeypatch.setattr(
+        'cats.executor.structure.infrastructure.configure_terraform_data_dir',
+        lambda *_a, **_k: None,
+    )
+    monkeypatch.setattr(
+        'cats.executor.structure.infrastructure.ensure_integration_cache_env',
+        lambda *_a, **_k: None,
+    )
+    monkeypatch.setattr(
+        'cats.executor.structure.infrastructure.docker_daemon_ready',
+        lambda: False,
+    )
+    with pytest.raises(RuntimeError, match='Docker daemon is not running'):
+        infra.apply()
 
 
 def test_meshclient_init_does_not_call_bootstrap_ensure(tmp_path, monkeypatch):
