@@ -6,7 +6,8 @@ peers, no legacy CID remint).
 
 Process [Composed Function] transport callables are clients of Function-owned
 ``TransportPort`` (migrate / stage_for_plant only). The Executor narrows this
-``TransportContext`` with ``as_transport_port`` before invoking those callables.
+``TransportContext`` with ``cats.executor.function.as_transport_port`` before
+invoking those callables.
 
 **CAS ``ni:`` / hex / HTTP:** migrate and stage_for_plant materialize via Node
 ``CasHttpStore`` / AddressStore. Legacy CIDs fail closed (§6s).

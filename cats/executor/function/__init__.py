@@ -1,6 +1,7 @@
 """Function half of the Architectural Quantum (FaaS + Process/InfraFunction)."""
 from cats.executor.function.infrafunction import InfraFunction
 from cats.executor.function.processor import Processor
+from cats.executor.function.transport_port import as_transport_port
 
 
 class Function:
@@ -27,4 +28,4 @@ class Function:
         return self.ingress_data_id, self.integration_data_id, self.egress_data_id
 
 
-__all__ = ['Function', 'InfraFunction', 'Processor']
+__all__ = ['Function', 'InfraFunction', 'Processor', 'as_transport_port']
