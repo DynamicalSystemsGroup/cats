@@ -72,8 +72,10 @@ CAT Node is shipped with *Techncal Use-Case CAT Workload Specifications ( Templa
   * Constituent Commands / Utilities: 
     * `code2flow` used to generate *Functional Component Activity Diagram*: 
       * `uv run python utils/code2flow/diagram_c2f.py`
+        * Output: [`images/code2flow/cats_code2flow.png`](images/code2flow/cats_code2flow.png)
     * `pyreverse` used to generates *Class & Dependency Diagrams*: 
       * `uv run pyreverse -o png -p CATs -d images/pyreverse cats`
+        * Output: [`images/pyreverse/classes_CATs.png`](images/pyreverse/classes_CATs.png) (classes), [`images/pyreverse/packages_CATs.png`](images/pyreverse/packages_CATs.png) (packages)
 
 ### [Contribute!](docs/CONTRIBUTING.md)
 
