@@ -45,7 +45,11 @@ make deps-uv-sync
 ```
   - See [DEPS — uv](./docs/DEPS.md#uv) for the manual steps behind `make deps-uv-sync`.
   - See [ENV.md](./docs/ENV.md) for the full environment workflow, including the `ops` and `mac` extras.
-#### 1. Installation:
+c. Create a local `.env` from the template **only if missing** (never overwrite an existing `.env`):
+```bash
+test -f .env || cp .env.example .env
+```
+  - Operator keys (`CAT_NODE_HOST` / `CAT_NODE_PORT`, optional Kubo / Solid, …) are documented in [ENV.md](./docs/ENV.md). `.env` is gitignored.#### 1. Installation:
 `make deps-all` - Runs on macOS or Linux (see the [Makefile](./Makefile) and `make help`), or follow [DEPS.md](./docs/DEPS.md) to install each dependency manually.
 #### 2. [Storage](./docs/STORAGE.md) — content-store (CAS + optional Kubo):
 Live Orders use Node **CAS-over-HTTP**. Host Kubo is **optional** operator tooling (§6s).
