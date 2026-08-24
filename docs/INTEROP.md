@@ -48,7 +48,7 @@ These seams are how interoperability is supposed to work without rewriting Funct
 
 | Port / API | Owner (Function) | Adapter (Structure) | Demo implementation |
 |------------|------------------|---------------------|---------------------|
-| **TransportPort** | Process ingress / egress / integration_cache (`n=1`); kwargs `input_dir_id` | `TransportContext` | **CAS** materialize/`put_tree` for `ni:` / HTTP URI only (§6s — legacy CID fail closed; no Docker peers) |
+| **TransportPort** | Process ingress / egress / integration_cache (`n=1`); kwargs `input_dir_id`. Protocol is Function-owned; Executor applies `as_transport_port` | `TransportContext` | **CAS** materialize/`put_tree` for `ni:` / HTTP URI only (§6s — legacy CID fail closed; no Docker peers) |
 | **IoPort** | Process ingress / egress when `num_partitions > 1`; kwargs `input_dir_id` | `RayIoPort` (`plant/ray_io_utils.py`) | Opaque `part-NNNNN` file/dir layout via ContentMesh / AddressStore (CAS `put_dir` → `ni:`; §6p — no Kubo CAR mint); optional Plant job (`CATS_IO_VIA_JOB`) with `io_args`/`io_result` keys `input_id` / `layout_id` |
 | **ComputePort** | Process `process_*` hotF | `RayComputePort` (job working_dir) | Ray Data `map_batches`; `num_partitions` aligns blocks to `part-*` layout |
 | **PlantPort** | InfraFunction actuator | `RayPlantPort` | Ray Job Submission |
@@ -68,13 +68,13 @@ Process public surface is locked by `process.__all__` and
 |-----------|--------------|--------|------------|
 | **Factory** | Assembles Executor from Order CIDs; must not embed Plant/Ray | Demo-proved (generic compose) | Keep Factory free of adapter imports; regression: Order with alt `structure_cid` still composes |
 | **Architectural Quantum** | Function CID + Structure CID pairing | Contract-complete; one Structure proven | Same `function_cid` + second `structure_cid` (see **2f**) |
-| **Executor** | Wires ports (`as_transport_port`, `plant_port()`, `obj_store_context`) | Demo-proved | Assert Executor only passes ports/handles — never `JobSubmissionClient` / container names |
+| **Executor** | Wires ports (`as_transport_port`, `plant_port()`, `obj_store_context`). `as_transport_port` lives in `cats.executor.function` (CFL 4A); must not import the Order `data` package | Demo-proved | Assert Executor only passes ports/handles — never `JobSubmissionClient` / container names; grep-guard `from data.` / `import data` in `cats/` |
 
 ### Function [FaaS]
 
 | Sub-component | Contract | Status | Prove plan |
 |---------------|----------|--------|------------|
-| **Process [Composed Function]** | `TransportPort` + `IoPort` + `ComputePort`; no Ray; public `__all__` | Contract + demo (Ray adapters behind IoPort / ComputePort) | Unchanged Process modules against second Plant adapters (**2f**); keep `TYPE_CHECKING`-only `data.*` imports |
+| **Process [Composed Function]** | `TransportPort` Protocol (Function-owned, `data/input/function/process/transport_port.py`) + `IoPort` + `ComputePort`; no Ray; public `__all__`; no `as_transport_port` | Contract + demo (Ray adapters behind IoPort / ComputePort) | Unchanged Process modules against second Plant adapters (**2f**); keep `TYPE_CHECKING`-only `data.*` imports |
 | **InfraFunction [Actuator]** | `PlantPort` + `JobHandle`; no Job Submission client | Contract + demo (RayPlantPort) | Unchanged `infrafunction_subproc` against second PlantPort + scratch landing (**2f**) |
 
 ### Structure [PaaS]
@@ -117,7 +117,10 @@ adapter modules).
 7. **Executor / Factory adapter-blind CI:** Function modules are grep-guarded against Ray /
    Job Submission; extend CI so `cats/factory`, `cats/executor`, and `cats/runtime` never import
    `JobSubmissionClient` / `import ray` / hard-coded `structure-ipfs_*`. Executor may only pass
-   ports/handles (`plant_port()`, `obj_store_context()`, `as_transport_port(...)`).
+   ports/handles (`plant_port()`, `obj_store_context()`,
+   `cats.executor.function.as_transport_port(...)`). `cats/` must not `import data`
+   (Order Function/Structure sources); do not load `as_transport_port` from
+   `DATA_HOME` / `INPUT_HOME`.
 
 **Non-goals for 2f**
 

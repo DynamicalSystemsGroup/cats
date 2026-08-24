@@ -41,8 +41,9 @@ the wrapper is Make-only; `python -m cats.node start` soft-probes and does not h
 | `make node-up` | Convenience: ensure, then start |
 
 `TransportContext` owns CAS `migrate` / `stage_for_plant` only (§6s — no Docker peers).
-Process transport callables depend on Function-owned **`TransportPort`**; the Executor passes
-`as_transport_port(transport_context())`.
+Process transport callables depend on Function-owned **`TransportPort`**; the Executor
+narrows Structure `TransportContext` with **`cats.executor.function.as_transport_port`**
+(CFL 4A — Node wiring, not the Function CID tree).
 
 **CAS-only content ids:** `migrate` and `stage_for_plant` accept `ni:` / hex / HTTP only.
 Legacy CIDs fail closed (§6s).

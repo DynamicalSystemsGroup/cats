@@ -35,6 +35,17 @@
   [`tests/test_cas_http.py`](../tests/test_cas_http.py) /
   [`tests/test_meshclient_rpc_surface.py`](../tests/test_meshclient_rpc_surface.py) /
   [`tests/test_function_source_id.py`](../tests/test_function_source_id.py).
+  Registry claims / HTTP coherence (unit; live consumer
+  [`notebooks/new_cats_demo.py`](../notebooks/new_cats_demo.py)):
+  index parity [`tests/test_registry_parity.py`](../tests/test_registry_parity.py);
+  claims → HTTP reachability [`tests/test_registry_reachability.py`](../tests/test_registry_reachability.py);
+  post-execute projection [`tests/test_handoff_projection.py`](../tests/test_handoff_projection.py);
+  handoff + Order slot helpers [`tests/test_handoff_coherence.py`](../tests/test_handoff_coherence.py);
+  envelope content equivalence (mesh ≡ HTTP per subcomponent)
+  [`tests/test_content_equiv_bom.py`](../tests/test_content_equiv_bom.py) /
+  [`tests/test_content_equiv_invoice.py`](../tests/test_content_equiv_invoice.py) /
+  [`tests/test_content_equiv_order.py`](../tests/test_content_equiv_order.py).
+  These do **not** assert that all HTTP content lives in the registry.
   For mesh-reachable LDP hints in `hl:`, set `CAT_NODE_HOST` to an address peers can open
   (loopback only warns).
 
@@ -48,7 +59,10 @@
   uv sync --extra ops --group dev
   ```
     - `uv run` (below) uses this `.venv` automatically — no manual activation needed.
-  b. **Start CAT Node** — follow [`NodeLifeCycle.md`](./NodeLifeCycle.md).
+  b. **Start Docker daemon** — needed for Structure MinIO scratch + Plant / KubeRay
+     (not Docker Kubo T&D peers, retired §6s). See [`DEMO.md`](./DEMO.md) step 0.
+     `tests/test_provenance.py` skips if the daemon is down.
+  c. **Start CAT Node** — follow [`NodeLifeCycle.md`](./NodeLifeCycle.md).
   ```bash
   make content-store-ensure   # optional operator tooling
   make node-start
@@ -132,6 +146,6 @@
   # Structure root_id staging + getEnhancedBom materialize (+ §6i marker)
   uv run pytest -s tests/test_structure_root_id.py
 
-  # TransportPort Protocol + as_transport_port facade
+  # TransportPort Protocol (Function) + Executor as_transport_port facade
   uv run pytest -s tests/test_transport_port.py
   ```

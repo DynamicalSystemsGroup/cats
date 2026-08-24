@@ -37,10 +37,22 @@ Execute CATs on a single-node Mesh via Marimo — the **REPLaC (REPL as Code) Wo
 
 **What you should see after CAT0 `catSubmit`:** HTTP envelope with `content_id`, `bom_ldp_uri`, optional `hl` / `bom_solid_uri`; signed `bom` carrying `invoice_uri` / `log_uri` / `node_did` + Data Integrity proof; `flatten_bom` expands those URIs into Invoice / Order / stage refs (`data_uri`, `function_uri`, `structure_uri`, …). CAT1 in the notebook uses `linkProcess` (Function lineage) — not a second independent `create_order_request`.
 
+Marimo’s working directory is `notebooks/`. `from cats import …` does not import
+Order Function sources (`cats/` must not `import data`). The registry-first demo’s
+`cat0_create_order` cell inserts `CATS_HOME` on `sys.path` before named Process
+imports. For [`cats_demo.py`](../notebooks/cats_demo.py) (or any cell that imports
+`data` without that insert), run with the repo on `PYTHONPATH`:
+
 ```bash
-uv run marimo edit notebooks/cats_demo.py
+PYTHONPATH=. uv run marimo edit notebooks/cats_demo.py
 # registry-first lineage (linkProcess via content_id= / bom_ldp_uri=):
 uv run marimo edit notebooks/new_cats_demo.py
 ```
+
+After CAT0 `catSubmit`, [`new_cats_demo.py`](../notebooks/new_cats_demo.py) runs the same
+library helpers as the unit suites: registry **index parity**, **handoff projection**
+completeness, **claims reachability**, then **control-plane handoff coherence**,
+then **content equivalence** (`assert_*_content_equiv` before flatten) — not
+“all HTTP content ∈ registry.”
 
 Cells re-run reactively as dependencies change; work through the notebook top to bottom. See [`BomRegistry.md`](BomRegistry.md) for the Python registry guide.
