@@ -161,7 +161,7 @@ def test_infrastructure_content_store_ensure_loads_order_tree(tmp_path):
 
 
 def test_content_store_assert_passes_when_ready(tmp_path):
-    """content_store_assert succeeds when Order-tree ContentStore reports ready."""
+    """content_store_assert soft-succeeds when Order-tree ContentStore is ready."""
     structure_home = tmp_path / 'order_structure'
     utils_path = (
         structure_home
@@ -174,8 +174,8 @@ def test_content_store_assert_passes_when_ready(tmp_path):
     infra.content_store_assert()
 
 
-def test_content_store_assert_raises_when_not_ready(tmp_path):
-    """content_store_assert raises when Order-tree ContentStore stays not ready."""
+def test_content_store_assert_soft_when_not_ready(tmp_path, capsys):
+    """content_store_assert warns but does not raise when ContentStore is down (§6s)."""
     structure_home = tmp_path / 'order_structure'
     utils_path = (
         structure_home
@@ -185,50 +185,15 @@ def test_content_store_assert_raises_when_not_ready(tmp_path):
     )
     _write_fake_content_store_utils(utils_path, 'order-submitted', ready=False)
     infra = _infra_with_structure_home(structure_home, tmp_path / 'cats_home')
-    with pytest.raises(RuntimeError, match='ContentStore not ready'):
-        infra.content_store_assert()
-    # Do not re-exec the module (that resets class state); use the loaded copy.
-    mod = sys.modules['infrastructure_content_store_utils_order']
-    assert mod.ContentStore.ensured
-
-
-def test_content_store_assert_heals_once_when_ensure_recovers(tmp_path):
-    """content_store_assert succeeds if one ensure brings the API back."""
-    structure_home = tmp_path / 'order_structure'
-    utils_path = (
-        structure_home
-        / 'infrastructure'
-        / 'content_store_utils.py'
-    )
-    utils_path.parent.mkdir(parents=True, exist_ok=True)
-    utils_path.write_text(
-        textwrap.dedent(
-            """\
-            class ContentStore:
-                ensured = []
-                _ready = False
-
-                @classmethod
-                def ensure(cls, cwd=None):
-                    cls.ensured.append({'cwd': cwd})
-                    cls._ready = True
-
-                @classmethod
-                def is_ready(cls):
-                    return cls._ready
-            """
-        ),
-        encoding='utf-8',
-    )
-    infra = _infra_with_structure_home(structure_home, tmp_path / 'cats_home')
     infra.content_store_assert()
+    captured = capsys.readouterr().out
+    assert 'WARNING' in captured
     mod = sys.modules['infrastructure_content_store_utils_order']
-    assert mod.ContentStore.ensured
-    assert mod.ContentStore.is_ready()
+    assert mod.ContentStore.ensured == []
 
 
-def test_apply_does_not_call_content_store_ensure(tmp_path, monkeypatch):
-    """apply asserts readiness only; it must not call content_store_ensure."""
+def test_apply_soft_probes_content_store_not_transport(tmp_path, monkeypatch):
+    """apply soft-probes ContentStore; no transport_assert / ensure (§6s)."""
     structure_home = tmp_path / 'order_structure'
     utils_path = (
         structure_home
@@ -254,12 +219,12 @@ def test_apply_does_not_call_content_store_ensure(tmp_path, monkeypatch):
         lambda *_a, **_k: None,
     )
     monkeypatch.setattr(
-        'cats.executor.structure.infrastructure.cleanup_stale_docker_compose_ipfs_transport_state',
-        lambda *_a, **_k: None,
-    )
-    monkeypatch.setattr(
         'cats.executor.structure.infrastructure.terraform_bin',
         lambda *_a, **_k: 'terraform',
+    )
+    monkeypatch.setattr(
+        'cats.executor.structure.infrastructure.require_docker_daemon',
+        lambda: None,
     )
 
     plant_utils = SimpleNamespace(
@@ -274,34 +239,18 @@ def test_apply_does_not_call_content_store_ensure(tmp_path, monkeypatch):
     monkeypatch.setattr(infra, '_load_obj_store_module', lambda: obj_mod)
 
     content_assert_calls = []
-    transport_assert_calls = []
-    ensure_peered_calls = []
 
     monkeypatch.setattr(
         infra,
         'content_store_assert',
         lambda: content_assert_calls.append('assert'),
     )
-    monkeypatch.setattr(
-        infra,
-        'transport_assert',
-        lambda: transport_assert_calls.append('assert'),
-    )
-    monkeypatch.setattr(
-        infra,
-        'transport_context',
-        lambda: SimpleNamespace(
-            ensure_peered=lambda: ensure_peered_calls.append('peer'),
-            assert_ready=lambda: None,
-        ),
-    )
 
     infra.apply()
 
     assert ensure_calls == []
     assert content_assert_calls == ['assert']
-    assert transport_assert_calls == ['assert']
-    assert ensure_peered_calls == []
+    assert not hasattr(InfraStructure, 'transport_assert')
     infra.runtime.executeCMD.assert_called()
 
 
@@ -334,12 +283,42 @@ def test_destroy_runs_stale_structure_cleanup(tmp_path, monkeypatch):
         'cats.executor.structure.infrastructure.terraform_bin',
         lambda *_a, **_k: 'terraform',
     )
+    monkeypatch.setattr(
+        'cats.executor.structure.infrastructure.require_docker_daemon',
+        lambda: None,
+    )
 
     infra.destroy()
 
     assert cleanup_calls == ['cleanup']
     infra.runtime.executeCMD.assert_called()
     assert 'destroy' in infra.runtime.executeCMD.call_args.args[0]
+
+
+def test_apply_raises_when_docker_daemon_down(tmp_path, monkeypatch):
+    """apply fails closed with a clear error when Docker is not running."""
+    structure_home = tmp_path / 'order_structure'
+    utils_path = (
+        structure_home
+        / 'infrastructure'
+        / 'content_store_utils.py'
+    )
+    _write_fake_content_store_utils(utils_path, 'order-submitted', ready=True)
+    infra = _infra_with_structure_home(structure_home, tmp_path / 'cats_home')
+    monkeypatch.setattr(
+        'cats.executor.structure.infrastructure.configure_terraform_data_dir',
+        lambda *_a, **_k: None,
+    )
+    monkeypatch.setattr(
+        'cats.executor.structure.infrastructure.ensure_integration_cache_env',
+        lambda *_a, **_k: None,
+    )
+    monkeypatch.setattr(
+        'cats.executor.structure.infrastructure.docker_daemon_ready',
+        lambda: False,
+    )
+    with pytest.raises(RuntimeError, match='Docker daemon is not running'):
+        infra.apply()
 
 
 def test_meshclient_init_does_not_call_bootstrap_ensure(tmp_path, monkeypatch):
@@ -383,6 +362,41 @@ def test_meshclient_put_dir_triggers_bootstrap_readiness_once(tmp_path, monkeypa
 
     client.put_dir(str(payload))
     assert calls == ['ready_check', 'ready_check']
+
+
+def test_meshclient_put_dir_requires_cats_home(tmp_path, monkeypatch):
+    """put_dir without CATS_HOME fails closed (no Kubo add fallback; §6r)."""
+    monkeypatch.setattr(
+        ContentMesh,
+        'ensure_bootstrap_content_store',
+        lambda self: None,
+    )
+    fake_ipfs = MagicMock()
+    client = ContentMesh(ipfsClient=fake_ipfs, CATS_HOME=None)
+    payload = tmp_path / 'payload'
+    payload.mkdir()
+    (payload / 'f.txt').write_text('x', encoding='utf-8')
+
+    with pytest.raises(RuntimeError, match='CATS_HOME is required'):
+        client.put_dir(str(payload))
+    fake_ipfs.add.assert_not_called()
+
+
+def test_meshclient_put_file_requires_cats_home(tmp_path, monkeypatch):
+    """put_file without CATS_HOME fails closed (no Kubo add fallback; §6r)."""
+    monkeypatch.setattr(
+        ContentMesh,
+        'ensure_bootstrap_content_store',
+        lambda self: None,
+    )
+    fake_ipfs = MagicMock()
+    client = ContentMesh(ipfsClient=fake_ipfs, CATS_HOME=None)
+    payload = tmp_path / 'f.txt'
+    payload.write_text('x', encoding='utf-8')
+
+    with pytest.raises(RuntimeError, match='CATS_HOME is required'):
+        client.put_file(str(payload))
+    fake_ipfs.add.assert_not_called()
 
 
 def test_meshclient_bootstrap_probes_is_ready_not_ensure(tmp_path):

@@ -51,7 +51,7 @@ except TypeError:
     ds_out = subproc('input', compute)
 
 if num_partitions > 1:
-    # Stable part-* names so egress can CAR-wrap 1:1 (no shuffle rename).
+    # Stable part-* names so egress can put_dir 1:1 (no shuffle rename).
     try:
         shards = ds_out.split(num_partitions, equal=True)
     except TypeError:

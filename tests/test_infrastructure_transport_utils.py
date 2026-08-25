@@ -1,7 +1,10 @@
 """Unit tests for InfraStructure directory-model transport_utils / TransportContext."""
 import importlib.util
+import os
 import sys
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TRANSPORT_UTILS = (
@@ -11,7 +14,6 @@ TRANSPORT_UTILS = (
     / 'structure'
     / 'infrastructure'
     / 'transport_utils.py'
-
 )
 PROCESS_PY = (
     REPO_ROOT / 'data' / 'input' / 'function' / 'process' / 'callables.py'
@@ -32,13 +34,6 @@ def _load_transport_utils():
 tu = _load_transport_utils()
 
 
-class _FakeCompleted:
-    def __init__(self, returncode=0, stdout='', stderr=''):
-        self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
-
-
 class _FakeTransport:
     def migrate(self, input_dir_id):
         return (f'cid-for-{input_dir_id}', 'data_1')
@@ -47,77 +42,26 @@ class _FakeTransport:
         return f'{cwd}/staged/{input_dir_id}'
 
 
-def test_assert_ready_fails_when_containers_missing(monkeypatch):
-    """assert_ready raises when transport containers are not running."""
-    monkeypatch.setattr(tu, '_container_running', lambda *_: False)
-    ctx = tu.TransportContext.default()
-    try:
-        ctx.assert_ready()
-        assert False, 'expected RuntimeError'
-    except RuntimeError as exc:
-        assert 'not ready' in str(exc)
-
-
-def test_assert_ready_ok_when_both_running(monkeypatch):
-    """assert_ready succeeds when both transport containers report running."""
-    monkeypatch.setattr(tu, '_container_running', lambda *_: True)
-    tu.TransportContext.default().assert_ready()
-
-
-def test_ensure_peered_noops_when_migration_missing(monkeypatch):
-    """ensure_peered does not swarm-connect when migration container is down."""
-    calls = []
-    monkeypatch.setattr(tu, '_container_running', lambda name: False)
-    monkeypatch.setattr(
-        tu, '_swarm_connect', lambda *a, **k: calls.append(a)
-    )
-    tu.TransportContext.default().ensure_peered()
-    assert calls == []
-
-
-def test_ensure_peered_connects_peers(monkeypatch):
-    """ensure_peered swarm-connects host and integration peers when ready."""
-    connects = []
-
-    def _running(name):
-        return True
-
-    monkeypatch.setattr(tu, '_container_running', _running)
-    monkeypatch.setattr(tu, '_host_peer_id', lambda: 'hostpeer')
-    monkeypatch.setattr(tu, '_container_ip', lambda c: '10.0.0.2')
-    monkeypatch.setattr(tu, '_container_peer_id', lambda c: 'peerid')
-    monkeypatch.setattr(
-        tu, '_swarm_connect', lambda c, m: connects.append((c, m))
-    )
-    monkeypatch.setattr(
-        tu, '_run', lambda *a, **k: _FakeCompleted(0)
-    )
-
-    tu.TransportContext.default().ensure_peered()
-    assert any('host.docker.internal' in m for _, m in connects)
-    assert any(tu.INTEGRATION_CONTAINER == c for c, _ in connects)
-
-
-def test_migrate_parses_cid(monkeypatch, tmp_path):
-    """migrate parses the added CID and data name from ipfs add stdout."""
-    monkeypatch.setattr(tu, '_container_running', lambda *_: True)
-    monkeypatch.setattr(tu.time, 'time', lambda: 1700000000)
-    monkeypatch.setattr(
-        tu,
-        '_run',
-        lambda cmd, **k: _FakeCompleted(
-            0, stdout='added QmTestCID data_1700000000\n'
-        ),
-    )
-
+def test_migrate_legacy_cid_fail_closed(tmp_path):
+    """Legacy CID migrate fails closed (§6s); no remint path."""
     ctx = tu.TransportContext.default(structure_home=str(tmp_path))
-    cid, name = ctx.migrate('QmInput')
-    assert cid == 'QmTestCID'
-    assert name == 'data_1700000000'
+    with pytest.raises(RuntimeError, match='unsupported|§6s'):
+        ctx.migrate('QmInputLegacy')
+
+
+def test_stage_for_plant_legacy_cid_fail_closed(tmp_path):
+    """Legacy CID stage_for_plant fails closed (§6s)."""
+    data_cache = tmp_path / 'outputs'
+    data_cache.mkdir()
+    ctx = tu.TransportContext.default(structure_home=str(tmp_path))
+    with pytest.raises(RuntimeError, match='unsupported|§6s'):
+        ctx.stage_for_plant(
+            'QmIn', cwd=str(tmp_path), data_cache=str(data_cache)
+        )
 
 
 def test_migrate_cas_skips_docker(monkeypatch, tmp_path):
-    """migrate on ni: materializes via CAS without Docker assert_ready."""
+    """migrate on ni: materializes via CAS without Docker peers."""
     cats_home = tmp_path / 'cats_home'
     cats_home.mkdir()
     monkeypatch.setenv('CATS_HOME', str(cats_home))
@@ -131,40 +75,15 @@ def test_migrate_cas_skips_docker(monkeypatch, tmp_path):
     store = CasHttpStore(str(cats_home))
     content_id = put_tree(store, str(src))
 
-    runs = []
-    monkeypatch.setattr(
-        tu, '_run', lambda *a, **k: runs.append(a) or _FakeCompleted(1)
-    )
-    monkeypatch.setattr(tu, '_container_running', lambda *_: False)
-
     ctx = tu.TransportContext.default(structure_home=str(tmp_path / 'structure'))
     (tmp_path / 'structure').mkdir()
     out_id, name = ctx.migrate(content_id)
     assert out_id.startswith('ni:///sha-256;')
     assert name == 'data_99'
-    assert runs == []
-
-
-def test_stage_for_plant_returns_host_path(monkeypatch, tmp_path):
-    """stage_for_plant returns the host-side staged data cache path."""
-    monkeypatch.setattr(tu, '_container_running', lambda *_: True)
-    monkeypatch.setattr(tu.time, 'time', lambda: 42)
-    data_cache = tmp_path / 'outputs'
-    staged = data_cache / 'staged_42'
-    staged.mkdir(parents=True)
-    monkeypatch.setattr(
-        tu, '_run', lambda *a, **k: _FakeCompleted(0)
-    )
-
-    ctx = tu.TransportContext.default()
-    path = ctx.stage_for_plant(
-        'QmIn', cwd=str(tmp_path), data_cache=str(data_cache)
-    )
-    assert path == str(staged)
 
 
 def test_stage_for_plant_cas_materializes_host(monkeypatch, tmp_path):
-    """stage_for_plant on ni: writes the tree under data_cache without Docker."""
+    """stage_for_plant on ni: writes the tree under data_cache."""
     cats_home = tmp_path / 'cats_home'
     cats_home.mkdir()
     monkeypatch.setenv('CATS_HOME', str(cats_home))
@@ -179,7 +98,6 @@ def test_stage_for_plant_cas_materializes_host(monkeypatch, tmp_path):
 
     data_cache = tmp_path / 'outputs'
     data_cache.mkdir()
-    monkeypatch.setattr(tu, '_container_running', lambda *_: False)
 
     ctx = tu.TransportContext.default(structure_home=str(tmp_path / 'structure'))
     (tmp_path / 'structure').mkdir()
@@ -190,33 +108,15 @@ def test_stage_for_plant_cas_materializes_host(monkeypatch, tmp_path):
     assert (Path(path) / 'x.csv').read_text(encoding='utf-8') == 'b\n'
 
 
-def test_cli_status_ready(monkeypatch):
-    """CLI status exits 0 when TransportContext.assert_ready succeeds."""
-    monkeypatch.setattr(
-        tu.TransportContext, 'assert_ready', lambda self: None
-    )
+def test_cli_status_ready():
+    """CLI status exits 0 (CAS transport needs no peer containers)."""
     assert tu._main(['status']) == 0
 
 
-def test_cli_status_not_ready(monkeypatch):
-    """CLI status exits 1 when TransportContext.assert_ready raises."""
-    def _raise(self):
-        raise RuntimeError('missing')
-
-    monkeypatch.setattr(tu.TransportContext, 'assert_ready', _raise)
-    assert tu._main(['status']) == 1
-
-
-def test_cli_ensure_peered(monkeypatch):
-    """CLI ensure-peered delegates to TransportContext.ensure_peered."""
-    calls = []
-    monkeypatch.setattr(
-        tu.TransportContext,
-        'ensure_peered',
-        lambda self: calls.append(True),
-    )
-    assert tu._main(['ensure-peered']) == 0
-    assert calls == [True]
+def test_cli_ensure_peered_removed():
+    """CLI ensure-peered is retired with Docker peers (§6s)."""
+    with pytest.raises(SystemExit):
+        tu._main(['ensure-peered'])
 
 
 def test_no_cats_network_peering_module():
@@ -255,7 +155,7 @@ def test_grep_guard_no_ensure_docker_ipfs_peers_in_process():
 
 
 def test_orphan_ipfs_connect_peers_sh_removed():
-    """Sole peering path is transport_utils; shell script must stay gone."""
+    """Shell peer script must stay gone."""
     orphan = (
         REPO_ROOT
         / 'data'
@@ -263,13 +163,12 @@ def test_orphan_ipfs_connect_peers_sh_removed():
         / 'structure'
         / 'infrastructure'
         / 'ipfs_connect_peers.sh'
-
     )
     assert not orphan.exists()
 
 
-def test_tf_peering_resource_every_apply_not_on_compose_create():
-    """Option B: Compose create-once; peering mutates every apply via triggers."""
+def test_tf_no_ipfs_peer_or_host_daemon_resources():
+    """§6s: infrastructure TF has no Docker Kubo peers or host_ipfs_daemon."""
     main_tf = (
         REPO_ROOT
         / 'data'
@@ -277,44 +176,22 @@ def test_tf_peering_resource_every_apply_not_on_compose_create():
         / 'structure'
         / 'infrastructure'
         / 'main.tf'
-
     )
     text = main_tf.read_text(encoding='utf-8')
-    assert 'resource "shell_script" "ipfs_transport_peering"' in text
-    assert 'timestamp()' in text
-    # Compose create block must not call ensure-peered (peering resource does).
-    compose_start = text.index('resource "shell_script" "docker_compose_ipfs_transport"')
-    peering_start = text.index('resource "shell_script" "ipfs_transport_peering"')
-    compose_block = text[compose_start:peering_start]
-    assert 'ensure-peered' not in compose_block
-    peering_block = text[peering_start:]
-    assert 'ensure-peered' in peering_block
+    assert 'docker_compose_ipfs_transport' not in text
+    assert 'ipfs_transport_peering' not in text
+    assert 'resource "shell_script" "host_ipfs_daemon"' not in text
+    assert 'resource "shell_script" "docker_compose_minio_scratch"' in text
 
 
-def test_transport_assert_wraps_assert_ready(tmp_path, monkeypatch):
-    """InfraStructure.transport_assert wraps assert_ready with peering context."""
-    from types import SimpleNamespace
-
-    from cats.executor.structure import InfraStructure
-
-    infra = InfraStructure.__new__(InfraStructure)
-    infra.INPUT_STRUCTURE_HOME = str(tmp_path)
-    infra.runtime = SimpleNamespace()
-
-    monkeypatch.setattr(
-        infra,
-        'transport_context',
-        lambda: SimpleNamespace(
-            assert_ready=lambda: (_ for _ in ()).throw(
-                RuntimeError('missing containers')
-            )
-        ),
+def test_ipfs_transport_compose_deleted():
+    """Docker Kubo peer compose file is removed (§6s)."""
+    compose = (
+        REPO_ROOT
+        / 'data'
+        / 'input'
+        / 'structure'
+        / 'infrastructure'
+        / 'ipfs_transport_compose.yaml'
     )
-    try:
-        infra.transport_assert()
-        raised = False
-    except RuntimeError as exc:
-        raised = True
-        assert 'ipfs_transport_peering' in str(exc)
-        assert 'missing containers' in str(exc)
-    assert raised
+    assert not compose.exists()

@@ -1,20 +1,16 @@
-"""AddressStore — content-addressed reads: CAS ``ni:``, ``hl:``, HTTP URI, or legacy CID."""
+"""AddressStore — content-addressed reads: CAS ``ni:``, ``hl:``, or HTTP URI.
+
+Legacy IPFS CIDs (``Qm…`` / ``bafy…``) fail closed (§6s).
+"""
 from __future__ import annotations
 
 import json
 import os
 import re
-import tempfile
 from typing import Any
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-from cats.network.address_store.cid_verify import verify_bytes_match_cid
-from cats.network.address_store.gateway import GatewayError, IpfsHttpGateway
-from cats.network.address_store.unixfs_extract import (
-    UnixfsExtractError,
-    extract_unixfs_from_car,
-)
 from cats.network.cas.content_ref import is_http_uri
 from cats.network.cas.digest import (
     from_ni,
@@ -30,15 +26,14 @@ _INVOICE_PATH = re.compile(r'^/ldp/invoices/([0-9a-fA-Za-z]+)$')
 _ORDER_PATH = re.compile(r'^/ldp/orders/([0-9a-fA-Za-z]+)$')
 
 
-def _env_flag(name: str, default: bool = False) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in ('1', 'true', 'yes', 'on')
+def _legacy_cid_unsupported(content_id: str) -> RuntimeError:
+    return RuntimeError(
+        f'Legacy CID {content_id!r} is unsupported (§6s); remint to ni: / HTTP uri'
+    )
 
 
 class AddressStore:
-    """Content-addressed reads.
+    """Content-addressed reads (CAS / ``hl:`` / HTTP only).
 
     * ``hl:`` — ``from_hl`` → GET hint URI(s) → sha256 verify (fail closed);
       empty/failed hints fall through to ``ni:`` (CAS + LocatorIndex).
@@ -46,31 +41,24 @@ class AddressStore:
       local ``CasHttpStore`` when ``cats_home`` is set.
     * ``http(s)://`` — GET then verify when digest known (path parse / locator /
       optional ``expect_digest``).
-    * Legacy CIDs — gateway-first when configured, else Kubo RPC.
+    * Legacy CIDs — raise (§6s).
     """
 
     def __init__(
         self,
-        ipfs_client,
+        ipfs_client=None,
         gateway_url: str | None = None,
         *,
         verify_rpc: bool | None = None,
         timeout: float = 120.0,
         cats_home: str | None = None,
     ):
+        # ipfs_client / gateway_url / verify_rpc kept for call-site compat; unused (§6s).
         self.ipfs = ipfs_client
         self.cats_home = cats_home
         self.timeout = timeout
-        if gateway_url is None:
-            gateway_url = os.environ.get('IPFS_GATEWAY_URL') or None
-        if gateway_url:
-            gateway_url = gateway_url.strip() or None
-        self.gateway = (
-            IpfsHttpGateway(gateway_url, timeout=timeout) if gateway_url else None
-        )
-        if verify_rpc is None:
-            verify_rpc = _env_flag('CATS_CID_VERIFY', default=False)
-        self.verify_rpc = bool(verify_rpc)
+        self.gateway = None
+        self.verify_rpc = False
 
     def _cas_local_bytes(self, content_id: str) -> bytes | None:
         if not self.cats_home:
@@ -217,21 +205,7 @@ class AddressStore:
                 raise RuntimeError(f'CAS sha256 mismatch for {content_id!r}')
             return data
 
-        # Legacy IPFS CID path.
-        cid = content_id
-        data: bytes | None = None
-        from_gateway = False
-        if self.gateway is not None:
-            try:
-                data = self.gateway.cat_bytes(cid)
-                from_gateway = True
-            except GatewayError:
-                data = None
-        if data is None:
-            data = self.ipfs.cat_bytes(cid)
-        if from_gateway or self.verify_rpc:
-            verify_bytes_match_cid(self.ipfs, cid, data)
-        return data
+        raise _legacy_cid_unsupported(content_id)
 
     def cat(self, content_id: str, *, expect_digest: str | None = None) -> str:
         return self.cat_bytes(content_id, expect_digest=expect_digest).decode('utf-8')
@@ -241,25 +215,14 @@ class AddressStore:
         return json.loads(self.cat(content_id, expect_digest=expect_digest))
 
     def dag_export(self, cid: str, filepath: str) -> None:
-        """Export DAG as CAR: gateway ``?format=car`` first, else Kubo RPC.
-
-        Not used for CAS ``ni:`` blobs (fetch via ``cat_bytes`` / ``get``).
-        """
-        if is_http_uri(cid) or is_ni_or_digest(cid) or is_hl(cid):
-            raise ValueError(f'dag_export is for legacy CIDs only, got {cid!r}')
-        if self.gateway is not None:
-            try:
-                self.gateway.dag_export(cid, filepath)
-                return
-            except GatewayError:
-                pass
-        self.ipfs.dag_export(cid, filepath)
+        """Retired (§6s). Legacy CID CAR export is unsupported."""
+        raise _legacy_cid_unsupported(cid)
 
     def get(self, content_id: str, dest_path: str, *, expect_digest: str | None = None) -> str:
         """Materialize content at ``dest_path``.
 
         CAS directory manifests expand to a tree; single CAS blobs write a file;
-        HTTP URIs fetch then write/verify; legacy CIDs use gateway / Kubo.
+        HTTP URIs fetch then write/verify. Legacy CIDs fail closed (§6s).
         """
         if is_http_uri(content_id) or is_ni_or_digest(content_id) or is_hl(content_id):
             raw = self.cat_bytes(content_id, expect_digest=expect_digest)
@@ -286,23 +249,4 @@ class AddressStore:
                 handle.write(raw)
             return dest_path
 
-        # Legacy IPFS CID path.
-        cid = content_id
-        if self.gateway is not None:
-            try:
-                return self.gateway.get_file(cid, dest_path)
-            except GatewayError:
-                pass
-            try:
-                with tempfile.TemporaryDirectory(prefix='cats-car-get-') as tmp:
-                    car_path = os.path.join(tmp, 'dag.car')
-                    self.gateway.dag_export(cid, car_path)
-                    return extract_unixfs_from_car(
-                        car_path,
-                        cid,
-                        dest_path,
-                        ipfs_client=self.ipfs,
-                    )
-            except (GatewayError, UnixfsExtractError, OSError, ValueError):
-                pass
-        return self.ipfs.get(cid, dest_path)
+        raise _legacy_cid_unsupported(content_id)

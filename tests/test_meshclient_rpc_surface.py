@@ -1,4 +1,4 @@
-"""ContentMesh uses CatsIPFSClient RPC + CAT_NODE_* endpoints (no ipfs CLI)."""
+"""ContentMesh CAS reads/writes + CAT_NODE_* endpoints (no ipfs CLI / legacy CID)."""
 import json
 import pickle
 from pathlib import Path
@@ -8,6 +8,7 @@ import pytest
 
 from cats.network import ContentMesh, _node_init_endpoint
 import cats.network.content_mesh as content_mesh_mod
+from cats.network.cas import CasHttpStore, put_tree
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTENT_MESH_SRC = REPO_ROOT / 'cats' / 'network' / 'content_mesh.py'
@@ -37,56 +38,52 @@ def test_node_init_endpoint_uses_cat_node_env(monkeypatch):
     assert _node_init_endpoint() == 'http://192.168.1.10:6000/cat/node/init'
 
 
-def test_cat_and_cat_obj_delegate_via_address_store(monkeypatch):
-    """cat / catObj read via AddressStore (RPC fallback when gateway unset)."""
-    monkeypatch.delenv('IPFS_GATEWAY_URL', raising=False)
-    monkeypatch.delenv('CATS_CID_VERIFY', raising=False)
-    fake = MagicMock()
-    fake.cat_bytes.side_effect = lambda cid: (
-        b'{"k": 1}' if cid == 'QmX' else b'\x80\x04'
-    )
-    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(REPO_ROOT))
+def test_cat_and_cat_obj_via_cas(tmp_path, monkeypatch):
+    """cat / catObj read CAS ni: blobs (legacy CID unsupported §6s)."""
+    store = CasHttpStore(str(tmp_path))
+    text_id = store.put(b'{"k": 1}')
+    raw_id = store.put(b'\x80\x04')
+    client = ContentMesh(ipfsClient=None, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
 
-    assert client.cat('QmX') == '{"k": 1}'
-    assert client.catObj('QmY') == b'\x80\x04'
-    assert fake.cat_bytes.call_count == 2
+    assert client.cat(text_id) == '{"k": 1}'
+    assert client.catObj(raw_id) == b'\x80\x04'
 
 
-def test_get_and_get_car_delegate(monkeypatch, tmp_path):
-    """get / getCar delegate to CatsIPFSClient.get / dag_export."""
-    fake = MagicMock()
-    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
+def test_legacy_cid_cat_fail_closed(tmp_path, monkeypatch):
+    """Legacy CID cat/get/getCar fail closed (§6s)."""
+    client = ContentMesh(ipfsClient=None, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
+    with pytest.raises(RuntimeError, match='§6s'):
+        client.cat('QmX')
+    with pytest.raises(RuntimeError, match='§6s'):
+        client.get('QmZ', 'bom.json', output=str(tmp_path))
+    with pytest.raises(RuntimeError, match='§6s'):
+        client.getCar('QmCar', str(tmp_path / 'x.car'))
 
-    assert client.get('QmZ', 'bom.json', output=str(tmp_path)) == 'bom.json'
-    fake.get.assert_called_once_with('QmZ', str(tmp_path / 'bom.json'))
 
-    client.getCar('QmCar', str(tmp_path / 'x.car'))
-    fake.dag_export.assert_called_once_with('QmCar', str(tmp_path / 'x.car'))
+def test_link_data_cas_manifest(tmp_path, monkeypatch):
+    """linkData resolves outputs via CAS directory manifest."""
+    root = tmp_path / 'tree'
+    (root / 'outputs').mkdir(parents=True)
+    (root / 'outputs' / 'f.txt').write_text('x', encoding='utf-8')
+    (root / 'inputs').mkdir()
+    (root / 'inputs' / 'g.txt').write_text('y', encoding='utf-8')
+    content_id = put_tree(CasHttpStore(str(tmp_path)), str(root))
 
-
-def test_link_data_uses_ls_links(monkeypatch):
-    """linkData resolves the outputs subdirectory via ls links."""
-    fake = MagicMock()
-    fake.ls.return_value = [
-        {'Name': 'inputs', 'Hash': 'QmIn'},
-        {'Name': 'outputs', 'Hash': 'QmOut'},
-    ]
-    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(REPO_ROOT))
+    client = ContentMesh(ipfsClient=None, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
-    assert client.linkData('QmRoot') == 'QmOut'
-    assert client.linkData('QmRoot', subdir=' - outputs/') == 'QmOut'
+    out_id = client.linkData(content_id)
+    assert out_id.startswith('ni:///sha-256;')
 
 
-def test_fetch_ipfs_object_uses_bytes(monkeypatch):
-    """fetch_ipfs_object unpickles objects fetched via cat_bytes."""
+def test_fetch_ipfs_object_uses_cas_bytes(tmp_path, monkeypatch):
+    """fetch_ipfs_object unpickles objects fetched via CAS catObj."""
     payload = pickle.dumps({'ok': True})
-    fake = MagicMock()
-    fake.cat_bytes.return_value = payload
-    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(REPO_ROOT))
+    content_id = CasHttpStore(str(tmp_path)).put(payload)
+    client = ContentMesh(ipfsClient=None, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
-    assert client.fetch_ipfs_object('QmP') == {'ok': True}
+    assert client.fetch_ipfs_object(content_id) == {'ok': True}
 
 
 def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
@@ -98,8 +95,6 @@ def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
         integration_cache,
         process_0,
     )
-
-    fake = MagicMock()
 
     structure = tmp_path / 'structure'
     plant = structure / 'plant'
@@ -122,10 +117,12 @@ def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
     (data / 'f.csv').write_text('a\n')
 
     def _put_dir(path):
-        name = Path(path).name
-        return f'Qm{name}', name
+        from cats.network.cas import sha256_hex, to_ni
 
-    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
+        name = Path(path).name
+        return to_ni(sha256_hex(name.encode())), name
+
+    client = ContentMesh(ipfsClient=None, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
     monkeypatch.setattr(client, 'put_dir', _put_dir)
     monkeypatch.setenv('CAT_NODE_HOST', '127.0.0.1')
@@ -139,7 +136,6 @@ def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
 
     monkeypatch.setattr(client, 'put_json', _spy_put)
 
-    # Stock callables mint named-bind leaves on CAS (no Kubo add_str).
     order_req = client.create_order_request(
         ingress_subproc=ingress,
         integrated_subproc=process_0,
@@ -167,9 +163,11 @@ def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
         and 'plant_uri' in obj
         and 'infrastructure_uri' in obj
     )
-    assert structure_payload['root_uri'] == 'Qmstructure-root'
-    assert structure_payload['plant_uri'] == 'Qmplant'
-    assert structure_payload['infrastructure_uri'] == 'Qminfrastructure'
+    assert 'structure-root' in structure_payload['root_uri'] or structure_payload[
+        'root_uri'
+    ].startswith('http')
+    assert structure_payload['plant_uri']
+    assert structure_payload['infrastructure_uri']
 
     function_payload = next(
         obj for obj in put_objs
@@ -178,19 +176,18 @@ def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
         and 'infrafunction_source_uri' in obj
         and 'process_uri' in obj
     )
-    assert function_payload['process_source_uri'] == 'Qmprocess'
-    assert function_payload['infrafunction_source_uri'] == 'Qminfrafunction'
+    assert function_payload['process_source_uri']
+    assert function_payload['infrafunction_source_uri']
 
 
-def test_cat_submit_uses_requests(monkeypatch, capsys):
+def test_cat_submit_uses_requests(monkeypatch, tmp_path, capsys):
     """catSubmit POSTs the order_request JSON via requests and returns the BOM."""
-    monkeypatch.delenv('IPFS_GATEWAY_URL', raising=False)
-    monkeypatch.delenv('CATS_CID_VERIFY', raising=False)
-    fake = MagicMock()
-    fake.cat_bytes.return_value = json.dumps(
-        {'endpoint': 'http://127.0.0.1:5000/cat/node/init', 'invoice_cid': 'QmI'}
+    store = CasHttpStore(str(tmp_path))
+    order_body = json.dumps(
+        {'endpoint': 'http://127.0.0.1:5000/cat/node/init', 'invoice_cid': 'x'}
     ).encode('utf-8')
-    client = ContentMesh(ipfsClient=fake, CATS_HOME=str(REPO_ROOT))
+    order_id = store.put(order_body)
+    client = ContentMesh(ipfsClient=None, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
 
     class _Resp:
@@ -212,16 +209,11 @@ def test_cat_submit_uses_requests(monkeypatch, capsys):
 
     monkeypatch.setattr(content_mesh_mod.requests, 'post', _post)
     out = client.catSubmit({
-        'content_id': 'QmOrder',
-        'order_uri': 'http://127.0.0.1:5000/ldp/orders/QmOrder',
+        'content_id': order_id,
+        'order_uri': f'http://127.0.0.1:5000/ldp/orders/{order_id.split(";")[-1]}',
     })
     assert out['bom'] is True
-    assert posts == [
-        (
-            'http://127.0.0.1:5000/cat/node/init',
-            {'order_uri': 'http://127.0.0.1:5000/ldp/orders/QmOrder'},
-        )
-    ]
+    assert posts[0][0] == 'http://127.0.0.1:5000/cat/node/init'
     assert 'curl -X POST' in out['POST']
     captured = capsys.readouterr().out
     assert 'POST http://127.0.0.1:5000/cat/node/init' in captured

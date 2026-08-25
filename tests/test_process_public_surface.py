@@ -22,7 +22,8 @@ PROCESS_PUBLIC_SURFACE = (
 
 # Demo, tests, and cats package — places that compose or exercise Function CIDs.
 _SCAN_GLOBS = (
-    'cats_demo.py',
+    'notebooks/cats_demo.py',
+    'notebooks/new_cats_demo.py',
     'tests/**/*.py',
     'cats/**/*.py',
 )

@@ -45,22 +45,28 @@ make deps-uv-sync
 ```
   - See [DEPS — uv](./docs/DEPS.md#uv) for the manual steps behind `make deps-uv-sync`.
   - See [ENV.md](./docs/ENV.md) for the full environment workflow, including the `ops` and `mac` extras.
-#### 1. Installation:
-`make deps-all` - Runs on macOS or Linux (see the [Makefile](./Makefile) and `make help`), or follow [DEPS.md](./docs/DEPS.md) to install each dependency manually.
-#### 2. [Storage](./docs/STORAGE.md) — content-store init (one-time):
-Before first `node-up`, initialize the host content-store if it does not already exist:
+c. Create a local `.env` from the template **only if missing** (never overwrite an existing `.env`):
 ```bash
-make content-store-init   # idempotent: creates the local content-store when missing
+test -f .env || cp .env.example .env
 ```
-Does **not** start the content-store service — that is `content-store-ensure` / `node-up`. After you finish using CAT Node, shut the content-store down (`make content-store-shutdown`, or `make node-down` to stop Flask and the content-store together). Details: [STORAGE.md](./docs/STORAGE.md).
+  - Operator keys (`CAT_NODE_HOST` / `CAT_NODE_PORT`, optional Kubo / Solid, …) are documented in [ENV.md](./docs/ENV.md). `.env` is gitignored.#### 1. Installation:
+`make deps-all` - Runs on macOS or Linux (see the [Makefile](./Makefile) and `make help`), or follow [DEPS.md](./docs/DEPS.md) to install each dependency manually.
+#### 2. [Storage](./docs/STORAGE.md) — content-store (CAS + optional Kubo):
+Live Orders use Node **CAS-over-HTTP**. Host Kubo is **optional** operator tooling (§6s).
+If you still want Kubo locally:
+```bash
+make content-store-init   # idempotent: creates the local Kubo repo when missing
+```
+Does **not** start Kubo — that is `content-store-ensure` / `node-up`. Details: [STORAGE.md](./docs/STORAGE.md) / [IPFS.md](./docs/IPFS.md).
 #### 3. [Node Lifecycle](./docs/NodeLifeCycle.md) — start / status / stop:
 ```bash
-make node-up     # content-store-ensure && node-start
+make node-start  # soft-probes ContentStore; Kubo not required for CAS-only
+# or: make node-up     # content-store-ensure && node-start (brings optional Kubo up too)
 make node-status # flask=up|down + content_store=ready|not_ready
-make node-stop   # Flask only — host content-store left running
+make node-stop   # Flask only — leave Kubo running if you started it
 ```
 *Optional:* `make node-down` = `make node-stop` + `make content-store-shutdown`
-Full command reference, exit codes, and why ensure ≠ start: [NodeLifeCycle.md](./docs/NodeLifeCycle.md).
+Full command reference: [NodeLifeCycle.md](./docs/NodeLifeCycle.md).
 #### 4. [Demonstration](./docs/DEMO.md):
 CAT Node is shipped with *Techncal Use-Case CAT Workload Specifications ( Templates / "Recipies")* as *CAT **Orders*** for which proccess will be executed and **Invoiced**. This repository will feature a Scalable Scientific Computing application **Ordered** as a 2 CATs. This **Order** is specified to utilize [Ray](https://www.ray.io/) as an execution middleware framework **Plant (SaaS)** deployed on **[Kubernetes](https://kubernetes.io/)** for interoperable & parallelized distributed computing applications / Big Data processing with Scientific Computing enabled [ecosystem integrations](https://docs.ray.io/en/latest/ray-overview/ray-libraries.html) such as [Apache Spark](https://spark.apache.org/), and [PyTorch](https://pytorch.org/).
 #### 5. [Testing:](./docs/TEST.md) *CAT Node Integration & Unit Tests*
@@ -70,8 +76,10 @@ CAT Node is shipped with *Techncal Use-Case CAT Workload Specifications ( Templa
   * Constituent Commands / Utilities: 
     * `code2flow` used to generate *Functional Component Activity Diagram*: 
       * `uv run python utils/code2flow/diagram_c2f.py`
+        * Output: [`images/code2flow/cats_code2flow.png`](images/code2flow/cats_code2flow.png)
     * `pyreverse` used to generates *Class & Dependency Diagrams*: 
       * `uv run pyreverse -o png -p CATs -d images/pyreverse cats`
+        * Output: [`images/pyreverse/classes_CATs.png`](images/pyreverse/classes_CATs.png) (classes), [`images/pyreverse/packages_CATs.png`](images/pyreverse/packages_CATs.png) (packages)
 
 ### [Contribute!](docs/CONTRIBUTING.md)
 

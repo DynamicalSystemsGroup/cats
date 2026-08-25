@@ -20,19 +20,19 @@ def test_node_pkg_has_no_ipfs_daemon_or_shutdown_strings():
     assert 'ipfs daemon' not in text
 
 
-def test_start_asserts_ready_before_run(monkeypatch):
-    """start asserts ContentStore readiness before catNode.run."""
+def test_start_soft_probes_before_run(monkeypatch):
+    """start soft-probes ContentStore then binds Flask (§6r)."""
     calls = []
 
-    def fake_assert():
-        calls.append('assert')
+    def fake_soft():
+        calls.append('soft')
 
     def fake_run(**kwargs):
         calls.append('run')
         return None
 
     monkeypatch.setattr(
-        cli, '_bootstrap_content_store_assert_ready', fake_assert
+        cli, '_bootstrap_content_store_soft_ready', fake_soft
     )
     monkeypatch.setattr(cli, '_free_stale_port', lambda *a, **k: None)
     monkeypatch.setattr(cli, '_flask_listening', lambda *a, **k: False)
@@ -40,13 +40,13 @@ def test_start_asserts_ready_before_run(monkeypatch):
     monkeypatch.setattr(cli.signal, 'signal', lambda *a, **k: None)
 
     assert node.main(['start']) == 0
-    assert calls == ['assert', 'run']
+    assert calls == ['soft', 'run']
 
 
 def test_start_rejects_foreign_port_holder(monkeypatch):
     """start exits when the Node port is held by a non-cats.node process."""
     monkeypatch.setattr(
-        cli, '_bootstrap_content_store_assert_ready', lambda: None
+        cli, '_bootstrap_content_store_soft_ready', lambda: None
     )
     monkeypatch.setattr(cli, '_free_stale_port', lambda *a, **k: None)
     monkeypatch.setattr(cli, '_flask_listening', lambda *a, **k: True)
@@ -70,21 +70,24 @@ def test_bare_main_defaults_to_start(monkeypatch):
     assert calls == ['start']
 
 
-def test_start_assert_failure_skips_run(monkeypatch):
-    """start exits non-zero and skips Flask run when ContentStore is not ready."""
+def test_start_continues_when_content_store_not_ready(monkeypatch):
+    """start still runs Flask when soft probe finds Kubo down (§6r)."""
     run_called = []
 
-    def boom():
-        raise RuntimeError('kubo down')
+    def soft_warn():
+        # Soft probe may warn; must not raise / abort start.
+        return None
 
-    monkeypatch.setattr(cli, '_bootstrap_content_store_assert_ready', boom)
+    monkeypatch.setattr(cli, '_bootstrap_content_store_soft_ready', soft_warn)
+    monkeypatch.setattr(cli, '_free_stale_port', lambda *a, **k: None)
+    monkeypatch.setattr(cli, '_flask_listening', lambda *a, **k: False)
+    monkeypatch.setattr(cli.signal, 'signal', lambda *a, **k: None)
     monkeypatch.setattr(
         app.catNode, 'run', lambda **k: run_called.append(True)
     )
 
-    assert node.main(['start']) == 1
-    assert run_called == []
-
+    assert node.main(['start']) == 0
+    assert run_called == [True]
 
 def test_stop_uses_port_helper_only(monkeypatch):
     """stop only frees the Flask port; it must not touch host Kubo."""
