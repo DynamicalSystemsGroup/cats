@@ -138,8 +138,9 @@ def _bootstrap_content_store_ensure():
 def _bootstrap_content_store_assert_ready():
     """Strict bootstrap ContentStore.is_ready (default tree; not Order-bound).
 
-    Used by ``node start``. Does not heal — run ``node ensure`` /
-    ``make content-store-ensure`` first if Kubo is down.
+    Kept for unit tests / callers that need a hard check. Does not heal —
+    run ``node ensure`` / ``make content-store-ensure`` if Kubo is down.
+    ``node start`` uses soft probe instead (§6r CAS-only).
     """
     module = _load_bootstrap_content_store_module(CATS_HOME)
     if module.ContentStore.is_ready():
@@ -148,28 +149,32 @@ def _bootstrap_content_store_assert_ready():
     raise RuntimeError(
         'Host Kubo ContentStore API not ready. Run '
         '`make content-store-ensure` or `uv run python -m cats.node ensure` '
-        'before node start (start asserts only; TF host_ipfs_daemon create '
-        'is the sole automatic Order-submitted ensure).'
+        '(start soft-warns only; host Kubo TF ensure retired §6s).'
     )
 
 
+def _bootstrap_content_store_soft_ready():
+    """Soft bootstrap ContentStore probe for ``node start`` (§6r/§6s).
+
+    Same posture as ContentMesh.ensure_bootstrap_content_store: warn when
+    Kubo is down, never abort. CAS-only Orders do not need live Kubo.
+    """
+    RUNTIME.contentMesh.ensure_bootstrap_content_store()
+
+
 def _handle_stop_signal(signum, frame):
-    """Exit cleanly; leave InfraStructure content-store (host Kubo) running."""
+    """Exit cleanly; leave optional host Kubo running if present."""
     raise SystemExit(0)
 
 
 def _cmd_start():
-    """Assert bootstrap ContentStore ready (strict), then bind Flask.
+    """Soft-probe bootstrap ContentStore, then bind Flask (§6r/§6s).
 
-    Host Kubo is InfraStructure's long-lived content-store facet — Node is
-    only a client. Start does not heal; use ``node ensure`` / content-store
-    CLI. SIGINT/SIGTERM must not stop Kubo.
+    Start does not heal and does not hard-require Kubo. Optional operator
+    heal: ``node ensure`` / content-store CLI.
+    SIGINT/SIGTERM must not stop Kubo.
     """
-    try:
-        _bootstrap_content_store_assert_ready()
-    except (RuntimeError, FileNotFoundError, OSError) as exc:
-        logger.error('ContentStore bootstrap assert failed: %s', exc)
-        return 1
+    _bootstrap_content_store_soft_ready()
 
     # Debug mode's reloader re-executes this script for its worker process,
     # inheriting the listening socket the monitor already created (via
@@ -242,10 +247,10 @@ def main(argv=None):
     """AQ-safe Node CLI: start|stop|status|ensure (default: start)."""
     parser = argparse.ArgumentParser(
         description=(
-            'CAT Node process lifecycle. start asserts InfraStructure '
-            'bootstrap ContentStore ready then binds Flask; ensure heals '
-            'host Kubo via ContentStore.ensure; stop kills Flask only '
-            '(never host Kubo).'
+            'CAT Node process lifecycle. start soft-probes InfraStructure '
+            'bootstrap ContentStore then binds Flask (Kubo optional for '
+            'CAS-only); ensure heals host Kubo via ContentStore.ensure; '
+            'stop kills Flask only (never host Kubo).'
         )
     )
     parser.add_argument(

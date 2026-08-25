@@ -53,6 +53,10 @@ print(ensure_solid_bom_acl())
 
 ## Environment
 
+Set these in the repo-root `.env` (see [`.env.example`](../.env.example) /
+[`ENV.md`](./ENV.md)). `cats` loads that file on import; already-exported
+shell variables win. Unset `SOLID_POD_BASE_URL` leaves Solid off.
+
 | Variable | Required | Description |
 | --- | --- | --- |
 | `SOLID_POD_BASE_URL` | for Solid | Pod base URL (e.g. `https://pod.example/user/`) |

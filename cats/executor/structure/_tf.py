@@ -7,7 +7,6 @@ import sys
 
 from cats.utils import subproc_run
 
-DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE = "module.infrastructure.shell_script.docker_compose_ipfs_transport"
 APPLIED_STRUCTURE_MARKER = '.applied-structure.id'
 LEGACY_APPLIED_STRUCTURE_MARKER = '.applied-structure.cid'
 TF_STATE_LOCK_INFO = '.terraform.tfstate.lock.info'
@@ -231,13 +230,6 @@ def _terraform_state_resources(runtime, structure_home):
     return {line.strip() for line in proc.stdout.splitlines() if line.strip()}
 
 
-def _docker_container_running(container):
-    proc = subproc_run(
-        f"docker ps --format '{{{{.Names}}}}' | grep -qx '{container}'"
-    )
-    return proc.returncode == 0
-
-
 def _path_has_open_holders(path):
     """True when ``lsof`` reports a live process holding ``path`` open."""
     if not path or not os.path.exists(path):
@@ -271,47 +263,6 @@ def heal_stale_terraform_state_lock(structure_home):
         f'Removed stale Terraform state lock at {lock_path} '
         f'(no live holder for this Structure home).'
     )
-
-
-def cleanup_stale_docker_compose_ipfs_transport_state(runtime, structure_home):
-    """Remove the state entry for the IPFS transport Docker Compose stack
-    when Terraform state believes it's already up but its containers are
-    gone from the host - e.g. after a Docker Desktop restart or reset.
-
-    Unlike `shell_script.host_ipfs_daemon` (ContentStore.ensure — idempotent
-    API probe), this resource's `create` script isn't self-probing, and the
-    `scottwinkler/shell` provider has no `read` command to detect this drift
-    on its own - so once this resource is in state, plain `apply` never
-    notices the containers are missing and never re-runs `create`. Left
-    alone, `ingress`/`egress` then fail against a nonexistent container
-    (e.g. "No such container: structure-ipfs_migration-1") the next time a
-    CAT executes."""
-    state = _terraform_state_resources(runtime, structure_home)
-    if DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE not in state:
-        return
-
-    transport_utils = _load_transport_utils_module(structure_home)
-    migration = transport_utils.MIGRATION_CONTAINER
-    integration = transport_utils.INTEGRATION_CONTAINER
-    if _docker_container_running(migration) and _docker_container_running(integration):
-        return
-
-    print(
-        f'Terraform state has "{DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE}" but its '
-        f'containers ("{migration}", "{integration}") are not '
-        f'running on the host; removing stale state so apply recreates them'
-    )
-    proc = subproc_run(
-        f'{terraform_bin(runtime)} state rm {DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE}',
-        cwd=structure_home,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f'Failed to remove stale Terraform state for '
-            f'"{DOCKER_COMPOSE_IPFS_TRANSPORT_RESOURCE}": {proc.stderr.strip()}'
-        )
-    if proc.stdout.strip():
-        print(proc.stdout.strip())
 
 
 def _terraform_output(runtime, structure_home, name):

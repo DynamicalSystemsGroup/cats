@@ -10,3 +10,4 @@
 * the (ephemeral) Executor of the Architectural Quantum:
     * defenitions of the nested Architectural Quantum's Components (https://github.com/DynamicalSystemsGroup/cats#quantum-architecture-description-as-a-minimal-federated-operating-model)
     * Control-Feedback Loop using an Executor to execute the Architectural Quantum: [ControlFeedbackLoop.md](ControlFeedbackLoop.md)
+    * Wires Function↔Structure ports (`plant_port()`, `obj_store_context()`, `as_transport_port` in `cats.executor.function`). Must not import Order `data/` sources; Function owns the `TransportPort` Protocol only.

@@ -17,13 +17,23 @@ from pathlib import Path
 
 
 def _part_inputs(input_path: str, num_partitions: int) -> list[str] | None:
-    """Return n shard paths if a partition layout is present; else None."""
+    """Return n shard paths if a partition layout is present; else None.
+
+    Prefer opaque ``part-*`` (§6p). Fall back to legacy ``part-*.car`` (sidecar
+    stem when present) for historical layouts.
+    """
     root = Path(input_path)
     if not root.is_dir():
         return None
+    shards = sorted(
+        p for p in root.glob('part-*')
+        if not p.name.endswith('.car')
+    )
+    if len(shards) == num_partitions:
+        return [str(p) for p in shards]
     cars = sorted(root.glob('part-*.car'))
     if len(cars) == num_partitions:
-        # Prefer unpacked sidecars (same stem) when present for CSV read.
+        # Legacy CAR layout: prefer unpacked sidecars (same stem) for CSV read.
         resolved: list[str] = []
         for car in cars:
             stem = car.with_suffix('')
@@ -32,12 +42,6 @@ def _part_inputs(input_path: str, num_partitions: int) -> list[str] | None:
             else:
                 resolved.append(str(car))
         return resolved
-    shards = sorted(
-        p for p in root.glob('part-*')
-        if not p.name.endswith('.car')
-    )
-    if len(shards) == num_partitions:
-        return [str(p) for p in shards]
     return None
 
 

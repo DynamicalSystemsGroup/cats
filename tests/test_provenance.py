@@ -65,6 +65,20 @@ CAT_INPUT_PATH = f'{DATA_HOME}/testing/cat_input'
 CAT_OUTPUT_PATH = f'{DATA_HOME}/testing/cat_output'
 
 
+def _docker_up() -> bool:
+    from cats.executor.structure.infrastructure import docker_daemon_ready
+
+    return docker_daemon_ready()
+
+
+requires_docker = pytest.mark.skipif(
+    not _docker_up(),
+    reason=(
+        'Docker daemon not running (Structure MinIO/Plant; see docs/DEMO.md)'
+    ),
+)
+
+
 def files_to_pandasDF(output, format):
     files = glob.glob(os.path.join(output, format))
     dfs = list(pd.read_csv(f).assign(filename=f) for f in files)
@@ -212,14 +226,34 @@ def assert_provenance_record(bom_response, order_request):
         f'{sorted(k for k in structure if k.endswith("_cid"))}'
     )
 
-    # --- Invoice: data + stage refs; Seed (#187) ---
+    # --- Invoice: data + data_stages nest; Seed (#187) ---
     data_id = ref_id(invoice, 'data')
-    ingress_id = ref_id(invoice, 'ingress_data')
-    integration_id = ref_id(invoice, 'integration_data')
+    data_stages = invoice.get('data_stages')
+    if isinstance(data_stages, dict):
+        ingress_id = ref_id(data_stages, 'ingressed_data')
+        integration_id = ref_id(data_stages, 'integrated_data')
+        egressed_id = ref_id(data_stages, 'egressed_data')
+    else:
+        # Pre-change flat Invoice siblings.
+        ingress_id = ref_id(invoice, 'ingress_data')
+        integration_id = ref_id(invoice, 'integration_data')
+        egressed_id = data_id
     seed_id = ref_id(invoice, 'seed')
     assert data_id, 'invoice.data should be set'
-    assert ingress_id, 'invoice.ingress_data should be set'
-    assert integration_id, 'invoice.integration_data should be set'
+    assert ref_id(invoice, 'data_stages') or (
+        ingress_id and integration_id
+    ), 'invoice.data_stages (or flat ingress/integration) should be set'
+    assert ingress_id, 'ingressed/ingress stage should be set'
+    assert integration_id, 'integrated/integration stage should be set'
+    if egressed_id and data_id:
+        from cats.network.cas.digest import from_ni, is_ni_or_digest
+
+        def _key(cid):
+            return from_ni(cid) if is_ni_or_digest(cid) else cid
+
+        assert _key(egressed_id) == _key(data_id), (
+            'data_stages.egressed_data must match invoice.data'
+        )
     assert seed_id, 'invoice.seed should be a real content id, not null'
     seed = invoice.get('seed')
     assert seed is not None, (
@@ -394,6 +428,7 @@ def cat_runs():
     return SimpleNamespace(cat0=cat0, cat1=cat1)
 
 
+@requires_docker
 class TestProvenanceCATs:
     """Live Node provenance + data lineage (one CAT0 + one CAT1 submit)."""
 

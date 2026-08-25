@@ -188,19 +188,30 @@ def test_flask_registry_routes(monkeypatch, tmp_path):
     assert 'order_cid' not in body
     assert 'data_cid' not in body
 
+    from cats.network.registry import (
+        assert_registry_bom_parity,
+        assert_registry_by_data_parity,
+        assert_registry_by_order_parity,
+    )
+
+    reg = BomRegistry(str(tmp_path))
+    assert_registry_bom_parity(record, body, bom_id='QmFlask')
     by_data = client.get('/ldp/registry/by-data/QmDataOut')
     assert by_data.status_code == 200
-    assert by_data.get_json() == {
-        'content_id': 'QmDataOut',
-        'bom_ids': ['QmFlask'],
-    }
+    assert_registry_by_data_parity(
+        reg.lookup_bom('QmDataOut'),
+        by_data.get_json(),
+        data_id='QmDataOut',
+    )
 
     by_order = client.get('/ldp/registry/by-order/QmOrder')
     assert by_order.status_code == 200
-    assert by_order.get_json() == {
-        'content_id': 'QmOrder',
-        'bom_ids': ['QmFlask'],
-    }
+    assert_registry_by_order_parity(
+        reg.lookup_by_order('QmOrder'),
+        by_order.get_json(),
+        order_id='QmOrder',
+        bom_id='QmFlask',
+    )
 
     missing = client.get('/ldp/registry/boms/QmMissing')
     assert missing.status_code == 404

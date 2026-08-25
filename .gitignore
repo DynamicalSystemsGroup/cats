@@ -6,6 +6,7 @@
 __marimo__/
 __marimo__/**
 *.pyc
+.cursorignore
 .ipynb_checkpoints
 .pytest_cache
 .venv

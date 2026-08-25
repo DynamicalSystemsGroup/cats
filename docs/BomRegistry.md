@@ -113,6 +113,115 @@ Python API (`cats.network.registry.BomRegistry`):
 | `resolve_unique_bom(data)` | Sole BOM `content_id`, else `RegistryError` / `AmbiguousBomError` |
 | `list_boms()` | BOM `content_id` keys by mtime descending |
 
+Ids may be `ni:` or bare hex; the store normalizes via `content_id_fs_key` /
+`from_ni`. **HTTP** routes below take the **64-hex** path segment only (not the
+full `ni:///sha-256;…` string).
+
+## Python usage guide
+
+The registry is an **index** of verified BOM envelopes — not the blob store.
+Look up **BOM / Order / data** equality ids (and locators), then fetch payloads
+via AddressStore / LDP / `ContentMesh.cat`. Node must have indexed a prior
+`Runtime.execute` (demo: after `catSubmit`).
+
+### Construct the client
+
+```python
+from cats import CATS_HOME, CONTENT_MESH as contentMesh
+from cats.network.registry import AmbiguousBomError, BomRegistry, RegistryError
+from cats.network.cas.digest import from_ni
+from cats.network.cas import LocatorIndex
+
+reg = BomRegistry(CATS_HOME)  # same tree Node wrote under .cats/registry/
+```
+
+### Look up by `ni:` (or hex)
+
+```python
+# Invoice / stage *data* equality → which BOM(s) produced it
+data_ni = "ni:///sha-256;…"          # e.g. flat_bom invoice data / contentId
+bom_ids = reg.lookup_bom(data_ni)    # [bom_content_id, …], newest first
+
+try:
+    bom_id = reg.resolve_unique_bom(data_ni)  # exactly one producer
+except RegistryError:
+    ...   # none
+except AmbiguousBomError as exc:
+    ...   # several — use exc.bom_ids or pass an explicit bom_uri
+
+# BOM's own content_id → index record (not the signed envelope bytes)
+record = reg.get(bom_id)             # or reg.get(data_ni) if you already have BOM id
+order_id = reg.lookup_order(bom_id)  # Order equality id
+
+# Order equality → BOMs that executed that Order
+bom_ids = reg.lookup_by_order(order_id)
+```
+
+### Fetch the envelope / stage content after lookup
+
+```python
+# Locators on the record (preferred HTTP fetch address)
+loc = (record or {}).get("locators") or {}
+bom_ldp_uri = loc.get("bom_ldp_uri")
+
+# Signed ExecutionBom JSON (LDP cache or AddressStore)
+envelope = contentMesh.catObj(bom_id)          # ni: / hex
+# or: contentMesh.catObj(bom_ldp_uri)
+
+# CAS / Invoice / Order bytes by equality id or HTTP *_uri
+invoice = contentMesh.catObj(record["data"])   # or record["data_uri"]
+order = contentMesh.catObj(record["order"])    # or record["order_uri"]
+
+# Digest → registered HTTP locators (LocatorIndex, same registry tree)
+hex_id = from_ni(data_ni)
+locators = LocatorIndex(CATS_HOME).lookup_uris(data_ni)
+```
+
+### Lineage without a held `cat_response` (REPLaC / demo)
+
+`linkProcess` / `linkStructure` / `linkOrder` resolve through the registry when
+you omit the prior HTTP response. `content_id=` / `hl=` mean **data** equality
+(`by-data`); `bom_uri=` / `bom_ldp_uri=` / `bom_solid_uri=` pin a BOM. Legacy
+`bom_cid=` / `data_cid=` raise.
+
+```python
+from data.input.function.process import process_1
+
+# After CAT0: data_ni = flattened invoice data equality (ni: or contentId)
+order_req = contentMesh.linkProcess(
+    content_id=data_ni,
+    integrated_subproc=process_1,
+)
+# equivalent pin:
+# order_req = contentMesh.linkProcess(bom_uri=bom_ldp_uri, integrated_subproc=process_1)
+
+cat_response = contentMesh.catSubmit(order_req)
+```
+
+Same intake keys work on `POST /cat/node/init` (`order_uri` / `content_id` /
+`data_uri` / `bom_uri` / `hl`) — see below.
+
+### HTTP from Python (hex path)
+
+```python
+import requests
+
+base = "http://127.0.0.1:5000"  # CAT_NODE_HOST:CAT_NODE_PORT
+hex_id = from_ni(data_ni)
+requests.get(f"{base}/ldp/registry/by-data/{hex_id}").json()   # {content_id, bom_ids}
+requests.get(f"{base}/ldp/registry/boms/{from_ni(bom_id)}").json()
+requests.get(f"{base}/ldp/registry/by-content/{hex_id}").json()  # locators
+```
+
+### Quick map
+
+| Your `ni:` / id is… | Python | Then fetch |
+| --- | --- | --- |
+| Stage / Invoice **data** | `lookup_bom` / `resolve_unique_bom` | `reg.get` → `bom_ldp_uri` / `contentMesh.catObj` |
+| **BOM** `content_id` | `get` / `lookup_order` | envelope via `catObj` or LDP URI |
+| **Order** equality | `lookup_by_order` | same |
+| Any digest’s HTTP URIs | `LocatorIndex.lookup_uris` | `GET` those URIs / `cat` |
+
 ## Publish on execute
 
 `Runtime.execute` signs the BOM, mints content id on **CAS** (`ni:`), writes

@@ -2,8 +2,8 @@ import importlib.util
 import os
 import sys
 
+from cats.executor.function.transport_port import as_transport_port
 from cats.utils import wait_for_directory
-from data.input.function.process.transport_port import as_transport_port
 
 _TRANSPORT_PORT_HINT = (
     'Process transport callables must accept a `transport` argument '

@@ -1,6 +1,11 @@
 """Ephemeral Executor of the Architectural Quantum and its halves."""
 from cats.executor.executor import Executor
-from cats.executor.function import Function, InfraFunction, Processor
+from cats.executor.function import (
+    Function,
+    InfraFunction,
+    Processor,
+    as_transport_port,
+)
 from cats.executor.structure import (
     InfraStructure,
     Plant,
@@ -15,6 +20,7 @@ __all__ = [
     'Function',
     'InfraFunction',
     'Processor',
+    'as_transport_port',
     'Structure',
     'InfraStructure',
     'Plant',

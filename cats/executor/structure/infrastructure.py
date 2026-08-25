@@ -1,11 +1,12 @@
 import importlib.util
 import os
+import shutil
+import subprocess
 import sys
 
 from cats.executor.structure._tf import (
     _load_transport_utils_module,
     _terraform_output,
-    cleanup_stale_docker_compose_ipfs_transport_state,
     configure_terraform_data_dir,
     ensure_integration_cache_env,
     ensure_provider_binaries_executable,
@@ -15,6 +16,33 @@ from cats.executor.structure._tf import (
     terraform_bin,
 )
 from cats.executor.structure.plant import Plant
+
+_DOCKER_REQUIRED = (
+    'Docker daemon is not running; Structure apply/destroy needs it for '
+    'MinIO scratch and Plant / KubeRay (start Docker Desktop, then retry). '
+    'See docs/DEMO.md.'
+)
+
+
+def docker_daemon_ready() -> bool:
+    """True when ``docker info`` can reach a running daemon."""
+    if shutil.which('docker') is None:
+        return False
+    try:
+        proc = subprocess.run(
+            ['docker', 'info'],
+            capture_output=True,
+            timeout=8,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return proc.returncode == 0
+
+
+def require_docker_daemon() -> None:
+    """Raise if Structure Terraform cannot ping Docker (MinIO / kind)."""
+    if not docker_daemon_ready():
+        raise RuntimeError(_DOCKER_REQUIRED)
 
 
 class InfraStructure:
@@ -99,78 +127,43 @@ class InfraStructure:
     def transport_context(self):
         """Resolve TransportContext from Order-submitted transport_utils.
 
-        T&D facet for Process port (migrate / stage_for_plant). Peering mutate
-        is TF shell_script.ipfs_transport_peering (every apply); apply only
-        asserts — not Process heal.
+        CAS migrate / stage_for_plant only (§6s — no Docker peer assert).
         """
         utils = self._load_transport_module()
         return utils.TransportContext.default(
             structure_home=self.INPUT_STRUCTURE_HOME
         )
 
-    def transport_assert(self):
-        """Fail loud if Order-submitted transport peer containers are not up.
-
-        Executor composes à la carte TF (ipfs_transport_peering ensures swarm
-        every apply); this only probes container readiness.
-        """
-        try:
-            self.transport_context().assert_ready()
-        except RuntimeError as exc:
-            raise RuntimeError(
-                'InfraStructure transport peers not ready after Structure '
-                'terraform apply. TF shell_script.ipfs_transport_peering '
-                'should have peered them; heal via '
-                'transport_utils.py ensure-peered or re-apply Structure. '
-                f'({exc})'
-            ) from exc
-
     def content_store_ensure(self, cwd=None):
-        """À la carte Order-submitted ContentStore.ensure (same tree as TF CLI).
+        """À la carte Order-submitted ContentStore.ensure (optional operator).
 
-        Distinct from ContentMesh bootstrap ensure (repo default tree). Structure
-        apply does **not** call this — TF ``shell_script.host_ipfs_daemon``
-        create is the Order-submitted mutate path; apply asserts (with one
-        soft-heal) afterward.
+        Distinct from ContentMesh bootstrap soft-probe (repo default tree).
+        Structure apply does **not** require this (§6s).
         """
         utils = self._load_content_store_module()
         utils.ContentStore.ensure(cwd=cwd)
 
     def content_store_assert(self):
-        """Fail loud if Order-submitted ContentStore is not ready after TF.
+        """Soft-probe Order-submitted ContentStore after TF (§6s).
 
-        Executor composes à la carte TF (host_ipfs_daemon ensures every apply).
-        If the API is still down at assert time (hung-daemon heal race during
-        the rest of apply), run one Order-tree ``ContentStore.ensure`` then
-        re-probe with a short backoff before failing closed.
+        Does not heal and does not raise — Kubo is optional for CAS-only.
+        Operator heal remains ``make content-store-ensure`` / ``node ensure``.
         """
-        import time
-
-        utils = self._load_content_store_module()
-        if utils.ContentStore.is_ready():
-            return
-        print(
-            'Host Kubo ContentStore not ready after Structure terraform apply; '
-            'running Order-submitted ContentStore.ensure once...',
-            flush=True,
-        )
         try:
-            utils.ContentStore.ensure(cwd=self.INPUT_STRUCTURE_HOME)
-        except Exception as exc:
-            raise RuntimeError(
-                'Host Kubo ContentStore not ready after Structure terraform '
-                'apply, and ContentStore.ensure failed. Heal via make '
-                'content-store-ensure / node ensure.'
-            ) from exc
-        for _ in range(20):
+            utils = self._load_content_store_module()
             if utils.ContentStore.is_ready():
                 return
-            time.sleep(0.5)
-        raise RuntimeError(
-            'Host Kubo ContentStore not ready after Structure terraform apply. '
-            'TF shell_script.host_ipfs_daemon should have ensured it on this '
-            'apply; heal via make content-store-ensure / node ensure.'
-        )
+            print(
+                'WARNING: host ContentStore API not ready (optional §6s); '
+                'run make content-store-ensure or python -m cats.node ensure '
+                'if you still need Kubo tooling.',
+                flush=True,
+            )
+        except (RuntimeError, FileNotFoundError, OSError) as exc:
+            print(
+                f'WARNING: Order-submitted ContentStore probe failed (§6s): {exc}',
+                flush=True,
+            )
 
     def _cleanup_stale_structure_state(self):
         """Drop TF state that cannot refresh when host resources are gone.
@@ -187,9 +180,6 @@ class InfraStructure:
             terraform_bin(self.runtime),
             configure_tf_data_dir=configure_terraform_data_dir,
         )
-        cleanup_stale_docker_compose_ipfs_transport_state(
-            self.runtime, self.INPUT_STRUCTURE_HOME
-        )
         self._load_obj_store_module().cleanup_stale_obj_store_state(
             self.INPUT_STRUCTURE_HOME,
             terraform_bin(self.runtime),
@@ -200,6 +190,7 @@ class InfraStructure:
         print('Destroy Structure!')
         configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
         ensure_integration_cache_env(self.runtime)
+        require_docker_daemon()
         self._cleanup_stale_structure_state()
         self.runtime.executeCMD(
             f'{terraform_bin(self.runtime)} destroy --auto-approve',
@@ -242,19 +233,15 @@ class InfraStructure:
         print('Apply Structure!')
         configure_terraform_data_dir(self.INPUT_STRUCTURE_HOME)
         ensure_integration_cache_env(self.runtime)
-        # ContentStore.ensure is à la carte TF (host_ipfs_daemon create), not
-        # Python apply — Executor asserts readiness after terraform apply and
-        # soft-heals once if the API is still down.
+        require_docker_daemon()
+        # Host Kubo TF ensure + Docker peer assert retired (§6s). Soft-probe
+        # ContentStore only; Process transport is CAS-only.
         self._cleanup_stale_structure_state()
         self.runtime.executeCMD(
             f'{terraform_bin(self.runtime)} apply --auto-approve',
             cwd=self.INPUT_STRUCTURE_HOME
         )
-        print('Assert InfraStructure content store ready (Order-submitted)...')
+        print('Probe InfraStructure content store (optional §6s)...')
         self.content_store_assert()
-        # Peering mutate is à la carte TF (ipfs_transport_peering every apply);
-        # Executor only asserts containers are up.
-        print('Assert InfraStructure transport peers ready (Order-submitted)...')
-        self.transport_assert()
         print()
         print()

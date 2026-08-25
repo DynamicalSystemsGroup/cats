@@ -66,6 +66,9 @@ def test_locator_index_and_by_content_route(tmp_path):
     resp = client.get(f'/ldp/registry/by-content/{from_ni(ni)}')
     assert resp.status_code == 200
     assert resp.get_json()['content_id'] == ni
+    from cats.network.registry import assert_locator_index_parity
+
+    assert_locator_index_parity(loc.lookup_uris(ni), resp.get_json())
 
 
 def test_cas_http_get_and_put_405(tmp_path):

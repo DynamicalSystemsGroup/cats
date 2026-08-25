@@ -113,7 +113,7 @@ class Runtime:
         # mints bom over the signed object.
         enhanced_bom, invoice_id = executor.execute(order_request)
 
-        from cats.network.cas import ref_id, ref_uri
+        from cats.network.cas import ref_id, ref_uri, resolve_invoice_data_stages
 
         # Structure as-executed nesting is on the Invoice (Executor-minted).
         # Stage refs feed signed PROV wasDerivedFrom edges (intra-run lineage).
@@ -139,6 +139,11 @@ class Runtime:
             except Exception:
                 input_data_id = None
 
+        stages = resolve_invoice_data_stages(
+            invoice,
+            content_mesh=self.contentMesh,
+            cats_home=self.CATS_HOME,
+        )
         log_id = ref_id(enhanced_bom, 'log', cats_home=self.CATS_HOME)
         bom = build_execution_bom(
             log_id=log_id,
@@ -146,20 +151,19 @@ class Runtime:
             node_did=resolve_node_did(cats_home=self.CATS_HOME),
             order_id=order_id,
             input_data_id=input_data_id,
-            ingress_data_id=ref_id(invoice, 'ingress_data', cats_home=self.CATS_HOME),
-            integration_data_id=ref_id(
-                invoice, 'integration_data', cats_home=self.CATS_HOME
-            ),
-            data_id=ref_id(invoice, 'data', cats_home=self.CATS_HOME),
+            ingress_data_id=stages['ingress_data_id'],
+            integration_data_id=stages['integration_data_id'],
+            data_id=stages['egress_data_id']
+            or ref_id(invoice, 'data', cats_home=self.CATS_HOME),
             structure_as_executed_id=ref_id(
                 invoice, 'structure_as_executed', cats_home=self.CATS_HOME
             ),
             invoice_uri=enhanced_bom.get('invoice_uri') or invoice.get('invoice_uri'),
             log_uri=enhanced_bom.get('log_uri') or ref_uri(enhanced_bom, 'log'),
             order_uri=ref_uri(invoice, 'order'),
-            ingress_data_uri=ref_uri(invoice, 'ingress_data'),
-            integration_data_uri=ref_uri(invoice, 'integration_data'),
-            data_uri=ref_uri(invoice, 'data'),
+            ingress_data_uri=stages['ingress_data_uri'],
+            integration_data_uri=stages['integration_data_uri'],
+            data_uri=stages['egress_data_uri'] or ref_uri(invoice, 'data'),
             structure_as_executed_uri=ref_uri(invoice, 'structure_as_executed'),
         )
         bom = sign_execution_bom(bom, cats_home=self.CATS_HOME)
@@ -241,9 +245,10 @@ class Runtime:
         for stage_id in (
             invoice_id,
             order_id,
-            ref_id(invoice, 'data', cats_home=self.CATS_HOME),
-            ref_id(invoice, 'ingress_data', cats_home=self.CATS_HOME),
-            ref_id(invoice, 'integration_data', cats_home=self.CATS_HOME),
+            stages['egress_data_id'],
+            stages['ingress_data_id'],
+            stages['integration_data_id'],
+            stages['data_stages_id'],
             ref_id(invoice, 'seed', cats_home=self.CATS_HOME),
             ref_id(invoice, 'structure_as_executed', cats_home=self.CATS_HOME),
             log_id,

@@ -1,5 +1,5 @@
 # Process [Composed Function] callables (composed via the REPLaC Workflow UI of
-# Function [FaaS] — this demo: Marimo / cats_demo.py):
+# Function [FaaS] — this demo: Marimo / notebooks/cats_demo.py):
 #   - ingress / integration_cache / egress — transport *port* callables; they
 #     receive a Function-owned TransportPort as `transport` and only call
 #     migrate / stage_for_plant. When num_partitions > 1, ingress/egress also

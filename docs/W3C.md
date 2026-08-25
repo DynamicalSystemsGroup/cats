@@ -2,12 +2,12 @@
 
 Scope: **how provenance is modeled, attributed, signed, published, and discovered** — not Plant/MinIO/transport rewrites.
 
-Phases **1 / 1b / 2a** (signed JSON-LD/PROV envelope, AddressStore gateway, Node LDP, optional Solid dual-write), the **Node-local BOM registry**, **CAS-over-HTTP**, **Phase 2b MVP** (URI address + `ni:` proof), **§6d hard-drop of `*_cid` field names** (URI-only new mints), **§6e–§6k naming hygiene** (control-plane / observation / Process–Plant–Ray `*_id` ABI; `cat(content_id=)`; no `cidDir` aliases), and **§6f `hl:` handoff** (resolve + emit + intake) are **on mainline**. The `w3c` vs `dev` columns below are a **historical** comparison of pre-merge `dev` (implicit CID threading) against that stack — branches are now tip-aligned. Remaining gaps are mesh federation of the index (§6g–§6h) — not signing, and not “no reverse lookup at all.”
+Phases **1 / 1b / 2a** (signed JSON-LD/PROV envelope, Node LDP, optional Solid dual-write), the **Node-local BOM registry**, **CAS-over-HTTP**, **Phase 2b MVP** (URI address + `ni:` proof), **§6d–§6k naming hygiene**, **§6f `hl:` handoff**, and **primary substrate §6p–§6s** (CAS-only Node; legacy CID / Docker T&D retired) are **on mainline**. The `w3c` vs `dev` columns below are a **historical** comparison of pre-merge `dev` (implicit CID threading) against that stack — branches are now tip-aligned. Remaining gaps are mesh federation of the index (§6g–§6h) — not signing, and not “no reverse lookup at all.”
 
 ## One-line verdict (provenance)
 
 * **Before (pre-merge `dev`):** provenance was mostly **implicit** [CID](https://docs.ipfs.tech/concepts/content-addressing/) **threading**.
-* **Now (mainline):** lineage is an **explicit,** [DID](https://www.w3.org/TR/did-core/)**-attributed**, [Data Integrity](https://www.w3.org/TR/vc-data-integrity/)**-signed** [JSON-LD](https://www.w3.org/TR/json-ld11/)/[PROV-O](https://www.w3.org/TR/prov-o/) **envelope**, published at [LDP](https://www.w3.org/TR/ldp/)/[Solid](https://solidproject.org/) **HTTP locators** peers can fetch and verify — while **new** data-plane content uses **`ni:`** equality plus HTTP **`*_uri`** only (§6d; no `*_cid` JSON keys). Legacy **CID** graphs remain readable via `ref_id` / Kubo/gateway. Node-local **BOM registry** reverse lookup (data → BOM / BOM → Order) is landed ([`BomRegistry.md`](BomRegistry.md)).
+* **Now (mainline):** lineage is an **explicit,** [DID](https://www.w3.org/TR/did-core/)**-attributed**, [Data Integrity](https://www.w3.org/TR/vc-data-integrity/)**-signed** [JSON-LD](https://www.w3.org/TR/json-ld11/)/[PROV-O](https://www.w3.org/TR/prov-o/) **envelope**, published at [LDP](https://www.w3.org/TR/ldp/)/[Solid](https://solidproject.org/) **HTTP locators** peers can fetch and verify — while the **data plane** uses **`ni:`** equality plus HTTP **`*_uri`** only (§6d/§6s; no Kubo/CID on the hot path). Node-local **BOM registry** reverse lookup (data → BOM / BOM → Order) is landed ([`BomRegistry.md`](BomRegistry.md)).
 
 ## Envelope vs stage payloads (unchanged discipline)
 
@@ -80,7 +80,7 @@ Full contract, record shape, disk layout, and routes: [`BomRegistry.md`](BomRegi
 | --- | --- | --- | --- |
 | **2a** | CID + AddressStore; LDP/Solid envelope locators | **CID** (legacy) | Landed |
 | **Registry (before 2b)** | BOM→Order, `data_cid`→BOM; `init` / `link*` via index | **CID / `ni:`** (index keys) | **Landed** (Node-local) |
-| **CAS-over-HTTP (before 2b)** | Digest-keyed LDP/`ni:` store; locator index; Kubo = legacy CID read | **digest / `ni:`** | **Landed** |
+| **CAS-over-HTTP (before 2b)** | Digest-keyed LDP/`ni:` store; locator index; Kubo optional tooling only (§6s) | **digest / `ni:`** | **Landed** |
 | **Phase 2b** | URI as address; DI-signed BOM → URI/`ni:`/`hl:` payloads | **HTTP URI** (data); DI (control) | **Landed** (MVP dual-field) |
 | **§6d Hard-drop `*_cid`** | URI-only graph slots; `ni:` equality unnamed | **HTTP `*_uri`**; `ni:` / `contentId` | **Landed** |
 
@@ -114,9 +114,9 @@ Full contract, record shape, disk layout, and routes: [`BomRegistry.md`](BomRegi
 
 | Technology | Spec / reference | Role on mainline |
 | --- | --- | --- |
-| **IPFS / CID** | [Content addressing](https://docs.ipfs.tech/concepts/content-addressing/), [CIDs](https://docs.ipfs.tech/concepts/content-addressing/#identifier-formats) | Legacy address of record; registry keys for historical CIDs |
-| **IPFS HTTP Gateway** | [Gateway API](https://docs.ipfs.tech/reference/http/gateway/) | Opt-in AddressStore reads for **legacy CIDs** (`IPFS_GATEWAY_URL`) |
-| **Kubo** | [Kubo](https://docs.ipfs.tech/install/command-line/) | **Legacy CID** RPC/gateway reads + mid-migration ensure; **not** used for new CAS mints |
+| **IPFS / CID** | [Content addressing](https://docs.ipfs.tech/concepts/content-addressing/), [CIDs](https://docs.ipfs.tech/concepts/content-addressing/#identifier-formats) | Historical address of record (retired on hot path §6s) |
+| **IPFS HTTP Gateway** | [Gateway API](https://docs.ipfs.tech/reference/http/gateway/) | Retired from AddressStore (§6s); was opt-in legacy CID reads |
+| **Kubo** | [Kubo](https://docs.ipfs.tech/install/command-line/) | Optional operator tooling (`ContentStore.ensure`); **not** required for CAS-only Orders |
 | **CAS-over-HTTP** | Node LDP `/ldp/cas/` | Digest-keyed put/get + sha256 verify; directory manifests |
 | **Multibase** | [multibase](https://github.com/multiformats/multibase) | `did:key` / proofValue encoding helpers |
 

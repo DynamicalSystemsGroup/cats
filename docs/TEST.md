@@ -23,17 +23,37 @@
   [`tests/test_infrastructure_transport_utils.py`](../tests/test_infrastructure_transport_utils.py) /
   [`tests/test_infrastructure_obj_store_utils.py`](../tests/test_infrastructure_obj_store_utils.py) /
   [`tests/test_ray_io_partitions.py`](../tests/test_ray_io_partitions.py).
+  §6p CAS-native opaque `part-*` partition I/O (no Kubo CAR mint):
+  [`tests/test_ray_io_partitions.py`](../tests/test_ray_io_partitions.py).
+  §6q legacy CID transport gate (historical; remint retired in §6s):
+  [`tests/test_infrastructure_transport_utils.py`](../tests/test_infrastructure_transport_utils.py).
+  §6s retire legacy CID read + Docker T&D (fail closed; CAS-only transport):
+  [`tests/test_infrastructure_transport_utils.py`](../tests/test_infrastructure_transport_utils.py) /
+  [`tests/test_address_store_cas_only.py`](../tests/test_address_store_cas_only.py) /
+  [`tests/test_content_store_ensure_binding.py`](../tests/test_content_store_ensure_binding.py).
   §6k dual-mode `cat(content_id=)` / drop `cidDir` aliases:
   [`tests/test_cas_http.py`](../tests/test_cas_http.py) /
-  [`tests/test_address_store_gateway.py`](../tests/test_address_store_gateway.py) /
   [`tests/test_meshclient_rpc_surface.py`](../tests/test_meshclient_rpc_surface.py) /
   [`tests/test_function_source_id.py`](../tests/test_function_source_id.py).
+  Registry claims / HTTP coherence (unit; live consumer
+  [`notebooks/new_cats_demo.py`](../notebooks/new_cats_demo.py)):
+  index parity [`tests/test_registry_parity.py`](../tests/test_registry_parity.py);
+  claims → HTTP reachability [`tests/test_registry_reachability.py`](../tests/test_registry_reachability.py);
+  post-execute projection [`tests/test_handoff_projection.py`](../tests/test_handoff_projection.py);
+  handoff + Order slot helpers [`tests/test_handoff_coherence.py`](../tests/test_handoff_coherence.py);
+  envelope content equivalence (mesh ≡ HTTP per subcomponent)
+  [`tests/test_content_equiv_bom.py`](../tests/test_content_equiv_bom.py) /
+  [`tests/test_content_equiv_invoice.py`](../tests/test_content_equiv_invoice.py) /
+  [`tests/test_content_equiv_order.py`](../tests/test_content_equiv_order.py);
+  stageLineage directory-manifest hops
+  [`tests/test_manifest_equiv.py`](../tests/test_manifest_equiv.py).
+  These do **not** assert that all HTTP content lives in the registry.
   For mesh-reachable LDP hints in `hl:`, set `CAT_NODE_HOST` to an address peers can open
   (loopback only warns).
 
 1. **[Install CATs](https://github.com/DynamicalSystemsGroup/cats/tree/cats2?tab=readme-ov-file#get-started)** (`uv sync --extra ops --group dev` for mesh demos and tests; `dev` provides `pytest`)
-  - **Root Dependency**: see [`NodeLifeCycle.md`](./NodeLifeCycle.md) — run `make content-store-ensure` before
-  `make node-start` (start asserts only). Host Kubo detail: [`IPFS.md`](./IPFS.md).
+  - **Root Dependency**: see [`NodeLifeCycle.md`](./NodeLifeCycle.md) — `make node-start` soft-probes
+  ContentStore (Kubo optional §6r/§6s). Host Kubo detail: [`IPFS.md`](./IPFS.md).
 2. **Session 1**
   a. *[Create the environment](./ENV.md)*
   ```bash
@@ -41,9 +61,12 @@
   uv sync --extra ops --group dev
   ```
     - `uv run` (below) uses this `.venv` automatically — no manual activation needed.
-  b. **Ensure ContentStore, then start CAT Node** — follow [`NodeLifeCycle.md`](./NodeLifeCycle.md).
+  b. **Start Docker daemon** — needed for Structure MinIO scratch + Plant / KubeRay
+     (not Docker Kubo T&D peers, retired §6s). See [`DEMO.md`](./DEMO.md) step 0.
+     `tests/test_provenance.py` skips if the daemon is down.
+  c. **Start CAT Node** — follow [`NodeLifeCycle.md`](./NodeLifeCycle.md).
   ```bash
-  make content-store-ensure
+  make content-store-ensure   # optional operator tooling
   make node-start
   ```
 3. **Session 2:**
@@ -85,7 +108,7 @@
   # InfraStructure transport_utils / TransportContext
   uv run pytest -s tests/test_infrastructure_transport_utils.py
 
-  # CatsIPFSClient Kubo RPC (smoke skips if :5001 down)
+  # Optional CatsIPFSClient Kubo RPC smoke (skips if :5001 down; not required for CAS)
   uv run pytest -s tests/test_ipfs_client.py
 
   # ContentMesh.linkOrder — combined Function/Structure lineage helper
@@ -99,12 +122,12 @@
   uv run pytest -s tests/test_bom_registry.py
 
   # CAS-over-HTTP — CasHttpStore, ni:/digest, manifests, locators, AddressStore
-  uv run pytest -s tests/test_cas_http.py
+  uv run pytest -s tests/test_cas_http.py tests/test_address_store_cas_only.py
 
   # Phase 2b / §6f — URI address + ni:/hl: proof, Order/Invoice LDP, hl: resolve/emit
   uv run pytest -s tests/test_phase2b_uri.py tests/test_hl_resolve.py
 
-  # ContentMesh Kubo RPC + CAT_NODE_* endpoints (no ipfs CLI)
+  # ContentMesh CAS + CAT_NODE_* endpoints (no ipfs CLI / legacy CID)
   uv run pytest -s tests/test_meshclient_rpc_surface.py
 
   # Named-bind JSON leaves vs pickle for Function Order slots
@@ -125,6 +148,6 @@
   # Structure root_id staging + getEnhancedBom materialize (+ §6i marker)
   uv run pytest -s tests/test_structure_root_id.py
 
-  # TransportPort Protocol + as_transport_port facade
+  # TransportPort Protocol (Function) + Executor as_transport_port facade
   uv run pytest -s tests/test_transport_port.py
   ```

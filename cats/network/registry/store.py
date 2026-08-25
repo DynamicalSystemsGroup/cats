@@ -7,6 +7,7 @@ from typing import Any
 
 from cats.network.cas.content_ref import ref_id, ref_uri
 from cats.network.cas.digest import content_id_fs_key, is_ni_or_digest, to_ni, from_ni
+from cats.network.cas.invoice_stages import resolve_invoice_data_stages
 from cats.network.feedback import verify_execution_bom
 
 
@@ -99,6 +100,10 @@ def project_record(record: dict[str, Any]) -> dict[str, Any]:
         out['integration_data'] = record.get('integration_data') or record.get(
             'integration_data_cid'
         )
+    if record.get('data_stages_uri'):
+        out['data_stages_uri'] = record['data_stages_uri']
+    elif record.get('data_stages'):
+        out['data_stages'] = record['data_stages']
     if record.get('seed_uri'):
         out['seed_uri'] = record['seed_uri']
     elif record.get('seed') or record.get('seed_cid'):
@@ -178,6 +183,9 @@ def build_record(
     )
     order_uri = loc.get('order_uri') or ref_uri(invoice, 'order')
     data_uri = ref_uri(invoice, 'data')
+    stages = resolve_invoice_data_stages(
+        invoice, content_mesh=content_mesh, cats_home=cats_home
+    )
 
     return {
         'content_id': bom_id,
@@ -195,13 +203,18 @@ def build_record(
             'bom_solid_uri': loc.get('bom_solid_uri'),
             'invoice_uri': loc.get('invoice_uri') or invoice_uri,
             'order_uri': loc.get('order_uri') or order_uri,
+            **(
+                {'data_stages_uri': stages['data_stages_uri']}
+                if stages.get('data_stages_uri')
+                else {}
+            ),
         },
-        'ingress_data': ref_id(invoice, 'ingress_data', cats_home=cats_home),
-        'ingress_data_uri': ref_uri(invoice, 'ingress_data'),
-        'integration_data': ref_id(
-            invoice, 'integration_data', cats_home=cats_home
-        ),
-        'integration_data_uri': ref_uri(invoice, 'integration_data'),
+        'ingress_data': stages.get('ingress_data_id'),
+        'ingress_data_uri': stages.get('ingress_data_uri'),
+        'integration_data': stages.get('integration_data_id'),
+        'integration_data_uri': stages.get('integration_data_uri'),
+        'data_stages': stages.get('data_stages_id'),
+        'data_stages_uri': stages.get('data_stages_uri'),
         'seed': ref_id(invoice, 'seed', cats_home=cats_home),
         'seed_uri': ref_uri(invoice, 'seed'),
     }
