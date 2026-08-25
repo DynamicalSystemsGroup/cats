@@ -427,7 +427,10 @@ def _(mo):
 
 @app.cell
 def cat0_ordered_function(
-    assert_order_function_slots, order0_function_uri, pprint, requests
+    assert_order_function_slots,
+    order0_function_uri,
+    pprint,
+    requests,
 ):
     raw_function0 = requests.get(order0_function_uri, timeout=60).json()
     assert_order_function_slots(raw_function0)
@@ -464,7 +467,10 @@ def _(mo):
 
 @app.cell
 def cat0_ordered_structure(
-    assert_order_structure_slots, order0_structure_uri, pprint, requests
+    assert_order_structure_slots,
+    order0_structure_uri,
+    pprint,
+    requests,
 ):
     raw_structure0 = requests.get(order0_structure_uri, timeout=60).json()
     assert_order_structure_slots(raw_structure0)
@@ -499,7 +505,10 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def cat0_ordered_invoice(
-    assert_input_invoice_slots, order0_invoice_uri, pprint, requests
+    assert_input_invoice_slots,
+    order0_invoice_uri,
+    pprint,
+    requests,
 ):
     raw_ordered_invoice0 = requests.get(order0_invoice_uri, timeout=60).json()
     assert_input_invoice_slots(raw_ordered_invoice0)
@@ -569,7 +578,11 @@ def cat0_used_order(executor, requests):
 
 
 @app.cell
-def cat0_stage_lineage_payload_equiv(assert_stage_lineage_payload_equiv, bom0, http_get_json):
+def cat0_stage_lineage_payload_equiv(
+    assert_stage_lineage_payload_equiv,
+    bom0,
+    http_get_json,
+):
     # Shared helper (same as tests/test_manifest_equiv.py): ingress ≡ input;
     # later hops — wasDerivedFrom ≡ prior stage (pointer coherence).
     assert_stage_lineage_payload_equiv(bom0, http_get_json=http_get_json)
@@ -577,7 +590,12 @@ def cat0_stage_lineage_payload_equiv(assert_stage_lineage_payload_equiv, bom0, h
 
 
 @app.cell
-def cat0_stage0_ingress(assert_directory_manifest_equiv, bom0, http_get_json, requests):
+def cat0_stage0_ingress(
+    assert_directory_manifest_equiv,
+    bom0,
+    http_get_json,
+    requests,
+):
     # stageLineage[0]: ingress_data ← input Invoice data
     ingress_stage = bom0["stageLineage"][0]
     ingress_uri = ingress_stage["@id"]
@@ -798,6 +816,11 @@ def _(
             "asserts_ok": True,
         }
     )
+    return
+
+
+@app.cell
+def _():
     return
 
 
