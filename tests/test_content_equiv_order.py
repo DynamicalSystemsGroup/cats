@@ -8,6 +8,9 @@ import pytest
 
 from cats.network.registry import (
     assert_order_content_equiv,
+    assert_order_function_content_equiv,
+    assert_order_invoice_content_equiv,
+    assert_order_structure_content_equiv,
     assert_order_subcomponent_equiv,
 )
 
@@ -80,6 +83,12 @@ def test_order_function_fetch_equiv():
         http_get=http_get,
     )
     assert out == function
+    assert_order_function_content_equiv(
+        function,
+        content_mesh=mesh,
+        http_get_json=http_get_json,
+        http_get=http_get,
+    )
 
 
 def test_order_structure_fetch_equiv():
@@ -109,6 +118,12 @@ def test_order_structure_fetch_equiv():
         http_get=http_get,
     )
     assert out == structure
+    assert_order_structure_content_equiv(
+        structure,
+        content_mesh=mesh,
+        http_get_json=http_get_json,
+        http_get=http_get,
+    )
 
 
 def test_order_invoice_fetch_equiv_with_data():
@@ -127,6 +142,12 @@ def test_order_invoice_fetch_equiv_with_data():
         http_get=http_get,
     )
     assert out == invoice
+    assert_order_invoice_content_equiv(
+        invoice,
+        content_mesh=mesh,
+        http_get_json=http_get_json,
+        http_get=http_get,
+    )
 
 
 def test_order_input_invoice_ignores_registry_output_invoice():
