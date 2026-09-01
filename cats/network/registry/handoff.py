@@ -34,10 +34,12 @@ def resolve_handoff_invoice_uri(
     cat_response: dict[str, Any],
     record: dict[str, Any],
 ) -> str | None:
-    """Prefer response, then BOM body, then registry record / locators."""
+    """Prefer signed BOM body, then registry record / locators.
+
+    Execute HTTP envelopes do not carry top-level ``invoice_uri``.
+    """
     locs = record.get('locators') or {}
     candidates = (
-        cat_response.get('invoice_uri'),
         (cat_response.get('bom') or {}).get('invoice_uri'),
         record.get('invoice_uri'),
         locs.get('invoice_uri'),
@@ -99,7 +101,8 @@ def assert_control_plane_handoff_coherence(
 
     Checks:
 
-    1. **Locator presence** — ``bom_ldp_uri`` and ``invoice_uri`` exist.
+    1. **Locator presence** — ``bom_ldp_uri`` on the execute response and a
+       resolvable Invoice URI (signed BOM body, then registry).
     2. **Response–registry locator agreement** — execute response locators ≡
        ``record`` / locators.
     3. **Envelope–Invoice binding** — signed ExecutionBom ``invoice_uri`` ≡

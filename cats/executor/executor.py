@@ -100,11 +100,6 @@ class Executor:
             'durable_er_uri': self.function.processor.durable_er_uri,
             'durable_er_pointer': self.function.processor.durable_er_pointer,
         }
-        set_ref(self.enhanced_bom['log'], 'ingress_data', self.ingress_data_id)
-        set_ref(
-            self.enhanced_bom['log'], 'integration_data', self.integration_data_id
-        )
-        set_ref(self.enhanced_bom['log'], 'egress_data', self.egress_data_id)
         # Invoice feedback (Seed deferred / #187): stage refs on Invoice until
         # Seed holds the Process replay dictionary.
         invoice = self.enhanced_bom['invoice']
