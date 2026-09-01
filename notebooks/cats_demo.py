@@ -96,19 +96,20 @@ def _(mo):
 
     Expect HTTP envelope keys `content_id`, `bom_ldp_uri`, optional `hl` /
     `bom_solid_uri`; signed `bom` with `invoice_uri` / `log_uri` / `node_did` +
-    Data Integrity proof. `flatten_bom` expands those URIs.
+    Data Integrity proof. CAT1 `flatten_bom` returns `{invoice, log}` with
+    uri slots kept and fetched JSON under `flat` (does not mutate the envelope).
     """)
     return
 
 
 @app.cell
 def _(cat_order_request_0, contentMesh):
-    cat_invoiced_response_0 = contentMesh.catSubmit(cat_order_request_0)
-    # cat_invoiced_response_0
-    # pprint(cat_invoiced_response_0)
-    # flat_cat_invoiced_response_0 = contentMesh.flatten_bom(cat_invoiced_response_0)
-    # pprint(flat_cat_invoiced_response_0)
-    return (cat_invoiced_response_0,)
+    cat_bom_response_0 = contentMesh.catSubmit(cat_order_request_0)
+    # cat_bom_response_0
+    # pprint(cat_bom_response_0)
+    # flat_cat_response_0 = contentMesh.flatten_bom(cat_bom_response_0)
+    # pprint(flat_cat_response_0)
+    return (cat_bom_response_0,)
 
 
 @app.cell
@@ -133,11 +134,11 @@ def _(mo):
 
 
 @app.cell
-def cat0_bom(cat_invoiced_response_0, pprint, requests):
-    bom0_ldp_uri = cat_invoiced_response_0.get("bom_ldp_uri") or {}
+def cat0_bom(cat_bom_response_0, pprint, requests):
+    bom0_ldp_uri = cat_bom_response_0.get("bom_ldp_uri") or {}
     bom0 = requests.get(bom0_ldp_uri).json()
 
-    invoice0_uri = cat_invoiced_response_0.get("invoice_uri")
+    invoice0_uri = bom0.get("invoice_uri")
     raw_invoice0 = requests.get(invoice0_uri).json()
 
     order0_uri = raw_invoice0.get("order_uri")
@@ -429,9 +430,9 @@ def _(mo):
 
 
 @app.cell
-def _(cat_invoiced_response_0, contentMesh, pprint, process_1):
+def _(cat_bom_response_0, contentMesh, pprint, process_1):
     cat_order_request_1 = contentMesh.linkProcess(
-        cat_invoiced_response_0,
+        cat_bom_response_0,
         integrated_subproc=process_1,
     )
     pprint(cat_order_request_1)
@@ -448,10 +449,10 @@ def _(mo):
 
 @app.cell
 def _(cat_order_request_1, contentMesh, pprint):
-    cat_invoiced_response_1 = contentMesh.catSubmit(cat_order_request_1)
-    # pprint(cat_invoiced_response_1)
-    flat_cat_invoiced_response_1 = contentMesh.flatten_bom(cat_invoiced_response_1)
-    pprint(flat_cat_invoiced_response_1)
+    cat_bom_response_1 = contentMesh.catSubmit(cat_order_request_1)
+    # pprint(cat_bom_response_1)
+    flat_cat_response_1 = contentMesh.flatten_bom(cat_bom_response_1)
+    pprint(flat_cat_response_1)
     return
 
 
