@@ -35,7 +35,7 @@ make node-stop               # Flask only — host Kubo left running if you star
 
 Execute CATs on a single-node Mesh via Marimo — the **REPLaC (REPL as Code) Workflow UI** of Function [FaaS], used to compose Process [Composed Function] (transport callables plus a Higher-Order Transfer Function / hotF, `integrated_subproc`) for InfraFunction [Actuator] to dispatch onto Plant [SaaS]. Function sources are packaged as `data/input/function/process/` and `data/input/function/infrafunction/` (import the package public surfaces). Compose Orders with **named imports** of the Process public surface only (`ingress`, `egress`, `integration_cache`, `process_*`, … — see `process.__all__`); never `from data.input.function.process import *`. Stock surfaces are Order-bound as named-bind JSON leaves (`contentId` + optional `source_uri` / `module` / `qualname`); non-stock REPL callables still pickle. Across runs, `linkProcess` mutates Function lineage, `linkStructure` mutates Structure lineage, and `linkOrder` mutates Function and/or Structure in one lineage step (all chain prior Invoice **data** equality via `data_uri` / `ni:`). Each `link*` accepts a prior HTTP `cat_response` **or** `content_id=` / `data_uri=` / `bom_uri=` / `hl=` resolved through the Node-local BOM registry (`GET /ldp/registry/…`; see [`BomRegistry.md`](BomRegistry.md)). Legacy `bom_cid=` / `data_cid=` are rejected. Recreate Orders after Function module-path or bind-shape changes.
 
-**What you should see after CAT0 `catSubmit`:** HTTP envelope with `content_id`, `bom_ldp_uri`, optional `hl` / `bom_solid_uri`; signed `bom` carrying `invoice_uri` / `log_uri` / `node_did` + Data Integrity proof; `flatten_bom` expands those URIs into Invoice / Order / stage refs (`data_uri`, `function_uri`, `structure_uri`, …). CAT1 in the notebook uses `linkProcess` (Function lineage) — not a second independent `create_order_request`.
+**What you should see after CAT0 `catSubmit`:** HTTP envelope with `content_id`, `bom_ldp_uri`, optional `hl` / `bom_solid_uri`; signed `bom` carrying `invoice_uri` / `log_uri` / `node_did` + Data Integrity proof. Order URI is on the Invoice (`invoice.order_uri`), not on the HTTP envelope. `flatten_bom` (CAT1 in the demos) **returns** `{invoice, log}` with uri slots kept and fetched JSON under each parent’s `flat` (`max_depth=4` by default) — it does not mutate the envelope. CAT1 uses `linkProcess` (Function lineage) — not a second independent `create_order_request`.
 
 Marimo’s working directory is `notebooks/`. `from cats import …` does not import
 Order Function sources (`cats/` must not `import data`). The registry-first demo’s
@@ -55,5 +55,12 @@ completeness, **claims reachability**, then **control-plane handoff coherence**,
 then **content equivalence** (`assert_*_content_equiv` before flatten), then
 **stageLineage directory-manifest** hops (`assert_directory_manifest_equiv` /
 `assert_stage_lineage_payload_equiv`) — not “all HTTP content ∈ registry.”
+
+**Not in this notebook** ([`new_cats_demo.py`](../notebooks/new_cats_demo.py)): this walk is **demo-proved** on one Structure (KubeRay + MinIO + CAS), not **interop-proved** (same Function CID graph on ≥2 Structure adapter sets) — see [`INTEROP.md`](./INTEROP.md).
+
+- `linkStructure` (Structure mutation) — Order op to swap Plant while carrying Function; required for INTEROP **2f** / **P2**. This notebook exercises `linkProcess` only.
+- mesh-federated registry — `link*` here uses the **Node-local** index ([`BomRegistry.md`](./BomRegistry.md), linked from INTEROP); federation is a remaining discovery gap, not a second Plant.
+- CAT1 `stageLineage` / as-executed / content-equiv — CAT1 inspect is lineage helpers + `flatten_bom`, not a second-Structure replay of CAT0’s locator walk.
+- dataframe transform checks (`tests/test_provenance.py`) — live integration on this same demo stack ([`TEST.md`](./TEST.md)); not a second Structure.
 
 Cells re-run reactively as dependencies change; work through the notebook top to bottom. See [`BomRegistry.md`](BomRegistry.md) for the Python registry guide.
