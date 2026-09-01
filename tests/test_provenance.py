@@ -20,6 +20,11 @@ from cats import INPUT_STRUCTURE_HOME, INPUT_DATA_HOME
 from cats.network import _node_init_endpoint
 from cats.network.cas import ref_id, ref_uri
 from cats.network.feedback import verify_execution_bom
+from cats.network.registry import (
+    assert_distinct_executions,
+    assert_order_pairing_lineage,
+    assert_plant_as_executed_snapshot,
+)
 
 from data.input.function.process import (
     egress,
@@ -44,14 +49,6 @@ FUNCTION_PAIRING_KEYS = (
     'infrafunction_source',
 )
 STRUCTURE_PAIRING_KEYS = ('root', 'plant', 'infrastructure')
-PLANT_SNAPSHOT_KEYS = (
-    'applied_structure_id',
-    'kind_cluster_name',
-    'kubeconfig_context',
-    'ray_dashboard_address',
-    'ray_release_name',
-    'rebuilt',
-)
 INFRASTRUCTURE_SNAPSHOT_KEYS = (
     'minio_scratch_bucket',
     'minio_scratch_endpoint_host',
@@ -133,8 +130,12 @@ def _assert_named_bind_leaf(leaf_id, *, expected_source_id):
     assert isinstance(leaf['qualname'], str) and leaf['qualname']
 
 
-def assert_provenance_record(bom_response, order_request):
-    """Assert full Order / Invoice / BOM / log / as-executed provenance coverage."""
+def assert_provenance_record(bom_response, order_request, flat_bom):
+    """Assert full Order / Invoice / BOM / log / as-executed provenance coverage.
+
+    Envelope checks use ``bom_response`` (execute HTTP dict). Inspect checks
+    use ``flat_bom`` from ``flatten_bom`` (not a key on the submit dict).
+    """
     assert 'error' not in bom_response, bom_response.get('error')
     assert 'bom' in bom_response
     assert 'content_id' in bom_response and bom_response['content_id']
@@ -168,15 +169,19 @@ def assert_provenance_record(bom_response, order_request):
     ), f'bom still has *_cid keys: {sorted(k for k in bom if str(k).endswith("_cid"))}'
 
 
-    flat = bom_response['flat_bom']
+    flat = flat_bom
     invoice = flat['invoice']
-    order = invoice['order']
+    order = invoice['flat']['order']
     function = order['flat']['function']
     structure = order['flat']['structure']
     input_invoice = order['flat']['invoice']
     log = flat['log']
-    plant = flat['plant']
-    object_store_as_executed = flat['object_store_as_executed']
+    sae = invoice['flat']['structure_as_executed']
+    plant = sae['flat']['plant_as_executed']
+    infrastructure_as_executed = sae['flat']['infrastructure_as_executed']
+    object_store_as_executed = infrastructure_as_executed['flat'][
+        'object_store_as_executed'
+    ]
 
     # --- Order (submitted) vs Invoice backfill ---
     order_id = order_request.get('content_id') or order_request.get('order_cid')
@@ -228,7 +233,7 @@ def assert_provenance_record(bom_response, order_request):
 
     # --- Invoice: data + data_stages nest; Seed (#187) ---
     data_id = ref_id(invoice, 'data')
-    data_stages = invoice.get('data_stages')
+    data_stages = invoice['flat'].get('data_stages')
     if isinstance(data_stages, dict):
         ingress_id = ref_id(data_stages, 'ingressed_data')
         integration_id = ref_id(data_stages, 'integrated_data')
@@ -255,9 +260,9 @@ def assert_provenance_record(bom_response, order_request):
             'data_stages.egressed_data must match invoice.data'
         )
     assert seed_id, 'invoice.seed should be a real content id, not null'
-    seed = invoice.get('seed')
+    seed = invoice['flat'].get('seed')
     assert seed is not None, (
-        'flat_bom.invoice.seed should be resolved by flatten_bom from seed ref'
+        'invoice.flat.seed should be resolved by flatten_bom from seed ref'
     )
     assert set(seed) == {'seed', 'rng_seed', 'num_partitions'}, (
         f'seed keys unexpected: {seed!r}'
@@ -283,18 +288,20 @@ def assert_provenance_record(bom_response, order_request):
         f'{sorted(k for k in invoice if k.endswith("_cid"))}'
     )
 
-    structure_as_executed = flat['structure_as_executed']
+    structure_as_executed = invoice['flat']['structure_as_executed']
     assert structure_as_executed is not None
     assert ref_id(structure_as_executed, 'plant_as_executed')
     assert ref_id(structure_as_executed, 'infrastructure_as_executed')
-    infrastructure_as_executed = flat['infrastructure_as_executed']
     assert infrastructure_as_executed is not None
     assert ref_id(infrastructure_as_executed, 'object_store_as_executed')
 
-    # --- Log mirrors stage refs + JobHandle correlator ---
-    assert ref_id(log, 'ingress_data') == ingress_id
-    assert ref_id(log, 'integration_data') == integration_id
-    assert ref_id(log, 'egress_data') == data_id
+    # --- Log: JobHandle / rebuild correlators (stages live on data_stages) ---
+    assert not ref_id(log, 'ingress_data')
+    assert not ref_id(log, 'integration_data')
+    assert not ref_id(log, 'egress_data')
+    assert 'ingress_data_uri' not in log
+    assert 'integration_data_uri' not in log
+    assert 'egress_data_uri' not in log
     assert 'plant_rebuilt' in log
     assert isinstance(log['plant_rebuilt'], bool)
     _assert_job_handle_uri(log.get('object_store_result_uri'))
@@ -303,13 +310,9 @@ def assert_provenance_record(bom_response, order_request):
     )
 
     # --- Plant as-executed (observed; flattened) ---
-    assert plant is not None
-    for key in PLANT_SNAPSHOT_KEYS:
-        assert key in plant, f'plant as-executed missing {key}'
-    assert plant['applied_structure_id'] == ref_id(order, 'structure'), (
-        'plant.applied_structure_id must equal order.structure content id'
+    assert_plant_as_executed_snapshot(
+        plant, structure_id=ref_id(order, 'structure')
     )
-    assert isinstance(plant['rebuilt'], bool)
 
     # --- ObjectStore as-executed (observed; nested under infrastructure) ---
     assert object_store_as_executed is not None
@@ -358,11 +361,11 @@ def _submit_and_load(order_request):
         raise RuntimeError(
             f"CAT node returned an error: {response['error']}"
         )
-    flat = contentMesh.flatten_bom(response)
-    pprint(flat)
+    flat_bom = contentMesh.flatten_bom(response)
+    pprint(flat_bom)
     print()
 
-    provenance = assert_provenance_record(flat, order_request)
+    provenance = assert_provenance_record(response, order_request, flat_bom)
     print(provenance['input_data_cid'])
     print()
     print(provenance['output_data_cid'])
@@ -475,13 +478,19 @@ class TestProvenanceCATs:
             cat_runs.cat1.input_df.values,
         )
 
+    def test_cat0_cat1_order_pairing_lineage(self, cat_runs):
+        """Independent process_0 / process_1 Orders: Function mutated, Structure carried."""
+        order0 = cat_runs.cat0.provenance['invoice']['flat']['order']
+        order1 = cat_runs.cat1.provenance['invoice']['flat']['order']
+        assert_order_pairing_lineage(
+            order0, order1, function='mutated', structure='carried'
+        )
+
     def test_cat0_cat1_seed_uniqueness(self, cat_runs):
         """CAT0 and CAT1 each mint a distinct Seed replay dict (#187)."""
-        seed0 = cat_runs.cat0.provenance['seed']
-        seed1 = cat_runs.cat1.provenance['seed']
-        assert seed0['seed'] != seed1['seed'], (
-            'CAT0/CAT1 seed identity hex should differ per execution'
-        )
-        assert seed0['rng_seed'] != seed1['rng_seed'], (
-            'CAT0/CAT1 rng_seed should differ (derived from distinct seed hex)'
+        assert_distinct_executions(
+            cat_runs.cat0.provenance['invoice'],
+            cat_runs.cat1.provenance['invoice'],
+            prior_seed=cat_runs.cat0.provenance['seed'],
+            next_seed=cat_runs.cat1.provenance['seed'],
         )

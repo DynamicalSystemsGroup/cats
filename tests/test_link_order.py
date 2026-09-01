@@ -6,6 +6,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from cats.network import ContentMesh
+from cats.network.registry import (
+    assert_invoice_data_chain,
+    assert_order_pairing_lineage,
+)
 from data.input.function.process import process_1
 
 
@@ -130,10 +134,15 @@ def test_link_order_function_only(monkeypatch, tmp_path):
     assert 'invoice_uri' in order_req
 
     order = _last_order(put_objs)
-    assert order['function_uri'] != function_id
-    assert order['structure_uri'] == structure_id
+    assert_order_pairing_lineage(
+        {'function_cid': function_id, 'structure_cid': structure_id},
+        order,
+        function='mutated',
+        structure='carried',
+    )
     assert order['endpoint'] == 'http://127.0.0.1:5000/cat/node/init'
-    assert _invoice_payloads(put_objs) == [{'data_uri': data_id}]
+    invoices = _invoice_payloads(put_objs)
+    assert_invoice_data_chain({'data_cid': data_id}, invoices[0])
     assert not any(k.endswith('_cid') for k in order)
 
 
@@ -154,8 +163,12 @@ def test_link_order_structure_only(monkeypatch, tmp_path):
     client.linkOrder(cat_response, plant_id='QmPlantV2')
 
     order = _last_order(put_objs)
-    assert order['function_uri'] == function_id
-    assert order['structure_uri'] != structure_id
+    assert_order_pairing_lineage(
+        {'function_cid': function_id, 'structure_cid': structure_id},
+        order,
+        function='carried',
+        structure='mutated',
+    )
     assert order['structure_filepath'] == 'structure'
 
     pairing = next(
@@ -170,7 +183,9 @@ def test_link_order_structure_only(monkeypatch, tmp_path):
         'plant_uri': 'QmPlantV2',
         'infrastructure_uri': prev_structure['infrastructure_cid'],
     }
-    assert _invoice_payloads(put_objs) == [{'data_uri': data_id}]
+    assert_invoice_data_chain(
+        {'data_cid': data_id}, _invoice_payloads(put_objs)[0]
+    )
 
 
 def test_link_order_both_sides_single_invoice(monkeypatch, tmp_path):
@@ -202,10 +217,16 @@ def test_link_order_both_sides_single_invoice(monkeypatch, tmp_path):
     )
 
     order = _last_order(put_objs)
-    assert order['function_uri'] != function_id
-    assert order['structure_uri'] != structure_id
+    assert_order_pairing_lineage(
+        {'function_cid': function_id, 'structure_cid': structure_id},
+        order,
+        function='mutated',
+        structure='mutated',
+    )
     assert order['structure_filepath'] == 'structure'
-    assert _invoice_payloads(put_objs) == [{'data_uri': data_id}]
+    assert_invoice_data_chain(
+        {'data_cid': data_id}, _invoice_payloads(put_objs)[0]
+    )
 
 
 def test_link_order_fails_when_neither_side(monkeypatch, tmp_path):
