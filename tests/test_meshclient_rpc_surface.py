@@ -219,3 +219,109 @@ def test_cat_submit_uses_requests(monkeypatch, tmp_path, capsys):
     assert 'POST http://127.0.0.1:5000/cat/node/init' in captured
     assert 'done in' in captured
     assert '200' in captured
+
+
+def test_flatten_bom_returns_inspect_tree_without_mutating_response():
+    """flatten_bom returns uri slots + flat; execute envelope is unchanged."""
+    from copy import deepcopy
+
+    bodies = {
+        'inv': {
+            'order_uri': 'ord',
+            'data_uri': 'dat',
+            'seed_uri': 'seed',
+            'data_stages_uri': 'stages',
+            'structure_as_executed_uri': 'sae',
+        },
+        'ord': {
+            'function_uri': 'fn',
+            'structure_uri': 'st',
+            'invoice_uri': 'ii',
+        },
+        'fn': {'k': 'function'},
+        'st': {'k': 'structure'},
+        'ii': {'k': 'input-invoice'},
+        'seed': {'seed': 'abc', 'rng_seed': 1, 'num_partitions': 2},
+        'stages': {'egressed_data_uri': 'dat'},
+        'sae': {
+            'plant_as_executed_uri': 'plt',
+            'infrastructure_as_executed_uri': 'iae',
+        },
+        'plt': {'rebuilt': False},
+        'iae': {'object_store_as_executed_uri': 'ose'},
+        'ose': {'minio_scratch_bucket': 'cats-scratch'},
+        'log': {'k': 'log'},
+    }
+
+    def fake_fetch(obj, stem):
+        key = obj.get(f'{stem}_uri')
+        if key is None or key not in bodies:
+            return None
+        return deepcopy(bodies[key])
+
+    client = ContentMesh(ipfsClient=None, CATS_HOME=None)
+    client._fetch_ref = fake_fetch
+    bom = {'invoice_uri': 'inv', 'log_uri': 'log'}
+    envelope = {'content_id': 'bom-id', 'bom': bom}
+    tree = client.flatten_bom(envelope)
+    assert 'flat_bom' not in envelope
+    assert envelope['content_id'] == 'bom-id'
+    assert envelope['bom'] is bom
+    assert 'content_id' not in tree
+    assert 'data_stages' not in tree
+    assert 'plant' not in tree
+    invoice = tree['invoice']
+    assert invoice['order_uri'] == 'ord'
+    assert 'order' not in invoice
+    order = invoice['flat']['order']
+    assert order['flat']['function'] == {'k': 'function'}
+    assert order['flat']['structure'] == {'k': 'structure'}
+    assert order['flat']['invoice'] == {'k': 'input-invoice'}
+    assert invoice['flat']['seed']['seed'] == 'abc'
+    assert invoice['flat']['data_stages']['egressed_data_uri'] == 'dat'
+    sae = invoice['flat']['structure_as_executed']
+    assert sae['flat']['plant_as_executed'] == {'rebuilt': False}
+    infra = sae['flat']['infrastructure_as_executed']
+    assert infra['object_store_as_executed_uri'] == 'ose'
+    assert infra['flat']['object_store_as_executed'] == {
+        'minio_scratch_bucket': 'cats-scratch'
+    }
+    assert tree['log'] == {'k': 'log'}
+    assert 'flat' not in tree['log']
+
+
+def test_flatten_bom_max_depth_stops_expansions():
+    from copy import deepcopy
+
+    bodies = {
+        'inv': {'order_uri': 'ord'},
+        'ord': {'function_uri': 'fn'},
+        'fn': {'k': 'function'},
+        'log': {'k': 'log'},
+    }
+
+    def fake_fetch(obj, stem):
+        key = obj.get(f'{stem}_uri')
+        if key is None or key not in bodies:
+            return None
+        return deepcopy(bodies[key])
+
+    client = ContentMesh(ipfsClient=None, CATS_HOME=None)
+    client._fetch_ref = fake_fetch
+    envelope = {'bom': {'invoice_uri': 'inv', 'log_uri': 'log'}}
+
+    zero = client.flatten_bom(envelope, max_depth=0)
+    assert zero['invoice'] is None
+    assert zero['log'] is None
+    assert zero['invoice_uri'] == 'inv'
+    assert zero['log_uri'] == 'log'
+
+    one = client.flatten_bom(envelope, max_depth=1)
+    assert one['invoice']['order_uri'] == 'ord'
+    assert 'flat' not in one['invoice']
+    assert one['log'] == {'k': 'log'}
+
+    two = client.flatten_bom(envelope, max_depth=2)
+    order = two['invoice']['flat']['order']
+    assert order['function_uri'] == 'fn'
+    assert 'flat' not in order
