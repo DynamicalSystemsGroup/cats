@@ -187,6 +187,8 @@ def test_runtime_execute_publishes_ldp(monkeypatch, tmp_path):
     assert 'bom_cid' not in response
     assert response['bom_ldp_uri'] == 'http://127.0.0.1:5002/ldp/boms/QmRuntimeBom'
     assert response['bom_solid_uri'] is None
+    assert 'invoice_uri' not in response
+    assert 'order_uri' not in response
     stored = BomLdpStore(str(tmp_path)).get('QmRuntimeBom')
     assert stored is not None
     assert stored['invoice_uri'] == 'QmInvoice'

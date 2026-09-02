@@ -36,6 +36,18 @@ class OrderOps:
         """Equality id from ``*_uri`` or legacy ``*_cid``."""
         return ref_id(obj, stem, cats_home=self._cats_home())
 
+    def _invoice_order_from_flat_bom(self, flat_bom):
+        """Invoice + Order from ``flatten_bom`` (``invoice.flat.order``)."""
+        invoice = flat_bom.get('invoice')
+        if not isinstance(invoice, dict):
+            raise RuntimeError('flatten_bom missing invoice')
+        order = (invoice.get('flat') or {}).get('order')
+        if not isinstance(order, dict):
+            raise RuntimeError(
+                'flatten_bom invoice.flat.order missing; increase max_depth'
+            )
+        return invoice, order
+
     def _cat_stem(self, obj, stem):
         """Fetch JSON for a stem via ``*_uri`` or equality id (AddressStore)."""
         locator = ref_uri(obj, stem) or self._stem_id(obj, stem)
@@ -393,11 +405,13 @@ class OrderOps:
             hl=hl,
             **kwargs,
         )
-        flattened_bom = self.flatten_bom(cat_response)
-        flat_bom = deepcopy(flattened_bom['flat_bom'])
-        invoice = flat_bom['invoice']
-        order = invoice['order']
-        prev_function = order['flat']['function']
+        flat_bom = deepcopy(self.flatten_bom(cat_response))
+        invoice, order = self._invoice_order_from_flat_bom(flat_bom)
+        prev_function = (order.get('flat') or {}).get('function')
+        if prev_function is None:
+            raise RuntimeError(
+                'flatten_bom order.flat.function missing; increase max_depth'
+            )
         new_function_id = self._rebuild_function(
             prev_function,
             ingress_subproc=ingress_subproc,
@@ -455,11 +469,13 @@ class OrderOps:
             hl=hl,
             **kwargs,
         )
-        flattened_bom = self.flatten_bom(cat_response)
-        flat_bom = deepcopy(flattened_bom['flat_bom'])
-        invoice = flat_bom['invoice']
-        order = invoice['order']
-        prev_structure = order['flat']['structure']
+        flat_bom = deepcopy(self.flatten_bom(cat_response))
+        invoice, order = self._invoice_order_from_flat_bom(flat_bom)
+        prev_structure = (order.get('flat') or {}).get('structure')
+        if prev_structure is None:
+            raise RuntimeError(
+                'flatten_bom order.flat.structure missing; increase max_depth'
+            )
         pairing = self._resolve_structure_pairing(
             prev_structure,
             structure_filepath=structure_filepath,
@@ -549,10 +565,9 @@ class OrderOps:
             hl=hl,
             **kwargs,
         )
-        flattened_bom = self.flatten_bom(cat_response)
-        flat_bom = deepcopy(flattened_bom['flat_bom'])
-        invoice = flat_bom['invoice']
-        order = invoice['order']
+        flat_bom = deepcopy(self.flatten_bom(cat_response))
+        invoice, order = self._invoice_order_from_flat_bom(flat_bom)
+        order_flat = order.get('flat') or {}
 
         function_id = self._stem_id(order, 'function')
         if not function_id:
@@ -560,8 +575,13 @@ class OrderOps:
                 'prior Order missing function_uri / function_cid'
             )
         if function_requested:
+            prev_function = order_flat.get('function')
+            if prev_function is None:
+                raise RuntimeError(
+                    'flatten_bom order.flat.function missing; increase max_depth'
+                )
             function_id = self._rebuild_function(
-                order['flat']['function'], **function_kwargs
+                prev_function, **function_kwargs
             )
 
         structure_id = self._stem_id(order, 'structure')
@@ -571,8 +591,13 @@ class OrderOps:
             )
         structure_name = None
         if structure_requested:
+            prev_structure = order_flat.get('structure')
+            if prev_structure is None:
+                raise RuntimeError(
+                    'flatten_bom order.flat.structure missing; increase max_depth'
+                )
             pairing = self._resolve_structure_pairing(
-                order['flat']['structure'],
+                prev_structure,
                 structure_filepath=structure_filepath,
                 root_id=root_id,
                 plant_id=plant_id,

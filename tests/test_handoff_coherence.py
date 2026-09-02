@@ -25,16 +25,26 @@ def _store(**bodies):
     return http_get_json
 
 
-def test_resolve_handoff_invoice_uri_prefers_response():
+def test_resolve_handoff_invoice_uri_prefers_bom_then_registry():
     record = {
         'invoice_uri': 'http://n/inv-rec',
         'locators': {'invoice_uri': 'http://n/inv-loc'},
     }
-    resp = {'invoice_uri': 'http://n/inv-resp'}
-    assert resolve_handoff_invoice_uri(resp, record) == 'http://n/inv-resp'
+    # Top-level execute envelope invoice_uri is ignored.
+    assert (
+        resolve_handoff_invoice_uri({'invoice_uri': 'http://n/inv-resp'}, record)
+        == 'http://n/inv-rec'
+    )
     assert (
         resolve_handoff_invoice_uri({'bom': {'invoice_uri': 'http://n/inv-bom'}}, record)
         == 'http://n/inv-bom'
+    )
+    assert resolve_handoff_invoice_uri({}, record) == 'http://n/inv-rec'
+    assert (
+        resolve_handoff_invoice_uri(
+            {}, {'locators': {'invoice_uri': 'http://n/inv-loc'}}
+        )
+        == 'http://n/inv-loc'
     )
 
 
@@ -50,7 +60,6 @@ def test_assert_control_plane_handoff_coherence_ok():
 
     cat_response = {
         'bom_ldp_uri': bom_uri,
-        'invoice_uri': inv_uri,
     }
     record = {
         'invoice_uri': inv_uri,
@@ -98,7 +107,7 @@ def test_assert_fails_on_response_registry_locator_mismatch():
     inv_uri = 'http://n/i'
     with pytest.raises(AssertionError, match='bom_ldp_uri'):
         assert_control_plane_handoff_coherence(
-            cat_response={'bom_ldp_uri': bom_uri, 'invoice_uri': inv_uri},
+            cat_response={'bom_ldp_uri': bom_uri},
             record={
                 'locators': {
                     'bom_ldp_uri': 'http://n/other',
@@ -114,7 +123,7 @@ def test_assert_fails_on_incomplete_invoice():
     inv_uri = 'http://n/i'
     with pytest.raises(AssertionError, match='order_uri/data_uri/seed_uri'):
         assert_control_plane_handoff_coherence(
-            cat_response={'bom_ldp_uri': bom_uri, 'invoice_uri': inv_uri},
+            cat_response={'bom_ldp_uri': bom_uri},
             record={
                 'invoice_uri': inv_uri,
                 'locators': {'bom_ldp_uri': bom_uri, 'invoice_uri': inv_uri},

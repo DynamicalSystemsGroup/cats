@@ -146,7 +146,7 @@ Full contract, record shape, disk layout, and routes: [`BomRegistry.md`](BomRegi
 | Local publish | `ldp/bom_store.py` + routes | [LDP](https://www.w3.org/TR/ldp/) persist + GET cache (`/ldp/boms/`) |
 | BOM registry | `cats/network/registry/` | Node-local index (`data_cid`→BOM / BOM→Order); `GET /ldp/registry/…` — [`BomRegistry.md`](BomRegistry.md) |
 | `init` intake | `cats/node/app.py` | `order_cid` \| `bom_cid` \| unique `data_cid` (ambiguous → 409) |
-| `link*` | `cats/network/order.py` | `cat_response` **or** `bom_cid=` / `data_cid=` → `flatten_bom` |
+| `link*` | `cats/network/order.py` | `cat_response` **or** `content_id=` / `data_uri=` / `bom_uri=` → `flatten_bom` (`invoice.flat.order`; envelope unchanged) |
 | Fetch + verify | `ldp/client.py` | Fail-closed DI verify |
 | Solid publish / ACL / LDN | `solid_client.py`, `wac.py`, `ldn.py` | [Solid](https://solidproject.org/) + [WAC](https://solid.github.io/web-access-control-spec/) + [LDN](https://www.w3.org/TR/ldn/) |
 | Wire-up | `Runtime.execute` | Sign → `bom_cid` → LDP → optional Solid → **registry put** → LDN |

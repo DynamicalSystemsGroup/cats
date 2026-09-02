@@ -307,23 +307,54 @@ def assert_order_subcomponent_equiv(
     slot_kw = {**fetch_kw, 'record': None} if stem == 'invoice' else fetch_kw
     payload = assert_fetch_equiv(stem, uri, as_bytes=False, **slot_kw)
     if stem == 'function' and isinstance(payload, dict):
-        for slot in _FUNCTION_SLOT_STEMS:
-            slot_uri = _uri_slot(payload, slot)
-            if slot_uri is None:
-                continue
-            assert_fetch_equiv(slot, slot_uri, as_bytes=False, **fetch_kw)
+        assert_order_function_content_equiv(payload, **fetch_kw)
     elif stem == 'structure' and isinstance(payload, dict):
-        for slot in _STRUCTURE_SLOT_STEMS:
-            slot_uri = _uri_slot(payload, slot)
-            if slot_uri is None:
-                continue
-            assert_fetch_equiv(slot, slot_uri, as_bytes=False, **fetch_kw)
+        assert_order_structure_content_equiv(payload, **fetch_kw)
     elif stem == 'invoice' and isinstance(payload, dict):
-        data_uri = _uri_slot(payload, 'data')
-        if data_uri is not None:
-            # Input data ≠ registry egress ``data`` / ``data_uri``.
-            assert_fetch_equiv('data', data_uri, as_bytes=True, **slot_kw)
+        assert_order_invoice_content_equiv(payload, **slot_kw)
     return payload
+
+
+def assert_order_function_content_equiv(function: dict[str, Any], **fetch_kw) -> None:
+    """Assert mesh ≡ HTTP for Function nested slot URIs (already-fetched envelope)."""
+    if not isinstance(function, dict):
+        raise AssertionError(
+            f'Function is not a JSON object: {type(function).__name__}'
+        )
+    for slot in _FUNCTION_SLOT_STEMS:
+        slot_uri = _uri_slot(function, slot)
+        if slot_uri is None:
+            continue
+        assert_fetch_equiv(slot, slot_uri, as_bytes=False, **fetch_kw)
+
+
+def assert_order_structure_content_equiv(structure: dict[str, Any], **fetch_kw) -> None:
+    """Assert mesh ≡ HTTP for Structure nested slot URIs (already-fetched envelope)."""
+    if not isinstance(structure, dict):
+        raise AssertionError(
+            f'Structure is not a JSON object: {type(structure).__name__}'
+        )
+    for slot in _STRUCTURE_SLOT_STEMS:
+        slot_uri = _uri_slot(structure, slot)
+        if slot_uri is None:
+            continue
+        assert_fetch_equiv(slot, slot_uri, as_bytes=False, **fetch_kw)
+
+
+def assert_order_invoice_content_equiv(invoice: dict[str, Any], **fetch_kw) -> None:
+    """Assert mesh ≡ HTTP for Order *input* Invoice ``data_uri``.
+
+    Strips ``record`` so registry output Invoice / egress ``data`` are not
+    used as locators or digest checks.
+    """
+    if not isinstance(invoice, dict):
+        raise AssertionError(
+            f'Invoice is not a JSON object: {type(invoice).__name__}'
+        )
+    slot_kw = {**fetch_kw, 'record': None}
+    data_uri = _uri_slot(invoice, 'data')
+    if data_uri is not None:
+        assert_fetch_equiv('data', data_uri, as_bytes=True, **slot_kw)
 
 
 def assert_order_content_equiv(order: dict[str, Any], **fetch_kw) -> None:

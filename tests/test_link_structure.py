@@ -6,6 +6,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from cats.network import ContentMesh
+from cats.network.registry import (
+    assert_invoice_data_chain,
+    assert_order_pairing_lineage,
+)
 
 
 def _cat_response_fixture(
@@ -135,8 +139,12 @@ def test_link_structure_from_filepath(monkeypatch, tmp_path):
         obj for obj in reversed(put_objs)
         if isinstance(obj, dict) and 'endpoint' in obj and 'function_uri' in obj
     )
-    assert order['function_uri'] == function_id
-    assert order['structure_uri'] != 'QmStruct'
+    assert_order_pairing_lineage(
+        {'function_cid': function_id, 'structure_cid': 'QmStruct'},
+        order,
+        function='carried',
+        structure='mutated',
+    )
     assert order['structure_filepath'] == 'structure'
     assert order['endpoint'] == 'http://127.0.0.1:5000/cat/node/init'
     assert not any(k.endswith('_cid') for k in order)
@@ -159,7 +167,7 @@ def test_link_structure_from_filepath(monkeypatch, tmp_path):
         obj for obj in put_objs
         if isinstance(obj, dict) and set(obj) == {'data_uri'}
     )
-    assert invoice == {'data_uri': data_id}
+    assert_invoice_data_chain({'data_cid': data_id}, invoice)
 
 
 def test_link_structure_plant_override_only(monkeypatch, tmp_path):
@@ -193,7 +201,12 @@ def test_link_structure_plant_override_only(monkeypatch, tmp_path):
         obj for obj in reversed(put_objs)
         if isinstance(obj, dict) and 'endpoint' in obj and 'function_uri' in obj
     )
-    assert order['function_uri'] == function_id
+    assert_order_pairing_lineage(
+        {'function_cid': function_id, 'structure_cid': 'QmStruct'},
+        order,
+        function='carried',
+        structure='mutated',
+    )
     assert order['structure_filepath'] == 'structure'
 
 
