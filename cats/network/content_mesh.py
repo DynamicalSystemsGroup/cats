@@ -39,6 +39,22 @@ from cats.network.packaging import (
     stage_structure_root,
 )
 
+# JSON stems nested under parent ``flat`` (uri slots stay on the parent).
+# Opaque data / source / directory / stage bytes are never expanded.
+_FLAT_STEM_ORDER = (
+    'order',
+    'seed',
+    'data_stages',
+    'structure_as_executed',
+    'function',
+    'structure',
+    'invoice',
+    'plant_as_executed',
+    'infrastructure_as_executed',
+    'object_store_as_executed',
+    'log',
+)
+
 
 class ContentMesh(OrderOps):
     def __init__(self, ipfsClient, CATS_HOME=None, addressStore=None):
@@ -304,51 +320,76 @@ class ContentMesh(OrderOps):
             return None
         return json.loads(self.cat(key))
 
-    def flatten_bom(self, bom_response):
+    def _flatten_keep_uris(self, obj, max_depth, visited):
+        """Copy ``obj``, nest allowlisted JSON refs under ``flat``.
+
+        ``max_depth`` is remaining expansions (same counter as
+        ``flatten_uri_dict``). At 0, uri slots stay and ``flat`` is omitted.
+        """
+        if not isinstance(obj, dict):
+            return obj
+        out = dict(obj)
+        if max_depth <= 0:
+            return out
+        bag = {}
+        for stem in _FLAT_STEM_ORDER:
+            key = ref_uri(obj, stem) or ref_id(
+                obj, stem, cats_home=self.CATS_HOME
+            )
+            if not key:
+                continue
+            if key in visited:
+                continue
+            payload = self._fetch_ref(obj, stem)
+            if payload is None:
+                continue
+            child_visited = visited | {key}
+            if isinstance(payload, dict):
+                payload = self._flatten_keep_uris(
+                    payload, max_depth - 1, child_visited
+                )
+            bag[stem] = payload
+        if bag:
+            out['flat'] = bag
+        return out
+
+    def flatten_bom(self, bom_response, *, max_depth: int = 4):
+        """Fetch Invoice + log into an inspect tree (uri slots + ``flat``).
+
+        Reads ``bom_response["bom"]`` only. Does **not** mutate the execute
+        envelope. ``max_depth`` counts JSON expansions from the BOM (default 4
+        reaches ``object_store_as_executed``; Function ``process`` is not
+        inlined). ``max_depth <= 0`` returns uri slots only (no fetches).
+        """
         bom = bom_response["bom"]
+        invoice_key = ref_uri(bom, 'invoice') or ref_id(
+            bom, 'invoice', cats_home=self.CATS_HOME
+        )
+        log_key = ref_uri(bom, 'log') or ref_id(
+            bom, 'log', cats_home=self.CATS_HOME
+        )
+        if max_depth <= 0:
+            return {
+                'invoice': None,
+                'log': None,
+                'invoice_uri': invoice_key,
+                'log_uri': log_key,
+            }
         invoice = self._fetch_ref(bom, 'invoice')
         if invoice is None:
             raise RuntimeError('BOM missing invoice_uri / invoice_cid')
-        invoice['order'] = self._fetch_ref(invoice, 'order')
-        if invoice['order'] is None:
-            raise RuntimeError('Invoice missing order_uri / order_cid')
-        seed = self._fetch_ref(invoice, 'seed')
-        if seed is not None:
-            invoice['seed'] = seed
-        data_stages = self._fetch_ref(invoice, 'data_stages')
-        if data_stages is not None:
-            invoice['data_stages'] = data_stages
-        order = invoice['order']
-        order['flat'] = {
-            'function': self._fetch_ref(order, 'function'),
-            'structure': self._fetch_ref(order, 'structure'),
-            'invoice': self._fetch_ref(order, 'invoice'),
-        }
-        structure_as_executed = None
-        plant = None
-        infrastructure_as_executed = None
-        object_store_as_executed = None
-        structure_as_executed = self._fetch_ref(invoice, 'structure_as_executed')
-        if structure_as_executed is not None:
-            plant = self._fetch_ref(structure_as_executed, 'plant_as_executed')
-            infrastructure_as_executed = self._fetch_ref(
-                structure_as_executed, 'infrastructure_as_executed'
-            )
-            if infrastructure_as_executed is not None:
-                object_store_as_executed = self._fetch_ref(
-                    infrastructure_as_executed, 'object_store_as_executed'
-                )
+        visited = {invoice_key} if invoice_key else set()
+        invoice = self._flatten_keep_uris(invoice, max_depth - 1, visited)
         log = self._fetch_ref(bom, 'log')
-        bom_response["flat_bom"] = {
+        if log is not None:
+            log_visited = set(visited)
+            if log_key:
+                log_visited.add(log_key)
+            log = self._flatten_keep_uris(log, max_depth - 1, log_visited)
+        return {
             'invoice': invoice,
-            'data_stages': data_stages,
             'log': log,
-            'structure_as_executed': structure_as_executed,
-            'plant': plant,
-            'infrastructure_as_executed': infrastructure_as_executed,
-            'object_store_as_executed': object_store_as_executed,
         }
-        return bom_response
 
     def initBOMjson(self,
         structure_id: str, structure_filepath: str, function_id: str, init_data_id: str,

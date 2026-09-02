@@ -5,6 +5,8 @@
 .cursor/
 __marimo__/
 __marimo__/**
+.agents/
+skills-lock.json
 *.pyc
 .cursorignore
 .ipynb_checkpoints

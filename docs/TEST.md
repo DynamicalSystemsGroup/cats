@@ -36,7 +36,7 @@
   [`tests/test_meshclient_rpc_surface.py`](../tests/test_meshclient_rpc_surface.py) /
   [`tests/test_function_source_id.py`](../tests/test_function_source_id.py).
   Registry claims / HTTP coherence (unit; live consumer
-  [`notebooks/new_cats_demo.py`](../notebooks/new_cats_demo.py)):
+  [`notebooks/cats_demo.py`](../notebooks/cats_demo.py)):
   index parity [`tests/test_registry_parity.py`](../tests/test_registry_parity.py);
   claims → HTTP reachability [`tests/test_registry_reachability.py`](../tests/test_registry_reachability.py);
   post-execute projection [`tests/test_handoff_projection.py`](../tests/test_handoff_projection.py);

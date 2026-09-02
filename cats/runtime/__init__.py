@@ -188,13 +188,12 @@ class Runtime:
                 order_uri = None
         else:
             order_uri = None
+        invoice_uri = enhanced_bom.get('invoice_uri') or bom.get('invoice_uri')
         bom_response = {
             'bom': bom,
             'content_id': bom_id,
             'bom_ldp_uri': bom_ldp_uri(bom_id),
             'bom_solid_uri': None,
-            'invoice_uri': enhanced_bom.get('invoice_uri'),
-            'order_uri': order_uri,
         }
         if solid_configured():
             # Fail Runtime when Solid is configured and PUT fails (dual-write
@@ -267,8 +266,8 @@ class Runtime:
                 locators={
                     'bom_ldp_uri': bom_response['bom_ldp_uri'],
                     'bom_solid_uri': bom_response['bom_solid_uri'],
-                    'invoice_uri': bom_response.get('invoice_uri'),
-                    'order_uri': bom_response.get('order_uri'),
+                    'invoice_uri': invoice_uri,
+                    'order_uri': order_uri,
                 },
             )
         )

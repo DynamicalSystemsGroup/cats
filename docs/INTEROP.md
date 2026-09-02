@@ -113,7 +113,10 @@ adapter modules).
    `bom_cid=` / `data_cid=` via the Node-local BOM registry
    ([`BomRegistry.md`](./BomRegistry.md)). A-la-carte helpers remain
    (see [`LineageOfProvenance.md`](./LineageOfProvenance.md)). Available as Order ops for proving
-   2f; second Plant adapters still required for a full interop prove.
+   2f; second Plant adapters still required for a full interop prove. The registry-first walk in
+   [`DEMO.md`](./DEMO.md) (`cats_demo.py`) is **demo-proved `linkProcess` only**;
+   `linkStructure`, mesh-federated registry, and a second-Structure inspect path are listed there
+   under **Not in this notebook**.
 7. **Executor / Factory adapter-blind CI:** Function modules are grep-guarded against Ray /
    Job Submission; extend CI so `cats/factory`, `cats/executor`, and `cats/runtime` never import
    `JobSubmissionClient` / `import ray` / hard-coded `structure-ipfs_*`. Executor may only pass
@@ -184,6 +187,7 @@ Treat remaining soft edges (`job_endpoint` shape) as cleanup with the first non-
 - [`PLANTs.md`](./PLANTs.md) — Plant analogies and generation vs T&D
 - [`STORAGE.md`](./STORAGE.md) — content-store vs T&D facets; TransportPort / ComputePort / PlantPort / JobHandle
 - [`BOM.md`](./BOM.md) — Order Function/Structure CIDs; named Process imports
+- [`DEMO.md`](./DEMO.md) — registry-first notebook is demo-proved `linkProcess` on one Structure; **Not in this notebook** is the 2f / federation remainder
 - [`BomRegistry.md`](./BomRegistry.md) — Node-local BOM index; `link*` without a caller-held `cat_response`
 - [`LineageOfProvenance.md`](./LineageOfProvenance.md) — `linkProcess` / `linkStructure` / `linkOrder` Order lineage; **2f** still needs second Plant adapters
 - [`IPFS.md`](./IPFS.md) — optional host Kubo; CAS-only transport (§6s)

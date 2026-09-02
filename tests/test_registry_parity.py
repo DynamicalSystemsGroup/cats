@@ -2,7 +2,7 @@
 
 **Parity** = the same BomRegistry / LocatorIndex facts agree when read via
 on-disk Python APIs and via the Node's ``/ldp/registry/…`` routes (Flask test
-client here; live Node in ``notebooks/new_cats_demo.py``).
+client here; live Node in ``notebooks/cats_demo.py``).
 
 Goal: catch drift between disk indexes and the HTTP facade used by ``init`` /
 ``link*``. These tests do **not** validate signed ExecutionBom or Invoice
