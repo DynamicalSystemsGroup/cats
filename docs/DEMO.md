@@ -38,25 +38,26 @@ Execute CATs on a single-node Mesh via Marimo — the **REPLaC (REPL as Code) Wo
 **What you should see after CAT0 `catSubmit`:** HTTP envelope with `content_id`, `bom_ldp_uri`, optional `hl` / `bom_solid_uri`; signed `bom` carrying `invoice_uri` / `log_uri` / `node_did` + Data Integrity proof. Order URI is on the Invoice (`invoice.order_uri`), not on the HTTP envelope. `flatten_bom` (CAT1 in the demos) **returns** `{invoice, log}` with uri slots kept and fetched JSON under each parent’s `flat` (`max_depth=4` by default) — it does not mutate the envelope. CAT1 uses `linkProcess` (Function lineage) — not a second independent `create_order_request`.
 
 Marimo’s working directory is `notebooks/`. `from cats import …` does not import
-Order Function sources (`cats/` must not `import data`). The registry-first demo’s
-`cat0_create_order` cell inserts `CATS_HOME` on `sys.path` before named Process
-imports. For [`cats_demo.py`](../notebooks/cats_demo.py) (or any cell that imports
-`data` without that insert), run with the repo on `PYTHONPATH`:
+Order Function sources (`cats/` must not `import data`). The current demo
+([`cats_demo.py`](../notebooks/cats_demo.py)) is registry-first: `cat0_create_order`
+inserts `CATS_HOME` on `sys.path` before named Process imports. The envelope-held
+walk ([`old_cats_demo.py`](../notebooks/old_cats_demo.py), or any cell that imports
+`data` without that insert) needs the repo on `PYTHONPATH`:
 
 ```bash
-PYTHONPATH=. uv run marimo edit notebooks/cats_demo.py
-# registry-first lineage (linkProcess via content_id= / bom_ldp_uri=):
-uv run marimo edit notebooks/new_cats_demo.py
+uv run marimo edit notebooks/cats_demo.py
+# envelope-held walk (held cat_response; needs PYTHONPATH):
+PYTHONPATH=. uv run marimo edit notebooks/old_cats_demo.py
 ```
 
-After CAT0 `catSubmit`, [`new_cats_demo.py`](../notebooks/new_cats_demo.py) runs the same
+After CAT0 `catSubmit`, [`cats_demo.py`](../notebooks/cats_demo.py) runs the same
 library helpers as the unit suites: registry **index parity**, **handoff projection**
 completeness, **claims reachability**, then **control-plane handoff coherence**,
 then **content equivalence** (`assert_*_content_equiv` before flatten), then
 **stageLineage directory-manifest** hops (`assert_directory_manifest_equiv` /
 `assert_stage_lineage_payload_equiv`) — not “all HTTP content ∈ registry.”
 
-**Not in this notebook** ([`new_cats_demo.py`](../notebooks/new_cats_demo.py)): this walk is **demo-proved** on one Structure (KubeRay + MinIO + CAS), not **interop-proved** (same Function CID graph on ≥2 Structure adapter sets) — see [`INTEROP.md`](./INTEROP.md).
+**Not in this notebook** ([`cats_demo.py`](../notebooks/cats_demo.py)): this walk is **demo-proved** on one Structure (KubeRay + MinIO + CAS), not **interop-proved** (same Function CID graph on ≥2 Structure adapter sets) — see [`INTEROP.md`](./INTEROP.md).
 
 - `linkStructure` (Structure mutation) — Order op to swap Plant while carrying Function; required for INTEROP **2f** / **P2**. This notebook exercises `linkProcess` only.
 - mesh-federated registry — `link*` here uses the **Node-local** index ([`BomRegistry.md`](./BomRegistry.md), linked from INTEROP); federation is a remaining discovery gap, not a second Plant.

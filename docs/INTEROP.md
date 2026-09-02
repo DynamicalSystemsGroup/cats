@@ -114,7 +114,7 @@ adapter modules).
    ([`BomRegistry.md`](./BomRegistry.md)). A-la-carte helpers remain
    (see [`LineageOfProvenance.md`](./LineageOfProvenance.md)). Available as Order ops for proving
    2f; second Plant adapters still required for a full interop prove. The registry-first walk in
-   [`DEMO.md`](./DEMO.md) (`new_cats_demo.py`) is **demo-proved `linkProcess` only**;
+   [`DEMO.md`](./DEMO.md) (`cats_demo.py`) is **demo-proved `linkProcess` only**;
    `linkStructure`, mesh-federated registry, and a second-Structure inspect path are listed there
    under **Not in this notebook**.
 7. **Executor / Factory adapter-blind CI:** Function modules are grep-guarded against Ray /
