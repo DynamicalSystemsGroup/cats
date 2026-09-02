@@ -7,7 +7,7 @@ prior BOM (`content_id` → Order equality id) and recovers *which* BOM produced
 output (`data` / `content_id` → `[bom_ids, …]`) without a caller-held HTTP `cat_response`.
 
 Digest/`ni:` remains the **equality / lineage key** for Invoice / Order / stage bytes;
-**new** mints carry HTTP `*_uri` only as the data-plane address of record (§6d — no `*_cid`
+**new** mints carry HTTP `*_uri` only as the data-plane address of record ([URI-only graph](W3C.md#6d-uri-only-graph) — no `*_cid`
 JSON keys). The registry is an append-only **projection** of those envelopes — not a second
 store of provenance payloads. `LocatorIndex` (`by-content/`) maps content ids to HTTP CAS /
 Order / Invoice locators. Index **keys** stay hash-based (`by-data` / `by-order`), not URL-based.
@@ -37,9 +37,9 @@ Without a registry:
 - `linkProcess` / `linkStructure` / `linkOrder` required a prior HTTP
   `cat_response` in the caller’s process.
 
-The registry closes those gaps **on one Node**. §6d hard-drop of `*_cid` names and
-§6f `hl:` handoff are **landed**; remaining work is mesh federation of the index
-(§6g–§6h). See [`W3C.md`](W3C.md).
+The registry closes those gaps **on one Node**. [URI-only graph](W3C.md#6d-uri-only-graph) hard-drop of `*_cid` names and
+[`hl:` handoff](W3C.md#6f-hashlink-handoff) are **landed**; remaining work is [mesh federation of the index](W3C.md#6g-and-6h-mesh-federation).
+See [`W3C.md`](W3C.md).
 
 ```mermaid
 flowchart LR
@@ -52,7 +52,7 @@ flowchart LR
   Link["linkProcess / linkStructure / linkOrder"]
   Lookup[lookup_order / lookup_bom]
   Flatten[flatten_bom]
-  Data[AddressStore CID reads]
+  Data[AddressStore CAS reads]
 
   Runtime --> Sign --> Ldp --> Solid --> Reg
   Init -->|"order_uri / content_id / hl"| Data
@@ -64,7 +64,7 @@ flowchart LR
 
 ## Record shape
 
-`build_record(bom, bom_cid, *, content_mesh, locators)` **verifies** the signed
+`build_record(bom, content_id, *, content_mesh, locators)` **verifies** the signed
 envelope (`verify_execution_bom`), then extracts Invoice / Order fields via
 AddressStore. It does **not** trust client-supplied index fields beyond optional
 locators. Unsigned or tampered proofs raise `RegistryError`.
@@ -89,7 +89,7 @@ Legacy on-disk records with `*_cid` remain readable via `_record_*_id` helpers.
 ## Disk layout
 
 JSON under `{CATS_HOME}/.cats/registry/` (mirrors `BomLdpStore`; no SQLite).
-Path segments are CID- or digest-safe (`content_id_fs_key`). `put` is idempotent
+Path segments are digest-safe (`content_id_fs_key`). `put` is idempotent
 on `content_id`. Reverse-index files are append-if-absent lists, **newest first**.
 CAS locators live under `by-content/` (hex digest keys).
 
@@ -230,7 +230,7 @@ requests.get(f"{base}/ldp/registry/by-content/{hex_id}").json()  # locators
 
 ```python
 BomRegistry(self.CATS_HOME).put(build_record(
-    bom, bom_cid,
+    bom, content_id=bom_id,
     content_mesh=self.contentMesh,
     locators={'bom_ldp_uri': ..., 'bom_solid_uri': ...},
 ))
@@ -253,16 +253,16 @@ Registered from [`cats/node/app.py`](../cats/node/app.py) next to LDP
 | `GET /ldp/registry/by-order/<order>` | `{content_id, bom_ids: [...]}` |
 | `GET /ldp/registry/by-content/<digest>` | `{ content_id, locators: [...] }` (CAS locator index) |
 
-Invalid CID path segments → 400. `HEAD` / `OPTIONS` follow the LDP resource /
+Invalid digest path segments → 400. `HEAD` / `OPTIONS` follow the LDP resource /
 container header pattern used by `/ldp/boms/`.
 
 **Not the registry:** `GET /ldp/boms/` (local envelope list), Solid GET by a
-known `bom_cid`, LDN Announce. Those are locators / notifies; this is the
+known `content_id` / `bom_ldp_uri`, LDN Announce. Those are locators / notifies; this is the
 **queryable index**.
 
 ## `POST /cat/node/init` intake
 
-Body may identify the Order via §6d intake keys. Legacy `order_cid` / `bom_cid` /
+Body may identify the Order via [URI-only](W3C.md#6d-uri-only-graph) intake keys. Legacy `order_cid` / `bom_cid` /
 `data_cid` → **HTTP 400**.
 
 | Body | Resolution |
@@ -303,12 +303,12 @@ discoverable from the consuming CAT’s side, going forward — see
 
 ## Out of scope (later)
 
-Beyond Phase 2b / §6d / §6f (URI-only graph + `ni:` equality + `hl:` handoff landed):
+Beyond Phase 2b / [URI-only graph](W3C.md#6d-uri-only-graph) / [`hl:` handoff](W3C.md#6f-hashlink-handoff) (URI-only graph + `ni:` equality + `hl:` handoff landed):
 
 - Mesh federation of the index / Action Plane catalog filters
 - Solid PUT of registry records
 - Mesh-federated / Solid dual-write of CAS locator maps
-- Required Invoice `hl:` (§6i)
+- Required Invoice `hl:` ([hashlink handoff](W3C.md#6f-hashlink-handoff))
 - SPARQL over the index
 - Consumer-side downstream edges
 - Plant / MinIO / Ray
@@ -326,17 +326,17 @@ hint), Flask GET / PUT 405, `init` legacy `*_cid` → 400 / `{content_id}` /
 `data_cid=`). Runtime execute indexing is asserted in
 [`tests/test_ldp_bom_control_plane.py`](../tests/test_ldp_bom_control_plane.py).
 CAS put/get/verify, manifests, and locators: [`tests/test_cas_http.py`](../tests/test_cas_http.py).
-Phase 2b URI + §6d hard-drop: [`tests/test_phase2b_uri.py`](../tests/test_phase2b_uri.py).
+Phase 2b URI + [URI-only](W3C.md#6d-uri-only-graph) hard-drop: [`tests/test_phase2b_uri.py`](../tests/test_phase2b_uri.py).
 
 See also [`TEST.md`](TEST.md).
 
 ## Related docs
 
-- [`BOM.md`](BOM.md) — signed envelope, Invoice/Order CID nest, HTTP response
+- [`BOM.md`](BOM.md) — signed envelope, Invoice/Order `*_uri` nest, HTTP response
 - [`ControlFeedbackLoop.md`](ControlFeedbackLoop.md) — Order-from-BOM intake (notes 2 & 5)
-- [`LineageOfProvenance.md`](LineageOfProvenance.md) — `data_cid` reverse lookup; `link*`
+- [`LineageOfProvenance.md`](LineageOfProvenance.md) — data→BOM reverse lookup; `link*`
 - [`NodeLifeCycle.md`](NodeLifeCycle.md) — Flask routes served by `node-start`
 - [`SOLID.md`](SOLID.md) — envelope locators vs this index
 - [`W3C.md`](W3C.md) — provenance discovery; CAS-over-HTTP + Phase 2b MVP landed; remaining federation / hard-drop `*_cid`
-- [`DESIGN.md`](DESIGN.md) — next Order discovered via registry, not only `order_cid`
+- [`DESIGN.md`](DESIGN.md) — next Order discovered via registry, not only out-of-band `order_uri`
 - [`INTEROP.md`](INTEROP.md) — `link*` as Structure-lineage ops for second-Plant prove

@@ -7,8 +7,8 @@ Make targets wrap the same commands.
 
 **Ownership rule:** Node is a client of InfraStructure’s long-lived **content-store facet**.
 Host Kubo is **optional** operator tooling (`ContentStore.ensure`); **new** content lives on
-Node **CAS-over-HTTP** (`GET /ldp/cas/<hex>`). `start` **soft-probes** ContentStore (§6r/§6s —
-Kubo optional for CAS-only Orders); `ensure` **heals**/starts Kubo if you want it; `stop` kills
+Node **CAS-over-HTTP** (`GET /ldp/cas/<hex>`). `start` **[soft-probes](W3C.md#6r-soft-kubo-probe)** ContentStore
+(Kubo optional for [CAS-only Orders](W3C.md#6s-cas-only-node)); `ensure` **heals**/starts Kubo if you want it; `stop` kills
 Flask only — never host Kubo.
 
 ## Quick reference
@@ -33,7 +33,7 @@ make node-down               # node-stop then ipfs shutdown (full local teardown
 ## Why ensure and start are separate
 
 `make node-up` is a **Make-only** convenience that runs `content-store-ensure` then `node-start`.
-`python -m cats.node start` soft-probes ContentStore and binds Flask even when Kubo is down (§6r).
+`python -m cats.node start` [soft-probes](W3C.md#6r-soft-kubo-probe) ContentStore and binds Flask even when Kubo is down.
 
 | Target / CLI | Role |
 |--------------|------|
@@ -53,7 +53,7 @@ Details: [`STORAGE.md`](./STORAGE.md#node-up-vs-content-store-ensure-and-node-st
 
 ### Ensure ContentStore (host Kubo)
 
-Optional operator tooling (§6r/§6s). Live Orders use Node CAS and do not require Kubo.
+Optional operator tooling. Live Orders use Node CAS and do not require Kubo.
 `node-start` soft-warns when Kubo is not ready; it does not fail.
 
 ```bash
@@ -139,5 +139,5 @@ Make-only convenience: runs `node-stop`, then `ipfs shutdown`. Does **not** live
 - [`TEST.md`](./TEST.md) — integration tests that need a live Node
 - [`BomRegistry.md`](./BomRegistry.md) — Node-local BOM query index (`GET /ldp/registry/…`)
 - [`STORAGE.md`](./STORAGE.md) — content-store vs scratch ownership; why ensure ≠ start
-- [`IPFS.md`](./IPFS.md) — optional host Kubo facet, two-phase ensure (no Docker peers §6s)
+- [`IPFS.md`](./IPFS.md) — optional host Kubo facet, two-phase ensure (no Docker peers)
 - [`DASHBOARDS.md`](./DASHBOARDS.md) — Ray / MinIO / IPFS WebUI once Structure is deployed

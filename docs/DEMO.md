@@ -4,12 +4,12 @@
 
 ##### 0. Start Docker daemon:
 
-Needed for **Structure** facets (MinIO scratch + Plant / KubeRay), **not** Docker Kubo T&D peers (retired §6s).
+Needed for **Structure** facets (MinIO scratch + Plant / KubeRay), **not** Docker Kubo T&D peers (retired).
 
 ##### 1. Content store + Node lifecycle: see [`NodeLifeCycle.md`](./NodeLifeCycle.md) (optional Kubo: [`IPFS.md`](./IPFS.md))
 
 Live Orders use Node **CAS-over-HTTP**. Host Kubo is optional operator tooling. Node start
-**soft-probes** ContentStore and does not hard-require Kubo (§6r/§6s). See [`NodeLifeCycle.md`](./NodeLifeCycle.md).
+**soft-probes** ContentStore and does not hard-require Kubo. See [`NodeLifeCycle.md`](./NodeLifeCycle.md).
 
 ##### 2. [Create the environment](./ENV.md) and install dependencies *in Terminal C*:
 

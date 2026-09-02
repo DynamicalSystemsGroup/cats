@@ -1,6 +1,6 @@
 ### Host IPFS / Kubo (optional operator tooling)
 
-**CAS-over-HTTP** is the content-store address of record for live Orders (§6p–§6s).
+**CAS-over-HTTP** is the content-store address of record for live Orders.
 Host [Kubo](https://docs.ipfs.tech/install/command-line/#system-requirements) is **optional**
 operator tooling (`ContentStore.ensure` / `make content-store-ensure` / `node ensure`) — not required
 for Node start, Structure apply, or Process migrate/stage. See [`DEPS.md`](./DEPS.md) and
@@ -15,15 +15,15 @@ for Node start, Structure apply, or Process migrate/stage. See [`DEPS.md`](./DEP
 | `ni:` / hex digest | Locator index → `GET /ldp/cas/<hex>` → sha256 verify |
 | `hl:` | Hint HTTP URIs then bare `ni:` fallback → sha256 verify |
 | `http(s)://…` URI | Local LDP / HTTP GET → sha256 verify when digest known |
-| Legacy CID (`Qm…` / `bafy…`) | **Fail closed** (§6s) — remint to `ni:` / HTTP |
+| Legacy CID (`Qm…` / `bafy…`) | **Fail closed** — remint to `ni:` / HTTP |
 
 `CatsIPFSClient` (`cats/network/clients/ipfs_client.py`) remains available for optional Kubo RPC
 smoke / tooling; the Node constructs `ContentMesh(ipfsClient=None)`.
 
-**Partition layout (Process IoPort, §6p):** when `CATS_IO_PARTITIONS>1`, Plant `RayIoPort` builds a directory of opaque `part-XXXXX` files/dirs and `put_dir`s them onto CAS (`ni:` digest-keyed manifest). No Kubo `add` / `getCar` / `dag_export`. Legacy `part-*.car` layouts remain readable one cycle.
+**Partition layout (Process IoPort):** when `CATS_IO_PARTITIONS>1`, Plant `RayIoPort` builds a directory of opaque `part-XXXXX` files/dirs and `put_dir`s them onto CAS (`ni:` digest-keyed manifest). No Kubo `add` / `getCar` / `dag_export`. Legacy `part-*.car` layouts remain readable one cycle.
 
 Process `migrate` / `stage_for_plant` are **CAS-only** (`ni:` / hex / HTTP). Docker Kubo T&D peers are
-**retired** (§6s). No `ipfs` CLI from ContentMesh.
+**retired**. No `ipfs` CLI from ContentMesh.
 
 **Same API address for optional ensure/status:** `ContentStore.is_ready` / `ensure` probe
 `http://{IPFS_API_HOST}:{IPFS_API_PORT}/api/v0/id`. Optional override: `CATS_IPFS_API_ID_URL`.
@@ -43,9 +43,9 @@ left one running for tooling.
 | Phase | When | Which tree |
 |-------|------|------------|
 | **Bootstrap** | Node `start` / `ensure`; ContentMesh soft-warn; operator CLI | Repo default under `CATS_HOME/data/input/structure/.../content_store_utils.py` |
-| **Order soft probe** | `InfraStructure.apply` after terraform | Order-submitted tree (`ContentStore.is_ready` — soft-warn only §6s) |
+| **Order soft probe** | `InfraStructure.apply` after terraform | Order-submitted tree (`ContentStore.is_ready` — soft-warn only) |
 
-* **Node start** — soft bootstrap probe; does not heal or hard-require Kubo (§6r/§6s).
+* **Node start** — soft bootstrap probe; does not heal or hard-require Kubo.
 * **Node ensure** — operator heal facade: repo-tree `ContentStore.ensure` (no Flask).
 * **ContentMesh bootstrap** — lazy soft-warn; `put_dir` / `put_file` require `CATS_HOME`.
 * **Order apply** — soft-probes ContentStore; does **not** TF-ensure host Kubo or assert Docker peers.
@@ -77,7 +77,7 @@ ipfs daemon
 ipfs shutdown
 ```
 
-### Process transport (CAS-only §6s)
+### Process transport (CAS-only)
 
 [`transport_utils.py`](../data/input/structure/infrastructure/transport_utils.py) → `TransportContext`
 exposes `migrate` / `stage_for_plant` for Function-owned `TransportPort`. Docker Kubo peer Compose /

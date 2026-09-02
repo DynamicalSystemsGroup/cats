@@ -47,7 +47,7 @@
   # > (Use absolute paths; docker-compose treats relative volume paths as named volumes.)
   ```
 6. [**Go**](https://go.dev/dl/) (>= v3.13.1) (`make deps-go`)
-7. [**IPFS Kubo**](https://docs.ipfs.tech/install/command-line/#system-requirements) (>= 0.21.0) (`make deps-ipfs`) — **optional** operator tooling after §6s (CAS-only Node). See [`IPFS.md`](./IPFS.md).
+7. [**IPFS Kubo**](https://docs.ipfs.tech/install/command-line/#system-requirements) (>= 0.21.0) (`make deps-ipfs`) — **optional** operator tooling (CAS-only Node). See [`IPFS.md`](./IPFS.md).
 * [**helm**](https://helm.sh/docs/intro/install/) (>= 3.12.1) — optional; `terraform apply` manages Helm
   releases itself via the `hashicorp/helm` provider, which talks to the Helm SDK directly and doesn't shell
   out to a `helm` binary. Only install this CLI if you want to manually inspect releases with commands like

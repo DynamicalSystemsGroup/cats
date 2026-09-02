@@ -15,13 +15,13 @@ contract; object-store config is **not** a Runtime field — see [`MinIO.md`](./
 
 | Facet | What | Lifetime |
 |-------|------|----------|
-| **Content store** | Node **CAS-over-HTTP** (`CasHttpStore` under `.cats/ldp/cas/`) — address of record for live Orders; optional host Kubo for operator tooling only (§6s) | Long-lived CAS; Kubo optional |
-| **T&D** | MinIO **scratch** (`cats-scratch`) for Plant parallel writes (Docker Kubo peers retired §6s) | Structure lifetime (ILM 7d + destroy `down -v`) |
+| **Content store** | Node **CAS-over-HTTP** (`CasHttpStore` under `.cats/ldp/cas/`) — address of record for live Orders; optional host Kubo for operator tooling only ([CAS-only Node](W3C.md#6s-cas-only-node)) | Long-lived CAS; Kubo optional |
+| **T&D** | MinIO **scratch** (`cats-scratch`) for Plant parallel writes (Docker Kubo peers retired) | Structure lifetime (ILM 7d + destroy `down -v`) |
 | **Durable Entity Relationship** | Second MinIO (`cats-durable`) via same `ObjectStore` façade | Node lifetime; no ILM; Structure destroy leaves volume; GC via `gc-er` only |
 
 ### ContentMesh + Process transport
 
-**ContentMesh** (`cats.network.content_mesh`) owns content-store mesh I/O and Order compose/submit. Writes (`put_bytes` / `put_json` / `put_tree` / `put_dir` / `put_file`) require **`CATS_HOME`** and go to **CAS-over-HTTP** (`CasHttpStore` + `LocatorIndex`) → `ni:` (§6r). Reads resolve `ni:` / hex / `hl:` / `http(s)` via AddressStore (sha256 verify; fail closed). **Legacy CIDs fail closed** (§6s).
+**ContentMesh** (`cats.network.content_mesh`) owns content-store mesh I/O and Order compose/submit. Writes (`put_bytes` / `put_json` / `put_tree` / `put_dir` / `put_file`) require **`CATS_HOME`** and go to **CAS-over-HTTP** (`CasHttpStore` + `LocatorIndex`) → `ni:` ([soft Kubo probe](W3C.md#6r-soft-kubo-probe)). Reads resolve `ni:` / hex / `hl:` / `http(s)` via AddressStore (sha256 verify; fail closed). **Legacy CIDs fail closed** ([CAS-only Node](W3C.md#6s-cas-only-node)).
 
 JSON-LD + PROV-O BOM packaging (`build_execution_bom`) with Data Integrity signing (`sign_execution_bom`, `eddsa-jcs-2022`) and Node `node_did` key material live under `cats.network.feedback` / `identity` (Phase 1b — not Plant).
 The Phase 2a **control plane** (Node LDP cache + optional Solid pod dual-write / LDN) publishes signed envelopes at HTTP URIs; the **data plane** is CAS (`ni:` + `/ldp/cas/`) — see [`SOLID.md`](SOLID.md), [`BOM.md`](BOM.md), and [`W3C.md`](W3C.md). The Node-local **BOM registry** is a query index of those envelopes (plus `by-content` locators) — [`BomRegistry.md`](BomRegistry.md).
@@ -32,7 +32,7 @@ Optional Kubo: Node `start` / Structure `apply` soft-probe ContentStore; operato
 
 Get Started uses [`make node-up`](../Makefile) as a **convenience wrapper** that runs
 `content-store-ensure` then `node-start`. That does **not** mean the Node owns Kubo lifecycle —
-the wrapper is Make-only; `python -m cats.node start` soft-probes and does not hard-require Kubo (§6r/§6s).
+the wrapper is Make-only; `python -m cats.node start` [soft-probes](W3C.md#6r-soft-kubo-probe) and does not hard-require Kubo.
 
 | Target / CLI | Role |
 |--------------|------|
@@ -40,19 +40,19 @@ the wrapper is Make-only; `python -m cats.node start` soft-probes and does not h
 | `make node-start` / `uv run python -m cats.node start` | Soft probe + bind Flask; Kubo not required |
 | `make node-up` | Convenience: ensure, then start |
 
-`TransportContext` owns CAS `migrate` / `stage_for_plant` only (§6s — no Docker peers).
+`TransportContext` owns CAS `migrate` / `stage_for_plant` only ([CAS-only](W3C.md#6s-cas-only-node) — no Docker peers).
 Process transport callables depend on Function-owned **`TransportPort`**; the Executor
 narrows Structure `TransportContext` with **`cats.executor.function.as_transport_port`**
 (CFL 4A — Node wiring, not the Function CID tree).
 
 **CAS-only content ids:** `migrate` and `stage_for_plant` accept `ni:` / hex / HTTP only.
-Legacy CIDs fail closed (§6s).
+Legacy CIDs fail closed.
 
 Process hotFs depend on Function-owned **`ComputePort`** (`run_transfer`); the Plant-owned
 Ray job entrypoint (staged by **`RayPlantPort.submit_job`**) wires **`RayComputePort`**
 (no `import ray` in Process). Demo **batch ABI** is
 `Dict[str, np.ndarray] -> Dict[str, np.ndarray]` — the ComputePort adapter maps engine
-batches onto that shape (see [`INTEROP.md`](./INTEROP.md) §2g). InfraFunction dispatches
+batches onto that shape (see [`INTEROP.md` 2g](./INTEROP.md#2g-residual-ray-shaped-edges-polish)). InfraFunction dispatches
 via Function-owned **`PlantPort`** (`submit_job` / `wait`); Executor passes
 `Plant.plant_port()` → Structure **`RayPlantPort`**. `ObjectStore.write_job_scratch`
 stages scratch MinIO config only. Scratch correlator is
@@ -118,7 +118,7 @@ See [`MinIO.md`](./MinIO.md) and [`BOM.md`](./BOM.md) for Invoice stage CIDs.
 - [`NodeLifeCycle.md`](./NodeLifeCycle.md) — start / stop / status / ensure (Node process lifecycle)
 - [`INTEROP.md`](./INTEROP.md) — prove Plant/T&D interoperability per AQ component (incl. second Plant)
 - [`MinIO.md`](./MinIO.md) — operate the Structure MinIO shared object store
-- [`IPFS.md`](./IPFS.md) — optional host Kubo content-store facet; CAS-only `TransportContext` (§6s)
+- [`IPFS.md`](./IPFS.md) — optional host Kubo content-store facet; CAS-only `TransportContext`
 - [`DASHBOARDS.md`](./DASHBOARDS.md) — MinIO Console and IPFS WebUI
 - [`LineageOfProvenance.md`](./LineageOfProvenance.md) — CIDs as Data Provenance Records
 - [`DESIGN.md`](./DESIGN.md#how-the-architectural-quantum-is-realized-as-content-addressed-cids) — Order CID graph

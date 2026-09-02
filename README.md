@@ -22,8 +22,8 @@ CATs Chaordic Kernel
     - **2.** the *Node's* **Executor** 
       - **a.** *executes* the *AQ components* as **Function [FaaS]** on **Structure [PaaS]**
       - **b.** **Invoices** the *execution of data prcessing* as staged output **Content-Addresses**
-  - **B: Content-Addressed Bills-of-Materials (BOMs)** - *BOMs* employ **Content Identifiers (CIDs)** as *Content-Addesable Storage* of CATs to provide a means of [Data Verification](https://en.wikipedia.org/wiki/Data_verification) & location-agnostic **data transportation / retrieval** via a unique identification of CAT content. CATs' use of this content-addressing mechanism establishes a self-service Data Mesh as a heterogeneously scalable Compute Platform deployable on [Kubernetes](https://kubernetes.io/) as CAT Node's execution paradigm (Structure [PaaS]). 
-    - **3.** the *Node's* **Runtime** *emits* a **BOM** as the *Mesh-transportable Data Provenance record* to be *shared* & *re-executed* between Node; a Node-local **BOM registry** indexes verified envelopes so the next Order can be discovered via `bom_cid` / `data_cid` (not only out-of-band `order_cid`) — see `[docs/BomRegistry.md](./docs/BomRegistry.md)` / `[docs/ControlFeedbackLoop.md](./docs/ControlFeedbackLoop.md)`
+  - **B: Content-Addressed Bills-of-Materials (BOMs)** - *BOMs* employ Node **CAS-over-HTTP** for [Data Verification](https://en.wikipedia.org/wiki/Data_verification) and **content-address retrieval over HTTP URI** (`*_uri` locators; equality as `ni:`). That uniquely identifies CAT content and retrieves it without IPFS CIDs on the live path. CATs' use of this content-addressing mechanism establishes a self-service Data Mesh as a heterogeneously scalable Compute Platform deployable on [Kubernetes](https://kubernetes.io/) as CAT Node's execution paradigm (Structure [PaaS]).
+    - **3.** the *Node's* **Runtime** *emits* a **BOM** as the *Mesh-transportable Data Provenance record* to be *shared* & *re-executed* between Node; a Node-local **BOM registry** indexes verified envelopes so the next Order can be discovered via `content_id` / `data_uri` / `bom_ldp_uri` (not only out-of-band `order_uri`) — see [BomRegistry.md](./docs/BomRegistry.md) / [ControlFeedbackLoop.md](./docs/ControlFeedbackLoop.md)
 
 ### The sustainment of *Data Initiatives* & *Product Collaboration* on a Data Mesh's Architectural Planes via CATs' *Architectural Quantum*:
 
@@ -62,7 +62,7 @@ make deps-uv-sync
 
 #### 2. [Storage](./docs/STORAGE.md) — content-store (CAS + optional Kubo):
 
-Live Orders use Node **CAS-over-HTTP**. Host Kubo is **optional** operator tooling (§6s).
+Live Orders use Node **CAS-over-HTTP**. Host Kubo is **optional** operator tooling (not required for live Orders).
 If you still want Kubo locally:
 
 ```bash
@@ -116,7 +116,7 @@ of pipeline re-execution and **[data validation](https://en.wikipedia.org/wiki/D
 source to destination
 - **[Bill of Materials (BOM)](https://en.wikipedia.org/wiki/Bill_of_materials)** - an extensive list of raw materials,
 components, and instructions required to construct, manufacture, or repair a product or service
-- **[Content-Addressing](docs/CAS.md)** - reffers to **Content-Addressed Storage (CAS)**, which is a method of uniquely identifying and retrieving information based on its content rather than its location or address.
+- **[Content-Addressing](docs/CAS.md)** - reffers to **Content-Addressed Storage (CAS)**: uniquely identify by content (`ni:`) and retrieve over HTTP URI (`*_uri` / Node CAS-over-HTTP), rather than by a location-only address or an IPFS CID.
 - **[Distributed Computing](https://en.wikipedia.org/wiki/Distributed_computing)** - typically the concurrent and/or 
 parallel execution of job tasks distributed to networked computers processing data
 

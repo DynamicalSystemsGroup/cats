@@ -32,7 +32,7 @@ generation / Transmission & Distribution (T&D) architecture.
 For CATs, the meaningful match is the **Power Station** sense: `Plant [SaaS]` generates compute
 (Ray/KubeRay), `InfraStructure [IaaS]` is the Transmission & Distribution (T&D) substrate (IPFS/MinIO/Docker Compose)
 the generated results move through. Job **landing** (hotF entrypoint + `ComputePort` / `IoPort` adapters) is Plant-owned
-under `plant_cid` (`RayComputePort`, `RayIoPort`); scratch correlators (`ObjectStore` / `JobHandle`) stay IaaS — see [`INTEROP.md`](./INTEROP.md).
+under `plant_uri` (`RayComputePort`, `RayIoPort`); scratch correlators (`ObjectStore` / `JobHandle`) stay IaaS — see [`INTEROP.md`](./INTEROP.md).
 The Physical-Plant-internal "Power plants" taxonomy doesn't map onto that
 generation / Transmission & Distribution (T&D) split; at most, its primary-systems/balance-of-plant-systems distinction loosely echoes
 `Plant [SaaS]` (generation-specific core) vs. `InfraStructure [IaaS]` (generic supporting substrate reusable
@@ -62,8 +62,8 @@ Using `[COMPONENTS.md](COMPONENTS.md)`'s three named Architectural Components, p
 ### 1. the Factory
 
 `[COMPONENTS.md](COMPONENTS.md)` itself cites [Factory](https://en.wikipedia.org/wiki/Factory) directly. Among
-the six: **Manufacturing plant**. It takes an Order (raw materials: Input Invoice + Function CID + Structure
-CID) and assembles/composes them into a finished product (the ephemeral Executor) - the
+the six: **Manufacturing plant**. It takes an Order (raw materials: Input Invoice + Function `function_uri` + Structure
+`structure_uri`, equality `ni:`) and assembles/composes them into a finished product (the ephemeral Executor) - the
 assembly-from-specification pattern is exactly Manufacturing plant's definition.
 Order intake/staging is `Factory.accept` (reached via `Runtime.initFactory`); Runtime remains the
 Node process-lifetime ambient, not the manufacturing logic.
@@ -115,5 +115,5 @@ the Manufacturing-plant output (a composed Function+Structure pair) and those co
 
 See also: `[COMPONENTS.md](COMPONENTS.md)` for the Node's top-level Architectural Components,
 `[ControlFeedbackLoop.md](ControlFeedbackLoop.md)` for how they're exercised per execution,
-`[DESIGN.md](DESIGN.md)` for how the Architectural Quantum is realized as content-addressed CIDs, and
+`[DESIGN.md](DESIGN.md)` for how the Architectural Quantum is realized as content-addressed `ni:` / HTTP `*_uri`, and
 `[INTEROP.md](INTEROP.md)` for proving Plant/T&D interoperability across AQ components.

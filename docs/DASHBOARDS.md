@@ -51,6 +51,6 @@ Details: [`MinIO.md`](./MinIO.md), roles: [`STORAGE.md`](./STORAGE.md).
 ### [IPFS WebUI](http://127.0.0.1:5001/webui) (optional)
 
 - **URL:** http://127.0.0.1:5001/webui
-- Optional host Kubo daemon UI when you run Kubo for operator tooling (§6s — not required for
+- Optional host Kubo daemon UI when you run Kubo for operator tooling (not required for
   CAS-only Orders). See [`IPFS.md`](./IPFS.md) / `make content-store-ensure`.
 - Live content-store reads/writes use Node CAS (`GET /ldp/cas/<hex>`), not the gateway.

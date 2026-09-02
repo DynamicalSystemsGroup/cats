@@ -16,7 +16,7 @@ def _(mo):
     mo.md(r"""
     ### Execute Initial CAT0
     CAS-only Node client (`ContentMesh(ipfsClient=None)`). New Order graph slots are
-    HTTP `*_uri` with `ni:` equality — not Kubo / legacy CIDs (§6r/§6s).
+    HTTP `*_uri` with `ni:` equality — not Kubo / legacy CIDs.
 
     ##### Instantiate CAT Mesh Client
     """)
@@ -424,7 +424,7 @@ def _(mo):
 
     Same-Node alternative (not required here):
     `linkProcess(content_id=…, integrated_subproc=process_1)` via the BOM
-    registry — seeds §6g; still Node-local.
+    registry — seeds mesh federation of the index; still Node-local.
     """)
     return
 

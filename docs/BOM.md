@@ -1,6 +1,6 @@
 # What's Inside a BOM's Content Ids
 
-**Addressing note (§6d–§6s):** **new** Order / Invoice / Function / Structure / stage / BOM JSON carries HTTP **`*_uri`** only (no `*_cid` keys). Equality stays **`ni:`** (envelope `contentId` / registry hash keys / URI path hex). Control-plane **Python** uses `*_id` / `content_id` and `put_dir` / `put_file` (no `cidDir` / `cidFile` aliases). Mesh / AddressStore reads take **`content_id=`** (`ni:` / `hl:` / HTTP; legacy CID fail closed §6s). Named-bind leaves use `contentId` + optional `source_uri`. Structure reconcile marker on disk is **`.applied-structure.id`** (legacy `.applied-structure.cid` readable one cycle); plant as-executed uses **`applied_structure_id`**. Order-submitted Process/Plant/Ray ABI under `data/input/` uses **`input_dir_id`**, Ray job **`input_id` / `layout_id`**, and obj_store **`structure_id`** (ER pointer write `structure_id`; read also accepts legacy `structure_cid`). Readers still accept legacy graph `*_cid` via `ref_id`. Fetch via AddressStore / `GET /ldp/cas/<hex>` / `GET /ldp/invoices|orders/…` (or mesh `cat` / `get`).
+**Addressing note** (see [`W3C.md` workstream labels](W3C.md#workstream-labels)): **new** Order / Invoice / Function / Structure / stage / BOM JSON carries HTTP **`*_uri`** only (no `*_cid` keys). Equality stays **`ni:`** (envelope `contentId` / registry hash keys / URI path hex). Control-plane **Python** uses `*_id` / `content_id` and `put_dir` / `put_file` (no `cidDir` / `cidFile` aliases). Mesh / AddressStore reads take **`content_id=`** (`ni:` / `hl:` / HTTP; legacy CID fail closed). Named-bind leaves use `contentId` + optional `source_uri`. Structure reconcile marker on disk is **`.applied-structure.id`** (legacy `.applied-structure.cid` readable one cycle); plant as-executed uses **`applied_structure_id`**. Order-submitted Process/Plant/Ray ABI under `data/input/` uses **`input_dir_id`**, Ray job **`input_id` / `layout_id`**, and obj_store **`structure_id`** (ER pointer write `structure_id`; read also accepts legacy `structure_cid`). Readers still accept legacy graph `*_cid` via `ref_id`. Fetch via AddressStore / `GET /ldp/cas/<hex>` / `GET /ldp/invoices|orders/…` (or mesh `cat` / `get`).
 
 Each of the Architectural Quantum's four components (Function, InfraFunction, Structure, InfraStructure) is content-addressed independently, then paired back together as a small JSON object so the Order records both halves under a single content id:
 
@@ -18,7 +18,7 @@ Both are built in `create_order_request()` and unpacked back onto disk by `getEn
 }
 ```
 
-A stock named-bind leaf (`ipfs cat` of e.g. `integrated_subproc_cid`) looks like:
+A stock named-bind leaf (`GET /ldp/cas/<hex>` / mesh `cat` of e.g. `integrated_subproc_uri`) looks like:
 
 ```json
 {
@@ -29,7 +29,7 @@ A stock named-bind leaf (`ipfs cat` of e.g. `integrated_subproc_cid`) looks like
 }
 ```
 
-A real `structure_cid` fetched via `ipfs cat` looks like:
+A Structure pairing fetched via CAS (`structure_uri`) looks like:
 
 ```json
 {
@@ -39,7 +39,7 @@ A real `structure_cid` fetched via `ipfs cat` looks like:
 }
 ```
 
-The sibling `order.structure_filepath` field just records the directory name (e.g. `structure`) so `getEnhancedBom()` knows where to materialize root glue and each fetched module locally (`structure_filepath/` for root files, `structure_filepath/plant`, `structure_filepath/infrastructure`); `flatten_bom()` surfaces the parsed `{root_cid, plant_cid, infrastructure_cid}` object under `invoice.flat.order.flat.structure` for inspection.
+The sibling `order.structure_filepath` field just records the directory name (e.g. `structure`) so `getEnhancedBom()` knows where to materialize root glue and each fetched module locally (`structure_filepath/` for root files, `structure_filepath/plant`, `structure_filepath/infrastructure`); `flatten_bom()` surfaces the parsed `{root_uri, plant_uri, infrastructure_uri}` object under `invoice.flat.order.flat.structure` for inspection.
 
 ### CAT Node HTTP BOM response
 
@@ -113,7 +113,7 @@ Example `object_store_as_executed` content (`ObjectStore.snapshot()` after `Infr
 {"minio_scratch_bucket":"cats-scratch","minio_scratch_endpoint_host":"http://127.0.0.1:9000","minio_scratch_endpoint_pod":"http://172.19.0.1:9000","minio_durable_bucket":"cats-durable","minio_durable_endpoint_host":"http://127.0.0.1:9100","minio_durable_endpoint_pod":"http://172.19.0.1:9100"}
 ```
 
-Concretely, `InfraFunction` (`infrafunction_subproc`) dispatches `integrated_subproc` (Process `process_0` / `process_1` via **`ComputePort`** — no Ray in Process) onto Plant through **`PlantPort`** (this demo: `RayPlantPort` / Ray Job Submission). `ObjectStore.write_job_scratch` writes scratch MinIO config only; `RayPlantPort.submit_job` stages the Plant-owned entrypoint + **`RayComputePort`**. Demo batch ABI is `Dict[str, np.ndarray]` column batches. Workers land CSV shards under a **`JobHandle`** prefix in scratch MinIO; host-side retrieval uses `ObjectStore.download_job_result`. Durable Entity Relationship (structure namespace + `er/current` pointers) is a separate hard-isolated MinIO on the same `ObjectStore` façade — see [`MinIO.md`](./MinIO.md). `object_store_as_executed_cid` records both stores’ credential-free endpoints.
+Concretely, `InfraFunction` (`infrafunction_subproc`) dispatches `integrated_subproc` (Process `process_0` / `process_1` via **`ComputePort`** — no Ray in Process) onto Plant through **`PlantPort`** (this demo: `RayPlantPort` / Ray Job Submission). `ObjectStore.write_job_scratch` writes scratch MinIO config only; `RayPlantPort.submit_job` stages the Plant-owned entrypoint + **`RayComputePort`**. Demo batch ABI is `Dict[str, np.ndarray]` column batches. Workers land CSV shards under a **`JobHandle`** prefix in scratch MinIO; host-side retrieval uses `ObjectStore.download_job_result`. Durable Entity Relationship (structure namespace + `er/current` pointers) is a separate hard-isolated MinIO on the same `ObjectStore` façade — see [`MinIO.md`](./MinIO.md). `object_store_as_executed_uri` records both stores’ credential-free endpoints.
 
 Neither as-executed content id is re-consumed downstream to drive further behavior — their purpose is the permanent content-addressed record. `flatten_bom(max_depth=4)` returns `{invoice, log}`: uri slots stay on each JSON parent; fetched JSON is nested under that parent's `flat` (`invoice.flat.order` / `seed` / `data_stages` / `structure_as_executed`, SAE `flat.plant_as_executed` / `infrastructure_as_executed`, infra `flat.object_store_as_executed`). Default depth reaches object-store snapshot; Function `process` is not inlined. It does not mutate the HTTP execute envelope.
 
@@ -121,7 +121,7 @@ Lineage helpers (all chain Invoice `data` equality from a prior BOM): `linkProce
 
 ### Node-local BOM registry
 
-Full contract: **[`BomRegistry.md`](BomRegistry.md)** — append-only query index (`cats/network/registry/`), not the envelope store (`BomLdpStore` / Solid) and not LDN. `Runtime.execute` writes after LDP/Solid locators are known (fail closed). `POST /cat/node/init` accepts `order_uri`, `bom_ldp_uri` / `bom_solid_uri`, unique `content_id` / `data_uri` / `hl`, or `hl:` as a URI value via the index (`GET /ldp/registry/…`). Legacy `order_cid` / `bom_cid` / `data_cid` body keys → **400**. **CAS-over-HTTP** mints new Order/Invoice/stage bytes as `ni:` and registers `GET /ldp/registry/by-content/…` locators; **§6d** new mints are URI-only (`*_uri` + envelope `contentId`); **§6f** emits response/LDN `hl:` and resolves `hl:` on intake / AddressStore. Remaining gaps: mesh federation, Solid dual-write of registry records.
+Full contract: **[`BomRegistry.md`](BomRegistry.md)** — append-only query index (`cats/network/registry/`), not the envelope store (`BomLdpStore` / Solid) and not LDN. `Runtime.execute` writes after LDP/Solid locators are known (fail closed). `POST /cat/node/init` accepts `order_uri`, `bom_ldp_uri` / `bom_solid_uri`, unique `content_id` / `data_uri` / `hl`, or `hl:` as a URI value via the index (`GET /ldp/registry/…`). Legacy `order_cid` / `bom_cid` / `data_cid` body keys → **400**. **CAS-over-HTTP** mints new Order/Invoice/stage bytes as `ni:` and registers `GET /ldp/registry/by-content/…` locators; new mints are URI-only (`*_uri` + envelope `contentId`); Runtime/LDN emit `hl:` and AddressStore resolves `hl:` on intake. Remaining gaps: mesh federation, Solid dual-write of registry records.
 
 ### Invoice stage refs + Seed
 
@@ -135,4 +135,4 @@ After `Executor.execute()` (`cats/executor/executor.py`), the Invoice records bo
 
 The BOM `log` records `plant_rebuilt` and `object_store_result_uri` (`s3://cats-scratch/jobs/<uuid>/result`) as a non-secret correlator for Structure-lifetime scratch MinIO — not a substitute for integration data equality. Stage content ids live on Invoice `data_stages` only (not duplicated on the log). Scratch objects expire via ILM (7 days) and are wiped on Structure destroy (`down -v`). Optional `durable_er_uri` / `durable_er_pointer` correlators are set when Entity Relationship promote is used (otherwise `null`); durable MinIO is Node-lifetime and GC’d only via `gc-er`. Access is InfraStructure-as-Code (Consoles / S3 / `infrastructure/obj_store_utils.py` / `ObjectStore` / `JobHandle`); there is no CAT Node jobs API (see [`MinIO.md`](./MinIO.md) / [`STORAGE.md`](./STORAGE.md)). Plant, object-store, and transport config are not Runtime fields — Executor threads `Plant.plant_port()`, `obj_store_context()`, and Executor-owned `as_transport_port(transport_context())` (`cats.executor.function`; Function owns the `TransportPort` Protocol only) into Function stages. Plant input for the hotF is the host path returned by `integration_cache` under `INTEGRATION_INPUT_DATA_CACHE`, not an Ingress side-channel path.
 
-See also: [Design: How the Architectural Quantum is realized as content-addressed CIDs](DESIGN.md#how-the-architectural-quantum-is-realized-as-content-addressed-cids) and [Lineage of Provenance: How are CATs composed as a Lineage of Data Provenance on a Data Mesh?](LineageOfProvenance.md#how-are-cats-composed-as-a-lineage-of-data-provenance-on-a-data-mesh).
+See also: [Design: How the Architectural Quantum is realized as content-addressed components](DESIGN.md#how-the-architectural-quantum-is-realized-as-content-addressed-cids) and [Lineage of Provenance: How are CATs composed as a Lineage of Data Provenance on a Data Mesh?](LineageOfProvenance.md#how-are-cats-composed-as-a-lineage-of-data-provenance-on-a-data-mesh).
