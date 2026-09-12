@@ -2,87 +2,84 @@
 
 **Coverage (two tiers)**
 
-- **Integration** — [`tests/test_provenance.py`](../../tests/test_provenance.py): live Node + ContentStore.
-  Submits CAT0 and CAT1 **once** (module-scoped fixture), then asserts full provenance
-  records (Order Function/Structure pairing, Invoice stage refs, BOM log + Plant /
-  InfraStructure snapshots) and CAT0/CAT1 data lineage equality (`ni:` / content id).
-  Needs Session 1 below.
-  This is also the only live coverage of the ephemeral **Executor** path (Factory →
-  Executor → Invoice/BOM); there is no dedicated `test_executor*.py` module.
-  See [`BOM.md`](../provenance/BOM.md) and [`LineageOfProvenance.md`](../provenance/LineageOfProvenance.md).
+- **Integration** — `[tests/test_provenance.py](../../tests/test_provenance.py)`: live Node + ContentStore.
+Submits CAT0 and CAT1 **once** (module-scoped fixture), then asserts full provenance
+records (Order Function/Structure pairing, Invoice stage refs, BOM log + Plant /
+InfraStructure snapshots) and CAT0/CAT1 data lineage equality (`ni:` / content id).
+Needs Session 1 below.
+This is also the only live coverage of the ephemeral **Executor** path (Factory →
+Executor → Invoice/BOM); there is no dedicated `test_executor*.py` module.
+See `[BOM.md](../provenance/BOM.md)` and `[LineageOfProvenance.md](../provenance/LineageOfProvenance.md)`.
 - **Unit** — the other `tests/test_*.py` modules: mocked / in-process / source guards
-  (lineage helpers, named binds, ports, IaaS utils, ContentMesh RPC, Node CLI, etc.).
-  No live Node required. [`tests/test_ipfs_client.py`](../../tests/test_ipfs_client.py) is thin Kubo smoke (`@requires_kubo`; skips if `:5001` is down).
-  Control-plane Python (§6e) uses `*_id` / `put_dir`; minted JSON stays `*_uri` / `contentId` (§6d).
-  §6f `hl:` resolve/emit/intake: [`tests/test_hl_resolve.py`](../../tests/test_hl_resolve.py).
-  §6i Structure marker `.applied-structure.id` (+ plant `applied_structure_id`):
-  [`tests/test_structure_root_id.py`](../../tests/test_structure_root_id.py) /
-  [`tests/test_plant_utils.py`](../../tests/test_plant_utils.py).
-  §6j Process/Plant/Ray Order ABI (`input_dir_id`, Ray `input_id`/`layout_id`,
-  obj_store `structure_id`): [`tests/test_transport_port.py`](../../tests/test_transport_port.py) /
-  [`tests/test_infrastructure_transport_utils.py`](../../tests/test_infrastructure_transport_utils.py) /
-  [`tests/test_infrastructure_obj_store_utils.py`](../../tests/test_infrastructure_obj_store_utils.py) /
-  [`tests/test_ray_io_partitions.py`](../../tests/test_ray_io_partitions.py).
-  §6p CAS-native opaque `part-*` partition I/O (no Kubo CAR mint):
-  [`tests/test_ray_io_partitions.py`](../../tests/test_ray_io_partitions.py).
-  §6q legacy CID transport gate (historical; remint retired in §6s):
-  [`tests/test_infrastructure_transport_utils.py`](../../tests/test_infrastructure_transport_utils.py).
-  §6s retire legacy CID read + Docker T&D (fail closed; CAS-only transport):
-  [`tests/test_infrastructure_transport_utils.py`](../../tests/test_infrastructure_transport_utils.py) /
-  [`tests/test_address_store_cas_only.py`](../../tests/test_address_store_cas_only.py) /
-  [`tests/test_content_store_ensure_binding.py`](../../tests/test_content_store_ensure_binding.py).
-  §6k dual-mode `cat(content_id=)` / drop `cidDir` aliases:
-  [`tests/test_cas_http.py`](../../tests/test_cas_http.py) /
-  [`tests/test_meshclient_rpc_surface.py`](../../tests/test_meshclient_rpc_surface.py) /
-  [`tests/test_function_source_id.py`](../../tests/test_function_source_id.py).
-  Registry claims / HTTP coherence (unit; live consumer
-  [`notebooks/cats_lineage_demo.py`](../../notebooks/cats_lineage_demo.py)):
-  index parity [`tests/test_registry_parity.py`](../../tests/test_registry_parity.py);
-  claims → HTTP reachability [`tests/test_registry_reachability.py`](../../tests/test_registry_reachability.py);
-  post-execute projection [`tests/test_handoff_projection.py`](../../tests/test_handoff_projection.py);
-  handoff + Order slot helpers [`tests/test_handoff_coherence.py`](../../tests/test_handoff_coherence.py);
-  envelope content equivalence (mesh ≡ HTTP per subcomponent)
-  [`tests/test_content_equiv_bom.py`](../../tests/test_content_equiv_bom.py) /
-  [`tests/test_content_equiv_invoice.py`](../../tests/test_content_equiv_invoice.py) /
-  [`tests/test_content_equiv_order.py`](../../tests/test_content_equiv_order.py);
-  stageLineage directory-manifest hops
-  [`tests/test_manifest_equiv.py`](../../tests/test_manifest_equiv.py).
-  These do **not** assert that all HTTP content lives in the registry.
-  For mesh-reachable LDP hints in `hl:`, set `CAT_NODE_HOST` to an address peers can open
-  (loopback only warns).
+(lineage helpers, named binds, ports, IaaS utils, ContentMesh RPC, Node CLI, etc.).
+No live Node required. `[tests/test_ipfs_client.py](../../tests/test_ipfs_client.py)` is thin Kubo smoke (`@requires_kubo`; skips if `:5001` is down).
+Control-plane Python (§6e) uses `*_id` / `put_dir`; minted JSON stays `*_uri` / `contentId` (§6d).
+§6f `hl:` resolve/emit/intake: `[tests/test_hl_resolve.py](../../tests/test_hl_resolve.py)`.
+§6i Structure marker `.applied-structure.id` (+ plant `applied_structure_id`):
+`[tests/test_structure_root_id.py](../../tests/test_structure_root_id.py)` /
+`[tests/test_plant_utils.py](../../tests/test_plant_utils.py)`.
+§6j Process/Plant/Ray Order ABI (`input_dir_id`, Ray `input_id`/`layout_id`,
+obj_store `structure_id`): `[tests/test_transport_port.py](../../tests/test_transport_port.py)` /
+`[tests/test_infrastructure_transport_utils.py](../../tests/test_infrastructure_transport_utils.py)` /
+`[tests/test_infrastructure_obj_store_utils.py](../../tests/test_infrastructure_obj_store_utils.py)` /
+`[tests/test_ray_io_partitions.py](../../tests/test_ray_io_partitions.py)`.
+§6p CAS-native opaque `part-*` partition I/O (no Kubo CAR mint):
+`[tests/test_ray_io_partitions.py](../../tests/test_ray_io_partitions.py)`.
+§6q legacy CID transport gate (historical; remint retired in §6s):
+`[tests/test_infrastructure_transport_utils.py](../../tests/test_infrastructure_transport_utils.py)`.
+§6s retire legacy CID read + Docker T&D (fail closed; CAS-only transport):
+`[tests/test_infrastructure_transport_utils.py](../../tests/test_infrastructure_transport_utils.py)` /
+`[tests/test_address_store_cas_only.py](../../tests/test_address_store_cas_only.py)` /
+`[tests/test_content_store_ensure_binding.py](../../tests/test_content_store_ensure_binding.py)`.
+§6k dual-mode `cat(content_id=)` / drop `cidDir` aliases:
+`[tests/test_cas_http.py](../../tests/test_cas_http.py)` /
+`[tests/test_meshclient_rpc_surface.py](../../tests/test_meshclient_rpc_surface.py)` /
+`[tests/test_function_source_id.py](../../tests/test_function_source_id.py)`.
+Registry claims / HTTP coherence (unit; live consumer
+`[notebooks/cats_lineage_demo.py](../../notebooks/cats_lineage_demo.py)`):
+index parity `[tests/test_registry_parity.py](../../tests/test_registry_parity.py)`;
+claims → HTTP reachability `[tests/test_registry_reachability.py](../../tests/test_registry_reachability.py)`;
+post-execute projection `[tests/test_handoff_projection.py](../../tests/test_handoff_projection.py)`;
+handoff + Order slot helpers `[tests/test_handoff_coherence.py](../../tests/test_handoff_coherence.py)`;
+envelope content equivalence (mesh ≡ HTTP per subcomponent)
+`[tests/test_content_equiv_bom.py](../../tests/test_content_equiv_bom.py)` /
+`[tests/test_content_equiv_invoice.py](../../tests/test_content_equiv_invoice.py)` /
+`[tests/test_content_equiv_order.py](../../tests/test_content_equiv_order.py)`;
+stageLineage directory-manifest hops
+`[tests/test_manifest_equiv.py](../../tests/test_manifest_equiv.py)`.
+These do **not** assert that all HTTP content lives in the registry.
+For mesh-reachable LDP hints in `hl:`, set `CAT_NODE_HOST` to an address peers can open
+(loopback only warns).
 
 1. **[Install CATs](https://github.com/DynamicalSystemsGroup/cats/tree/cats2?tab=readme-ov-file#get-started)** (`uv sync --extra ops --group dev` for mesh demos and tests; `dev` provides `pytest`)
-  - **Root Dependency**: see [`NodeLifeCycle.md`](./NodeLifeCycle.md) — `make node-start` soft-probes
-  ContentStore (Kubo optional §6r/§6s). Host Kubo detail: [`IPFS.md`](../storage/IPFS.md).
+  - **Root Dependency**: see `[NodeLifeCycle.md](./NodeLifeCycle.md)` — `make node-start` soft-probes
+  ContentStore (Kubo optional §6r/§6s). Host Kubo detail: `[IPFS.md](../storage/IPFS.md)`.
 2. **Session 1**
   a. *[Create the environment](./ENV.md)*
   ```bash
   cd cats     
   uv sync --extra ops --group dev
   ```
-    - `uv run` (below) uses this `.venv` automatically — no manual activation needed.
+  - `uv run` (below) uses this `.venv` automatically — no manual activation needed.
   b. **Start Docker daemon** — needed for Structure MinIO scratch + Plant / KubeRay
-     (not Docker Kubo T&D peers, retired §6s). See [`DEMO.md`](./DEMO.md) step 0.
+     (not Docker Kubo T&D peers, retired §6s). See `[DEMO.md](./DEMO.md)` step 0.
      `tests/test_provenance.py` skips if the daemon is down.
-  c. **Start CAT Node** — follow [`NodeLifeCycle.md`](./NodeLifeCycle.md).
+  c. **Start CAT Node** — follow `[NodeLifeCycle.md](./NodeLifeCycle.md)`.
   ```bash
   make content-store-ensure   # optional operator tooling
   make node-start
   ```
 3. **Session 2:**
-
   a. *List integration tests* without running them:
   ```bash
   uv run pytest --collect-only tests/test_provenance.py
   ```
-
   b. **Run integration tests** (provenance + data lineage):
   ```bash
   # Live Node: CAT0/CAT1 once; full provenance records + data lineage equality
   uv run pytest -s tests/test_provenance.py
   ```
-    - `pytest` also invokes cleanup via `tests/conftest.py` at session start (session autouse fixture).
-    
+  - `pytest` also invokes cleanup via `tests/conftest.py` at session start (session autouse fixture).
   c. **Run unit tests** (everything except the live provenance module).
      All at once:
   ```bash
@@ -151,3 +148,4 @@
   # TransportPort Protocol (Function) + Executor as_transport_port facade
   uv run pytest -s tests/test_transport_port.py
   ```
+
