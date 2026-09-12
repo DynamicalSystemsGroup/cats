@@ -9,7 +9,7 @@ ContentMesh does not call ensure (readiness soft-warn only). Operator CLI /
 ``node ensure`` call ``ContentStore.ensure()``. The CAT Node process must not
 shut down this daemon on exit.
 
-See docs/IPFS.md and docs/STORAGE.md.
+See docs/storage/IPFS.md and docs/storage/STORAGE.md.
 """
 from __future__ import annotations
 

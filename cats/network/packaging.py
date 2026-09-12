@@ -10,6 +10,31 @@ STRUCTURE_ROOT_FILES = (
     'outputs.tf',
     '.terraform.lock.hcl',
 )
+# Apply residue hashed out of plant/ / infrastructure/ so a second
+# create_order_request after execute still carries Structure (same as-Code).
+# Keep ``.terraform.lock.hcl`` — that is as-Code, not apply output.
+STRUCTURE_APPLY_RESIDUE_DIRS = frozenset(
+    {'.terraform', '.terraform-data', '__pycache__'}
+)
+STRUCTURE_APPLY_RESIDUE_FILES = frozenset(
+    {
+        'terraform.tfstate',
+        'terraform.tfstate.backup',
+        '.terraform.tfstate.lock.info',
+        'terraform.tfstate.lock.info',
+        '.applied-structure.id',
+        '.applied-structure.cid',
+    }
+)
+
+
+def is_structure_apply_residue(rel: str) -> bool:
+    """True when ``rel`` is terraform/apply noise, not Structure as-Code."""
+    parts = (rel or '').replace('\\', '/').split('/')
+    if any(part in STRUCTURE_APPLY_RESIDUE_DIRS for part in parts):
+        return True
+    name = parts[-1] if parts else ''
+    return name in STRUCTURE_APPLY_RESIDUE_FILES or name.endswith('.pyc')
 
 
 def stage_structure_root(structure_filepath, staging_parent=None):

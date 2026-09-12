@@ -99,7 +99,7 @@ def test_create_order_request_emits_source_cids(monkeypatch, tmp_path):
     data.mkdir()
     (data / 'f.csv').write_text('a\n')
 
-    def _put_dir(path):
+    def _put_dir(path, **_kwargs):
         name = Path(path).name
         return f'Qm{name}', name
 

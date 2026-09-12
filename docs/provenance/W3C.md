@@ -1,0 +1,211 @@
+# Provenance on the W3C path
+
+Scope: **how provenance is modeled, attributed, signed, published, and discovered** — not Plant/MinIO/transport rewrites.
+
+Phases **1 / 1b / 2a** (signed JSON-LD/PROV envelope, Node LDP, optional Solid dual-write), the **Node-local BOM registry**, **CAS-over-HTTP**, **Phase 2b MVP** (URI address + `ni:` proof), naming hygiene ([6d](#6d-uri-only-graph)–[6k](#6k-mesh-cat-content-id)), [`hl:` handoff](#6f-hashlink-handoff), and [CAS-only Node](#6s-cas-only-node) (legacy CID / Docker T&D retired) are **on mainline**. The `w3c` vs `dev` columns below are a **historical** comparison of pre-merge `dev` (implicit CID threading) against that stack — branches are now tip-aligned. Remaining gaps are [mesh federation of the index](#6g-and-6h-mesh-federation) — not signing, and not “no reverse lookup at all.”
+
+## Workstream labels
+
+These IDs named landing steps. They are **headings on this page** so other docs can link them. They are not sections of [`ControlFeedbackLoop.md`](ControlFeedbackLoop.md) or the README.
+
+### 6d URI-only graph
+
+New Order / Invoice / Function / Structure / BOM JSON carries HTTP `*_uri` only (no `*_cid` keys). Equality is `ni:` (`contentId` / `content_id`). Intake rejects `order_cid` / `bom_cid` / `data_cid`.
+
+### 6e Control-plane Python names
+
+Python uses `*_id` / `content_id` and `put_dir` / `put_file` (no `cidDir` / `cidFile` aliases). Minted JSON stays `*_uri` / `contentId`.
+
+### 6f Hashlink handoff
+
+`hl:` tokens (`to_hl` / `from_hl`): AddressStore resolve, Runtime/LDN emit, `init` / `link*` intake.
+
+### 6g and 6h Mesh federation
+
+Deferred: mesh-global registry index / Action Plane catalog. Node-local `BomRegistry` is landed.
+
+### 6i Structure applied marker
+
+On-disk Structure reconcile marker `.applied-structure.id` (legacy `.applied-structure.cid` readable one cycle); plant as-executed uses `applied_structure_id`.
+
+### 6j Order ABI ids
+
+Process/Plant/Ray Order ABI: `input_dir_id`, Ray `input_id` / `layout_id`, obj_store `structure_id`.
+
+### 6k Mesh cat content-id
+
+Mesh / AddressStore reads take `content_id=` (`ni:` / `hl:` / HTTP). Dual-mode `cat(content_id=)`; no `cidDir` aliases.
+
+### 6p Opaque partition layout
+
+When `CATS_IO_PARTITIONS>1`, Plant IoPort uses opaque `part-*` files/dirs and CAS `put_dir` (`ni:` manifests). No Kubo CAR mint.
+
+### 6q Legacy CID transport gate
+
+Historical remint path. Retired; live path is [CAS-only](#6s-cas-only-node).
+
+### 6r Soft Kubo probe
+
+Node start / ContentMesh **soft-probe** optional host Kubo. Do not hard-require Kubo for CAS-only Orders.
+
+### 6s CAS-only Node
+
+Live fetch is CAS-over-HTTP (`GET /ldp/cas/<hex>`). Legacy CIDs (`Qm…` / `bafy…`) **fail closed**. Docker Kubo T&D peers retired. Kubo is optional operator tooling.
+
+## One-line verdict (provenance)
+
+* **Before (pre-merge `dev`):** provenance was mostly **implicit** [CID](https://docs.ipfs.tech/concepts/content-addressing/) **threading**.
+* **Now (mainline):** lineage is an **explicit,** [DID](https://www.w3.org/TR/did-core/)**-attributed**, [Data Integrity](https://www.w3.org/TR/vc-data-integrity/)**-signed** [JSON-LD](https://www.w3.org/TR/json-ld11/)/[PROV-O](https://www.w3.org/TR/prov-o/) **envelope**, published at [LDP](https://www.w3.org/TR/ldp/)/[Solid](https://solidproject.org/) **HTTP locators** peers can fetch and verify — while the **data plane** uses **`ni:`** equality plus HTTP **`*_uri`** only ([URI-only graph](#6d-uri-only-graph) and [CAS-only Node](#6s-cas-only-node); no Kubo/CID on the hot path). Node-local **BOM registry** reverse lookup (data → BOM / BOM → Order) is landed ([`BomRegistry.md`](BomRegistry.md)).
+
+## Envelope vs stage payloads (unchanged discipline)
+
+Provenance package stays cheap:
+
+* **In envelope:** `invoice_uri` / `log_uri`, `node_did`, [PROV-O](https://www.w3.org/TR/prov-o/) edges, [Data Integrity](https://www.w3.org/TR/vc-data-integrity/) proof
+* **Out of band:** Ray/MinIO bytes, directory manifests — Invoice stage refs + optional `object_store_result_uri` / durable ER correlators
+
+That split is the design doc’s core packaging rule: Control-Feedback **graph + proofs**, not inlined datasets.
+
+---
+
+## What “provenance” means in CATs
+
+The Control-Feedback Loop’s provenance surface is:
+
+1. **Order** (plan / as-Code Quantum) → `ni:` graph + HTTP `*_uri` locators
+2. **Executor run** (activity) → Invoice + stage `*_uri` / `ni:`
+3. **BOM** (HTTP / control-plane package) → points at Invoice + logs + agent
+4. **Registry** (Node-local index) → BOM → Order; data → BOM — so `init` / `link*` need not hold a prior HTTP response
+
+Stage products (`ingress_data_uri`, `integration_data_uri`, `data_uri`, `structure_as_executed_uri`, `seed_uri`) stay **out of the envelope as bytes** — only addresses; `seed_uri` resolves to a populated Process replay dictionary ([#187](https://github.com/DynamicalSystemsGroup/cats/issues/187)). See also [`LineageOfProvenance.md`](LineageOfProvenance.md) and [`BOM.md`](BOM.md).
+
+### Planes
+
+| Plane | What | Address of record |
+| --- | --- | --- |
+| **Data** | Quantum blobs, Invoice/log, IaC | **HTTP `*_uri`**; **`ni:`** equality (legacy CID [fail closed](#6s-cas-only-node)) |
+| **Control** | Signed ExecutionBom JSON-LD | **Solid URI** when set; else Node `bom_ldp_uri` (+ DI) |
+| **Index** | Verified BOM query projection (`BomRegistry`) | Node-local `{CATS_HOME}/.cats/registry/` (hash keys; not the envelope store) |
+
+---
+
+## Provenance properties: before / now
+
+| Property | Before (pre-merge `dev`) | Now (mainline) |
+| --- | --- | --- |
+| **Model** | Mostly **implicit** — CID equality between linked objects | **Explicit graph** — [JSON-LD](https://www.w3.org/TR/json-ld11/) + [PROV-O](https://www.w3.org/TR/prov-o/) on the ExecutionBom (`prov:wasAttributedTo`, `prov:wasGeneratedBy`) |
+| **Who produced it** | Weak / Node HTTP lifecycle | **`node_did` ([did:key](https://w3c-ccg.github.io/did-method-key/))** as PROV agent; Flask bind is **not** attribution |
+| **Tamper-evidence** | CID of unsigned (or ad-hoc) BOM JSON | `ni:` of **signed** object + [Data Integrity](https://www.w3.org/TR/vc-data-integrity/) `proof` ([`eddsa-jcs-2022`](https://www.w3.org/TR/vc-di-eddsa/) / [RFC 8785 JCS](https://www.rfc-editor.org/rfc/rfc8785)) |
+| **Envelope contents** | BOM fields in execute response | Address refs only: `invoice_uri`, `log_uri`, `node_did` + `@context` / `@type` + proof ([URI-only](#6d-uri-only-graph): no `*_cid`) |
+| **Publish / locator** | Response / Kubo only | + **`bom_ldp_uri`** ([LDP](https://www.w3.org/TR/ldp/) Node cache); optional **`bom_solid_uri`** ([Solid](https://solidproject.org/) dual-write); response **`content_id`** (not `bom_cid`) |
+| **Peer verify path** | Trust fetch + CID | `fetch_bom_envelope` → **`verify_execution_bom`** (Node or Solid URL) |
+| **Announce to mesh** | — | Best-effort [LDN](https://www.w3.org/TR/ldn/) Announce (`content_id`, `bom_solid_uri`) when Solid configured |
+| **ACL on write** | N/A (no Solid) | Solid [WAC](https://solid.github.io/web-access-control-spec/) (Node Write; readers / public Read); Node LDP **and** registry PUT stay **405** |
+| **Discovery / reverse lookup** | Gap — `init` needed out-of-band `order_cid`; `link*` needed a caller-held `cat_response` ([`LineageOfProvenance.md`](LineageOfProvenance.md)) | **Node-local registry** ([`BomRegistry.md`](BomRegistry.md) / `GET /ldp/registry/…`); `init` / `link*` accept `order_uri` / `bom_uri` / unique `content_id` / `data_uri` (legacy `*_cid` → 400; ambiguous → 409 `{bom_ids}`). Mesh federation still deferred |
+| **Intra-run stage lineage** | Invoice stage CIDs only | Same `ni:` / `*_uri` addresses on Invoice; signed BOM also carries `stageLineage` PROV entities (`wasDerivedFrom`; reachable after envelope verify via [AddressStore](../storage/IPFS.md)) |
+| **Large payloads** | [MinIO](https://min.io/) + IPFS CIDs | Same discipline — envelope never embeds stage bytes; fetch is CAS-over-HTTP ([`STORAGE.md`](../storage/STORAGE.md)) |
+
+### Discovery (Node-local BOM registry)
+
+The registry is an append-only **query index** of verified envelopes — not `BomLdpStore` / Solid (locators) and not LDN (push). `Runtime.execute` writes after locators are known (fail closed). **New** content ids are `ni:` digests; index keys are `ni:` / hex (legacy CID [fail closed](#6s-cas-only-node)). Locator map: `GET /ldp/registry/by-content/<digest>`.
+
+| Need | Status |
+| --- | --- |
+| BOM → Order for `POST /cat/node/init` | Landed (`bom_uri` / unique `content_id` / `data_uri` / `order_uri`; legacy `*_cid` → 400) |
+| `data` → BOM for `link*` | Landed (`content_id=` / `data_uri=` / `bom_uri=` as alternatives to `cat_response`; `bom_cid=` / `data_cid=` rejected) |
+| Intra-run `wasDerivedFrom` on `stageLineage` | Landed (signed envelope; not the registry) |
+| `content_id` → HTTP locators | **Landed** (CAS `LocatorIndex` + `/ldp/registry/by-content/`) |
+| Hard-drop `*_cid` graph field names ([6d](#6d-uri-only-graph)) | **Landed** (URI-only new mints; legacy read via `ref_id`) |
+| `hl:` handoff MVP ([6f](#6f-hashlink-handoff)) | **Landed** (AddressStore resolve; Runtime/LDN emit; init/`link*` intake) |
+| Mesh federation of the index | Deferred |
+| Downstream “who consumed me?” | Deferred (consumer-side only) |
+
+Full contract, record shape, disk layout, and routes: [`BomRegistry.md`](BomRegistry.md).
+
+### Remaining path
+
+| Step | What | Address of record | Status |
+| --- | --- | --- | --- |
+| **2a** | CID + AddressStore; LDP/Solid envelope locators | **CID** (legacy) | Landed |
+| **Registry (before 2b)** | BOM→Order, data→BOM; `init` / `link*` via index | **`ni:`** / hex (legacy CID keys retired) | **Landed** (Node-local) |
+| **CAS-over-HTTP (before 2b)** | Digest-keyed LDP/`ni:` store; locator index; Kubo optional tooling only ([6s](#6s-cas-only-node)) | **digest / `ni:`** | **Landed** |
+| **Phase 2b** | URI as address; DI-signed BOM → URI/`ni:`/`hl:` payloads | **HTTP URI** (data); DI (control) | **Landed** (superseded dual-field by [URI-only](#6d-uri-only-graph)) |
+| **[6d](#6d-uri-only-graph) Hard-drop `*_cid`** | URI-only graph slots; `ni:` equality unnamed | **HTTP `*_uri`**; `ni:` / `contentId` | **Landed** |
+
+---
+
+## W3C / web technologies that changed provenance
+
+| Technology | Spec / reference | Provenance role | Before | Now |
+| --- | --- | --- | --- | --- |
+| **JSON-LD 1.1** | [W3C TR](https://www.w3.org/TR/json-ld11/) | Semantic shape of the BOM package | No | Yes |
+| **PROV-O** | [W3C TR](https://www.w3.org/TR/prov-o/) | Explicit Agent / Activity / Entity edges | No | Yes for intra-run (attribution + `#executorRun` + `stageLineage` `wasDerivedFrom`); reverse data→BOM via Node-local registry; mesh-federated registry still open |
+| **DID Core** | [W3C TR](https://www.w3.org/TR/did-core/) | Decentralized agent identity framework | No | Yes (method below) |
+| **did:key** | [W3C CCG](https://w3c-ccg.github.io/did-method-key/) | Node DID from Ed25519 public key | No | Yes |
+| **Verifiable Credentials Data Model 2.0** | [W3C TR](https://www.w3.org/TR/vc-data-model-2.0/) | Framing for cryptographically verifiable claims (DI proofs on envelope) | No | Partial (DI proof on ExecutionBom; not a full VC issuance pipeline) |
+| **Data Integrity** | [W3C TR](https://www.w3.org/TR/vc-data-integrity/) | Tamper-evident binding of agent + document | No | Yes |
+| **EdDSA Cryptosuite (`eddsa-jcs-2022`)** | [W3C TR](https://www.w3.org/TR/vc-di-eddsa/) | Sign/verify cryptosuite used by CATs | No | Yes |
+| **JSON Canonicalization Scheme (JCS)** | [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) | Deterministic JSON before hash/sign | No | Yes (`rfc8785` dep) |
+| **Ed25519** | [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032) | Node signing key algorithm | No | Yes (`cryptography`) |
+| **Linked Data Platform (LDP)** | [W3C TR](https://www.w3.org/TR/ldp/) | Stable HTTP locator/cache for the provenance package; GET-only registry + CAS + Order/Invoice containers | No | Yes (`GET /ldp/boms/`, `/ldp/registry/`, `/ldp/cas/`, `/ldp/invoices/`, `/ldp/orders/`; PUT → 405) |
+| **Solid** | [Solid Project](https://solidproject.org/) / [Solid Protocol](https://solidproject.org/TR/protocol) | Open-world HTTP publish of envelopes | No | Optional (CSS-compatible); registry records are **not** dual-written |
+| **Community Solid Server (CSS)** | [GitHub](https://github.com/CommunitySolidServer/CommunitySolidServer) | Reference Solid implementation CATs talks to (external) | No | Operator-run (not in Structure) |
+| **WebID** | [W3C Incubator](https://www.w3.org/2005/Incubator/webid/spec/) | Solid agent identity bridged from `did:key` | No | Yes |
+| **Web Access Control (WAC)** | [Solid WAC](https://solid.github.io/web-access-control-spec/) | ACL on BOM container (Write/Append/Read) | No | Yes (`ensure_solid_bom_acl`) |
+| **Linked Data Notifications (LDN)** | [W3C TR](https://www.w3.org/TR/ldn/) | Announce new provenance packages to Inboxes | No | Best-effort when Solid set (not the query index) |
+| **ActivityPub** | [W3C TR](https://www.w3.org/TR/activitypub/) | Richer HTTP federation (design option) | No | **Not** landed (LDN only) |
+| **RDF Dataset Canonicalization (RDFC-1.0)** | [W3C TR](https://www.w3.org/TR/rdf-canon/) | Design-doc integrity option alongside DI | No | **Not** used yet (JCS path instead) |
+| **Hashlink (`hl:`)** | [IETF draft / hashlink](https://datatracker.ietf.org/doc/html/draft-sporny-hashlink) | Portable handoff token (hash ± URL hints); AddressStore resolve + Runtime/LDN emit | No | Yes ([6f](#6f-hashlink-handoff): `to_hl` / `from_hl`; fail-closed GET verify) |
+| **Named Information (`ni:`)** | [RFC 6920](https://www.rfc-editor.org/rfc/rfc6920) | Digest equality / lineage key; companion to `*_uri` | No | Yes (`ni:///sha-256;<base64url>`; hex on disk) |
+
+### Supporting (not provenance standards, but used after verify)
+
+| Technology | Spec / reference | Role on mainline |
+| --- | --- | --- |
+| **IPFS / CID** | [Content addressing](https://docs.ipfs.tech/concepts/content-addressing/), [CIDs](https://docs.ipfs.tech/concepts/content-addressing/#identifier-formats) | Historical address of record (retired on the [CAS-only](#6s-cas-only-node) hot path) |
+| **IPFS HTTP Gateway** | [Gateway API](https://docs.ipfs.tech/reference/http/gateway/) | Retired from AddressStore ([6s](#6s-cas-only-node)); was opt-in legacy CID reads |
+| **Kubo** | [Kubo](https://docs.ipfs.tech/install/command-line/) | Optional operator tooling (`ContentStore.ensure`); **not** required for CAS-only Orders |
+| **CAS-over-HTTP** | Node LDP `/ldp/cas/` | Digest-keyed put/get + sha256 verify; directory manifests |
+| **Multibase** | [multibase](https://github.com/multiformats/multibase) | `did:key` / proofValue encoding helpers |
+
+---
+
+## Semantic mapping
+
+| Loop concept | PROV-ish role | Implementation on mainline |
+| --- | --- | --- |
+| Order | Plan / [`prov:Entity`](https://www.w3.org/TR/prov-o/#Entity) | Invoice `order_uri` + `ni:` equality; also `prov:used` by `#executorRun`; discovered via registry `lookup_order` |
+| Executor run | [`prov:Activity`](https://www.w3.org/TR/prov-o/#Activity) | `#executorRun` on signed BOM (`prov:wasGeneratedBy`) |
+| Invoice + stage refs | Generated entities / feedback | Minted on Invoice as `*_uri` / `ni:`; mirrored as `stageLineage` `prov:Entity` + `wasDerivedFrom` |
+| CAT Node | [`prov:Agent`](https://www.w3.org/TR/prov-o/#Agent) | `node_did` + proof `verificationMethod` |
+| BOM | Signed provenance **package** | `build_execution_bom` + `sign_execution_bom`; published at LDP/Solid |
+| Registry record | Query projection (not a PROV document) | `build_record` after `verify_execution_bom`; `GET /ldp/registry/…` |
+
+---
+
+## Implementation seams (provenance-only)
+
+| Concern | Path | Change vs pre-merge `dev` |
+| --- | --- | --- |
+| Build envelope | `cats/network/feedback/envelope.py` | Structured LD/[PROV-O](https://www.w3.org/TR/prov-o/) BOM + `stageLineage` |
+| Sign / verify | `cats/network/feedback/data_integrity.py` | [Data Integrity](https://www.w3.org/TR/vc-data-integrity/) [`eddsa-jcs-2022`](https://www.w3.org/TR/vc-di-eddsa/) |
+| Agent keys | `cats/network/identity/node_did.py` | [did:key](https://w3c-ccg.github.io/did-method-key/) keyfile |
+| WebID bridge | `cats/network/identity/webid.py` | [WebID](https://www.w3.org/2005/Incubator/webid/spec/) ↔ same VM |
+| Local publish | `ldp/bom_store.py` + routes | [LDP](https://www.w3.org/TR/ldp/) persist + GET cache (`/ldp/boms/`) |
+| BOM registry | `cats/network/registry/` | Node-local index (data→BOM / BOM→Order); `GET /ldp/registry/…` — [`BomRegistry.md`](BomRegistry.md) |
+| `init` intake | `cats/node/app.py` | `order_uri` \| `bom_ldp_uri` / `bom_solid_uri` \| unique `content_id` / `data_uri` / `hl` (legacy `*_cid` → 400; ambiguous → 409 `{bom_ids}`) |
+| `link*` | `cats/network/order.py` | `cat_response` **or** `content_id=` / `data_uri=` / `bom_uri=` → `flatten_bom` (`invoice.flat.order`; envelope unchanged) |
+| Fetch + verify | `ldp/client.py` | Fail-closed DI verify |
+| Solid publish / ACL / LDN | `solid_client.py`, `wac.py`, `ldn.py` | [Solid](https://solidproject.org/) + [WAC](https://solid.github.io/web-access-control-spec/) + [LDN](https://www.w3.org/TR/ldn/) |
+| Wire-up | `Runtime.execute` | Sign → `content_id` (`ni:`) → LDP → optional Solid → **registry put** → LDN |
+
+---
+
+## See also
+
+- [`BomRegistry.md`](BomRegistry.md) — Node-local query index (not the envelope store)
+- [`SOLID.md`](SOLID.md) — Solid dual-write, WebID/WAC, LDN (`bom_solid_uri`)
+- [`BOM.md`](BOM.md) — signed envelope, Invoice/Order `*_uri` nest, HTTP response
+- [`ControlFeedbackLoop.md`](../architecture/ControlFeedbackLoop.md) — Order-from-BOM intake
+- [`LineageOfProvenance.md`](LineageOfProvenance.md) — `ni:` chain + reverse lookup
+- [`IPFS.md`](../storage/IPFS.md) / [`STORAGE.md`](../storage/STORAGE.md) — AddressStore / data plane (unchanged by this path)

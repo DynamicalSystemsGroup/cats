@@ -204,7 +204,7 @@ def test_link_order_both_sides_single_invoice(monkeypatch, tmp_path):
 
     structure = _write_structure_tree(tmp_path)
 
-    def _put_dir(path):
+    def _put_dir(path, **_kwargs):
         name = Path(path).name
         return f'QmNew{name}', name
 

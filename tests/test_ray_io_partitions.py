@@ -154,7 +154,7 @@ def test_run_partition_ingress_opaque_no_ipfs(tmp_path):
     mesh.get.side_effect = _get
     captured = {}
 
-    def _put_dir(path):
+    def _put_dir(path, **_kwargs):
         layout = Path(path)
         captured['parts'] = sorted(p.name for p in layout.iterdir())
         captured['has_car'] = any(p.name.endswith('.car') for p in layout.iterdir())

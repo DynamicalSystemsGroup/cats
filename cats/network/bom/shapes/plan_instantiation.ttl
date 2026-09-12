@@ -1,0 +1,13 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix cats: <https://cats.dynamicalsystemsgroup.com/ns#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix p-plan: <http://purl.org/net/p-plan#> .
+
+cats:PlanInstantiationShape
+    a sh:NodeShape ;
+    sh:targetClass prov:Activity ;
+    sh:property [
+        sh:path p-plan:correspondsToStep ;
+        sh:minCount 1 ;
+        sh:message "#executorRun must correspond to a CFL step" ;
+    ] .

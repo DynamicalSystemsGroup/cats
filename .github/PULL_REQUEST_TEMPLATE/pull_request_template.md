@@ -1,5 +1,5 @@
 **Creation Checklist:**
-- [ ] Review [CONTRIBUTING.md](../docs/CONTRIBUTING.md) file for general contributing guideline updates.
+- [ ] Review [CONTRIBUTING.md](../../docs/guide/CONTRIBUTING.md) file for general contributing guideline updates.
 - [ ] This PR is not a duplicate
 - [ ] Your PR targets the `release` branch of this repository.
 
@@ -28,8 +28,8 @@
 # How Has This Been Tested?
 <!--- Please describe the tests that you ran to verify your changes here. -->
 **Tests:**
-- [ ] [Test A](./docs/TEST.md)
-- [ ] [Test B](./docs/TEST.md)
+- [ ] [Test A](../../docs/guide/TEST.md)
+- [ ] [Test B](../../docs/guide/TEST.md)
 - [ ] ...
 
 # Merge Checklist:

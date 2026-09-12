@@ -4,7 +4,7 @@ CAT Node is a Data Product on a Data Mesh. Factory accepts a content-addressed
 Order, stages materials via ContentMesh (through Runtime.initBOMcar), assembles
 Function + Structure (AQ halves), and produces an ephemeral Executor.
 
-Not Structure's Plant [SaaS] (compute generation) — see docs/PLANTs.md.
+Not Structure's Plant [SaaS] (compute generation) — see docs/architecture/PLANTs.md.
 """
 from __future__ import annotations
 

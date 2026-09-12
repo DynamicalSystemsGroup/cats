@@ -303,13 +303,19 @@ ops = [
     { name = "ray", extra = ["data", "default"] },
     { name = "tqdm" },
 ]
+rtm = [
+    { name = "pyshacl" },
+    { name = "rdflib" },
+]
 
 [package.dev-dependencies]
 dev = [
     { name = "build" },
     { name = "code2flow" },
     { name = "pylint" },
+    { name = "pyshacl" },
     { name = "pytest" },
+    { name = "rdflib" },
 ]
 
 [package.metadata]
@@ -323,20 +329,24 @@ requires-dist = [
     { name = "py-cid", specifier = ">=0.5.0" },
     { name = "py-multihash", specifier = ">=3.0.0" },
     { name = "pyarrow", marker = "extra == 'ops'", specifier = ">=18.0.0" },
+    { name = "pyshacl", marker = "extra == 'rtm'", specifier = ">=0.26" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "ray", extras = ["default", "data"], marker = "extra == 'ops'", specifier = ">=2.45.0" },
+    { name = "rdflib", marker = "extra == 'rtm'", specifier = ">=7.0" },
     { name = "requests", specifier = ">=2.31.0" },
     { name = "rfc8785", specifier = ">=0.1.0" },
     { name = "tqdm", marker = "extra == 'ops'", specifier = ">=4.66.5" },
 ]
-provides-extras = ["ops"]
+provides-extras = ["ops", "rtm"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "build" },
     { name = "code2flow" },
     { name = "pylint" },
+    { name = "pyshacl", specifier = ">=0.26" },
     { name = "pytest", specifier = ">=8.0" },
+    { name = "rdflib", specifier = ">=7.0" },
 ]
 
 [[package]]
@@ -872,6 +882,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/01/ee/02a2c011bdab74c6fb3c75474d40b3052059d95df7e73351460c8588d963/h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1", size = 101250, upload-time = "2025-04-24T03:35:25.427Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86", size = 37515, upload-time = "2025-04-24T03:35:24.344Z" },
+]
+
+[[package]]
+name = "html5rdf"
+version = "1.2.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4c/55/1b839c43f5ed8207e17a9a02d8b395179520b8b4f00c00a41e113bc205ca/html5rdf-1.2.1.tar.gz", hash = "sha256:ace9b420ce52995bb4f05e7425eedf19e433c981dfe7a831ab391e2fa2e1a195", size = 287899, upload-time = "2024-10-30T05:06:56.384Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7d/c9/f6e1e8567660bc5b0aba281f2b0017b2a7665fcad6bf3ed67286a0c72cd4/html5rdf-1.2.1-py2.py3-none-any.whl", hash = "sha256:1f519121bc366af3e485310dc8041d2e86e5173c1a320fac3dc9d2604069b83e", size = 109765, upload-time = "2024-10-30T05:06:52.507Z" },
 ]
 
 [[package]]
@@ -1562,6 +1581,18 @@ wheels = [
 ]
 
 [[package]]
+name = "owlrl"
+version = "7.6.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "rdflib" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cb/08/50dd7fd0c64775d3d6309f35c0cc9a9d635f392f94ee2c4f9122404f7f86/owlrl-7.6.2.tar.gz", hash = "sha256:c743f35c2d908396e77823852bb1ebbce88340cd49961493983bec42c93283a8", size = 48564, upload-time = "2026-07-08T08:38:26.462Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4a/5e/314be7440bf28dbd47f85321a7434c5b74179a762228487d6493c01bddce/owlrl-7.6.2-py3-none-any.whl", hash = "sha256:83347bf7f133979e87b2b18695d51d25510b99cec3f6919b5df05d4fbf058ae0", size = 55814, upload-time = "2026-07-08T08:38:23.842Z" },
+]
+
+[[package]]
 name = "packaging"
 version = "26.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1647,6 +1678,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412, upload-time = "2025-05-15T12:30:07.975Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
+]
+
+[[package]]
+name = "prettytable"
+version = "3.18.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "wcwidth" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/81/74/ba08d81e668ccfe8658d7520a307e63c19862c08eb4ccb26f356c5239a7a/prettytable-3.18.0.tar.gz", hash = "sha256:439217116152244369caf3d9f1caf2f9fe29b03bd79e88d2928c8e718c95d680", size = 76373, upload-time = "2026-06-22T16:07:50.174Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fe/be/2e6798ace5cc036f5d05d36b7b2fd85346f1a708c87060890b070d0ec607/prettytable-3.18.0-py3-none-any.whl", hash = "sha256:b3346e0e6f79180833aebaac088ae926340586cf6d7d991b9eb125b65f72313a", size = 37357, upload-time = "2026-06-22T16:07:48.595Z" },
 ]
 
 [[package]]
@@ -2084,12 +2127,36 @@ wheels = [
 ]
 
 [[package]]
+name = "pyparsing"
+version = "3.3.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/91/9c6ee907786a473bf81c5f53cf703ba0957b23ab84c264080fb5a450416f/pyparsing-3.3.2.tar.gz", hash = "sha256:c777f4d763f140633dcb6d8a3eda953bf7a214dc4eff598413c070bcdc117cbc", size = 6851574, upload-time = "2026-01-21T03:57:59.36Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/10/bd/c038d7cc38edc1aa5bf91ab8068b63d4308c66c4c8bb3cbba7dfbc049f9c/pyparsing-3.3.2-py3-none-any.whl", hash = "sha256:850ba148bd908d7e2411587e247a1e4f0327839c40e2e5e6d05a007ecc69911d", size = 122781, upload-time = "2026-01-21T03:57:55.912Z" },
+]
+
+[[package]]
 name = "pyproject-hooks"
 version = "1.2.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e7/82/28175b2414effca1cdac8dc99f76d660e7a4fb0ceefa4b4ab8f5f6742925/pyproject_hooks-1.2.0.tar.gz", hash = "sha256:1e859bd5c40fae9448642dd871adf459e5e2084186e8d2c2a79a824c970da1f8", size = 19228, upload-time = "2024-09-29T09:24:13.293Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bd/24/12818598c362d7f300f18e74db45963dbcb85150324092410c8b49405e42/pyproject_hooks-1.2.0-py3-none-any.whl", hash = "sha256:9e5c6bfa8dcc30091c74b0cf803c81fdd29d94f01992a7707bc97babb1141913", size = 10216, upload-time = "2024-09-29T09:24:11.978Z" },
+]
+
+[[package]]
+name = "pyshacl"
+version = "0.40.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "owlrl" },
+    { name = "packaging" },
+    { name = "prettytable" },
+    { name = "rdflib", extra = ["html"] },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1f/b8/f92465fead905b7c5365631a3997107c896cf1e32f4f9a163bdaee54e4fb/pyshacl-0.40.1.tar.gz", hash = "sha256:011e3cf1a68b31747cb762ba3d755ae1bdcc464c8fad0dc212a9adc550719552", size = 1444205, upload-time = "2026-07-28T01:37:36.499Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/03/90/7f35a79db93032ef20db5b740062b54afba32a2c2475a6f0a43c141a69de/pyshacl-0.40.1-py3-none-any.whl", hash = "sha256:27dd58c8ddfa103303b4a8c40b2c666332ffc912dbcd3137f7adc7b7bc5e6bda", size = 1306209, upload-time = "2026-07-28T01:37:34.298Z" },
 ]
 
 [[package]]
@@ -2295,6 +2362,23 @@ default = [
     { name = "requests" },
     { name = "smart-open" },
     { name = "virtualenv" },
+]
+
+[[package]]
+name = "rdflib"
+version = "7.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyparsing" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/98/f5/18bb77b7af9526add0c727a3b2048959847dc5fb030913e2918bf384fec3/rdflib-7.6.0.tar.gz", hash = "sha256:6c831288d5e4a5a7ece85d0ccde9877d512a3d0f02d7c06455d00d6d0ea379df", size = 4943826, upload-time = "2026-02-13T07:15:55.938Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/10/c2/6604a71269e0c1bd75656d5a001432d16f2cc5b8c057140ec797155c295e/rdflib-7.6.0-py3-none-any.whl", hash = "sha256:30c0a3ebf4c0e09215f066be7246794b6492e054e782d7ac2a34c9f70a15e0dd", size = 615416, upload-time = "2026-02-13T07:15:46.487Z" },
+]
+
+[package.optional-dependencies]
+html = [
+    { name = "html5rdf" },
 ]
 
 [[package]]
@@ -2557,6 +2641,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/74/65/ec1d92091671e6407d3e7c1f5801413bb7b2b57630a50cae7750456ba0ed/virtualenv-21.6.0.tar.gz", hash = "sha256:e18a4d750f2b64dea73e72ffde3922f3c52365fabdc8157ebd3da20d031c4734", size = 5526111, upload-time = "2026-07-06T22:49:56.972Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b8/e7/2fbd0cc1653c53eed8f10670538bb547de2b3e37aacad283faa82a71094b/virtualenv-21.6.0-py3-none-any.whl", hash = "sha256:bce9d097950fef9d81129b333babfb7767072850c2f1acce0ec536708401bfd1", size = 5506216, upload-time = "2026-07-06T22:49:54.941Z" },
+]
+
+[[package]]
+name = "wcwidth"
+version = "0.8.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/36/57/ed58088fafdf4c55a0ad6bde846502567645424d7ebf325230b9237f4085/wcwidth-0.8.3.tar.gz", hash = "sha256:d128512515fbf4612e0ff21fd6380399210318b7b54a9af59dff8454cf9730eb", size = 1458450, upload-time = "2026-08-28T18:10:06.875Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c4/0e/57f6bb3024a597b2e8ec4aee710ffe62ddc95af2e2bb1ee7a7abdc22c68c/wcwidth-0.8.3-py3-none-any.whl", hash = "sha256:d5b73dba6158a595ec9370350e7f2637bcac8d6c5e4fde34f30fcffb6103a5e4", size = 331669, upload-time = "2026-08-28T18:10:04.909Z" },
 ]
 
 [[package]]

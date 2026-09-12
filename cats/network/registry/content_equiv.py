@@ -23,6 +23,10 @@ _REG_STEM = {
     'structure': 'structure',
     'invoice': 'invoice',
     'structure_as_executed': 'structure_as_executed',
+    'runtime_sbom': 'runtime_sbom',
+    'function_sbom': 'function_sbom',
+    'structure_sbom': 'structure_sbom',
+    'input_data_sbom': 'input_data_sbom',
 }
 
 # Opaque / non-JSON payloads — compare raw bytes when ``http_get`` is provided.
@@ -49,6 +53,10 @@ _DATA_STAGES_NEST_STEMS = (
     'integrated_data',
     'ingressed_data',
 )
+
+_RUNTIME_SBOM_NEST_STEMS = ('cyclonedx', 'syft')
+
+_INPUT_DATA_SBOM_NEST_STEMS = ('dcat', 'spdx')
 
 
 def _uri_digest(uri: str) -> str:
@@ -269,18 +277,38 @@ def assert_invoice_subcomponent_equiv(
                 continue
             assert_fetch_equiv(nested, nested_uri, as_bytes=True, **fetch_kw)
         return nest
+    if stem == 'runtime_sbom':
+        nest = assert_fetch_equiv(stem, uri, as_bytes=False, **fetch_kw)
+        if not isinstance(nest, dict):
+            raise AssertionError(
+                f'runtime_sbom at {uri!r} is not a JSON object: '
+                f'{type(nest).__name__}'
+            )
+        for nested in _RUNTIME_SBOM_NEST_STEMS:
+            nested_uri = _uri_slot(nest, nested)
+            if nested_uri is None:
+                if nested == 'cyclonedx':
+                    raise AssertionError(
+                        f'runtime_sbom nest at {uri!r} missing cyclonedx_uri'
+                    )
+                continue
+            assert_fetch_equiv(nested, nested_uri, as_bytes=False, **fetch_kw)
+        return nest
     as_bytes = stem in _BYTES_STEMS
     return assert_fetch_equiv(stem, uri, as_bytes=as_bytes, **fetch_kw)
 
 
 def assert_invoice_content_equiv(invoice: dict[str, Any], **fetch_kw) -> None:
-    """Umbrella: Invoice order/data/seed/data_stages/structure_as_executed."""
+    """Umbrella: Invoice order/data/seed/data_stages/structure_as_executed
+    plus optional ``runtime_sbom``.
+    """
     for stem in (
         'order',
         'data',
         'seed',
         'data_stages',
         'structure_as_executed',
+        'runtime_sbom',
     ):
         assert_invoice_subcomponent_equiv(invoice, stem, **fetch_kw)
 
@@ -303,6 +331,21 @@ def assert_order_subcomponent_equiv(
     uri = _uri_slot(order, stem)
     if uri is None:
         return None
+    if stem == 'input_data_sbom':
+        nest = assert_fetch_equiv(stem, uri, as_bytes=False, **fetch_kw)
+        if not isinstance(nest, dict):
+            raise AssertionError(
+                f'input_data_sbom at {uri!r} is not a JSON object: '
+                f'{type(nest).__name__}'
+            )
+        for nested in _INPUT_DATA_SBOM_NEST_STEMS:
+            nested_uri = _uri_slot(nest, nested)
+            if nested_uri is None:
+                raise AssertionError(
+                    f'input_data_sbom nest at {uri!r} missing {nested}_uri'
+                )
+            assert_fetch_equiv(nested, nested_uri, as_bytes=False, **fetch_kw)
+        return nest
     # Input Invoice ≠ registry output Invoice / egress data.
     slot_kw = {**fetch_kw, 'record': None} if stem == 'invoice' else fetch_kw
     payload = assert_fetch_equiv(stem, uri, as_bytes=False, **slot_kw)
@@ -358,6 +401,13 @@ def assert_order_invoice_content_equiv(invoice: dict[str, Any], **fetch_kw) -> N
 
 
 def assert_order_content_equiv(order: dict[str, Any], **fetch_kw) -> None:
-    """Umbrella: Order function/structure/invoice (+ nested slot URIs)."""
-    for stem in ('function', 'structure', 'invoice'):
+    """Umbrella: Order function/structure/invoice plus optional eBOM sbom stems."""
+    for stem in (
+        'function',
+        'structure',
+        'invoice',
+        'function_sbom',
+        'structure_sbom',
+        'input_data_sbom',
+    ):
         assert_order_subcomponent_equiv(order, stem, **fetch_kw)

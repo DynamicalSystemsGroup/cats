@@ -119,6 +119,15 @@ class Executor:
         data_stages_id = mesh.put_json(data_stages)
         set_ref(invoice, 'data_stages', data_stages_id)
         set_ref(invoice, 'structure_as_executed', structure_as_executed_id)
+        from cats.network.bom import attach_runtime_sbom
+
+        attach_runtime_sbom(
+            invoice,
+            mesh,
+            structure_as_executed=structure_as_executed,
+            structure_as_executed_id=structure_as_executed_id,
+            structure=self.enhanced_bom.get('structure'),
+        )
         log_id = mesh.put_json(self.enhanced_bom['log'])
         set_ref(self.enhanced_bom, 'log', log_id)
         # Prefer explicit content_uri when available (set_ref already sets

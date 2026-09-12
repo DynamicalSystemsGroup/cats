@@ -12,7 +12,7 @@ invoking those callables.
 **CAS ``ni:`` / hex / HTTP:** migrate and stage_for_plant materialize via Node
 ``CasHttpStore`` / AddressStore. Legacy CIDs fail closed (§6s).
 
-See docs/STORAGE.md and docs/IPFS.md.
+See docs/storage/STORAGE.md and docs/storage/IPFS.md.
 """
 from __future__ import annotations
 

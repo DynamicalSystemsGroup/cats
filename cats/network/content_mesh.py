@@ -35,6 +35,7 @@ from cats.network.node_http import _activity_spinner
 from cats.network.order import OrderOps
 from cats.network.packaging import (
     STRUCTURE_ROOT_DIRNAME,
+    is_structure_apply_residue,
     materialize_structure_root_files,
     stage_structure_root,
 )
@@ -46,6 +47,10 @@ _FLAT_STEM_ORDER = (
     'seed',
     'data_stages',
     'structure_as_executed',
+    'runtime_sbom',
+    'function_sbom',
+    'structure_sbom',
+    'input_data_sbom',
     'function',
     'structure',
     'invoice',
@@ -249,20 +254,20 @@ class ContentMesh(OrderOps):
             media_type=media_type,
         )
 
-    def put_tree(self, directory: str) -> str:
+    def put_tree(self, directory: str, *, ignore=None) -> str:
         """CAS directory manifest put; return ``ni:`` of the manifest."""
         if self.CATS_HOME is None:
             raise RuntimeError('ContentMesh.CATS_HOME required for CAS put_tree')
         from cats.network.cas import CasHttpStore, LocatorIndex, put_tree
 
         store = CasHttpStore(self.CATS_HOME)
-        content_id = put_tree(store, directory)
+        content_id = put_tree(store, directory, ignore=ignore)
         LocatorIndex(self.CATS_HOME).put_cas_node_locator(
             content_id, media_type='application/json'
         )
         return content_id
 
-    def put_dir(self, filepath: str):
+    def put_dir(self, filepath: str, *, ignore=None):
         self.ensure_bootstrap_content_store()
         if self.CATS_HOME is None:
             raise RuntimeError(
@@ -270,7 +275,7 @@ class ContentMesh(OrderOps):
                 '(CAS-only; no Kubo add fallback)'
             )
         name = filepath.split('/')[-1]
-        dir_id = self.put_tree(filepath)
+        dir_id = self.put_tree(filepath, ignore=ignore)
         return dir_id, name
 
     def put_file(self, filepath):
@@ -303,9 +308,13 @@ class ContentMesh(OrderOps):
             root_id, _ = self.put_dir(root_staging)
         finally:
             shutil.rmtree(staging_parent, ignore_errors=True)
-        plant_id, _ = self.put_dir(os.path.join(structure_filepath, 'plant'))
+        plant_id, _ = self.put_dir(
+            os.path.join(structure_filepath, 'plant'),
+            ignore=is_structure_apply_residue,
+        )
         infrastructure_id, _ = self.put_dir(
-            os.path.join(structure_filepath, 'infrastructure')
+            os.path.join(structure_filepath, 'infrastructure'),
+            ignore=is_structure_apply_residue,
         )
         pairing = {}
         set_ref(pairing, 'root', root_id)

@@ -24,6 +24,7 @@ PROCESS_PUBLIC_SURFACE = (
 _SCAN_GLOBS = (
     'notebooks/cats_demo.py',
     'notebooks/old_cats_demo.py',
+    'notebooks/cats_lineage_demo.py',
     'tests/**/*.py',
     'cats/**/*.py',
 )

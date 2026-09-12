@@ -207,6 +207,144 @@ def test_order_content_equiv_umbrella():
     )
 
 
+def test_order_ebom_stems_fetch_equiv():
+    fn_sbom_uri = 'http://n/ldp/cas/fnsbom'
+    st_sbom_uri = 'http://n/ldp/cas/stsbom'
+    nest_uri = 'http://n/ldp/cas/indatasbom'
+    dcat_uri = 'http://n/ldp/cas/dcat'
+    spdx_uri = 'http://n/ldp/cas/spdx'
+    fn_sbom = {'spdxVersion': '3.0.1', 'name': 'function'}
+    st_sbom = {'spdxVersion': '3.0.1', 'name': 'structure'}
+    nest = {'dcat_uri': dcat_uri, 'spdx_uri': spdx_uri}
+    dcat = {'@type': 'dcat:Catalog'}
+    spdx = {'spdxVersion': '3.0.1', 'name': 'input'}
+    order = {
+        'function_sbom_uri': fn_sbom_uri,
+        'structure_sbom_uri': st_sbom_uri,
+        'input_data_sbom_uri': nest_uri,
+    }
+    bodies = {
+        fn_sbom_uri: fn_sbom,
+        st_sbom_uri: st_sbom,
+        nest_uri: nest,
+        dcat_uri: dcat,
+        spdx_uri: spdx,
+    }
+    mesh = _mesh(bodies)
+    http_get_json, http_get = _http(bodies)
+    assert (
+        assert_order_subcomponent_equiv(
+            order,
+            'function_sbom',
+            content_mesh=mesh,
+            http_get_json=http_get_json,
+            http_get=http_get,
+        )
+        == fn_sbom
+    )
+    assert (
+        assert_order_subcomponent_equiv(
+            order,
+            'structure_sbom',
+            content_mesh=mesh,
+            http_get_json=http_get_json,
+            http_get=http_get,
+        )
+        == st_sbom
+    )
+    assert (
+        assert_order_subcomponent_equiv(
+            order,
+            'input_data_sbom',
+            content_mesh=mesh,
+            http_get_json=http_get_json,
+            http_get=http_get,
+        )
+        == nest
+    )
+    assert_order_content_equiv(
+        order,
+        content_mesh=mesh,
+        http_get_json=http_get_json,
+        http_get=http_get,
+    )
+
+
+def test_order_ebom_stems_missing_still_pass_umbrella():
+    order = {
+        'function_uri': 'http://n/f',
+        'structure_uri': 'http://n/s',
+        'invoice_uri': 'http://n/i',
+    }
+    bodies = {'http://n/f': {}, 'http://n/s': {}, 'http://n/i': {}}
+    mesh = _mesh(bodies)
+    http_get_json, http_get = _http(bodies)
+    assert (
+        assert_order_subcomponent_equiv(
+            order,
+            'function_sbom',
+            content_mesh=mesh,
+            http_get_json=http_get_json,
+            http_get=http_get,
+        )
+        is None
+    )
+    assert_order_content_equiv(
+        order,
+        content_mesh=mesh,
+        http_get_json=http_get_json,
+        http_get=http_get,
+    )
+
+
+def test_order_ebom_stem_unfetchable_fails():
+    order = {'function_sbom_uri': 'http://n/ldp/cas/missing'}
+    mesh = _mesh({})
+    http_get_json, http_get = _http({})
+    with pytest.raises((AssertionError, KeyError)):
+        assert_order_subcomponent_equiv(
+            order,
+            'function_sbom',
+            content_mesh=mesh,
+            http_get_json=http_get_json,
+            http_get=http_get,
+        )
+
+
+def test_order_input_data_sbom_missing_dcat_fails():
+    nest_uri = 'http://n/ldp/cas/indatasbom'
+    nest = {'spdx_uri': 'http://n/ldp/cas/spdx'}
+    order = {'input_data_sbom_uri': nest_uri}
+    bodies = {nest_uri: nest, 'http://n/ldp/cas/spdx': {'spdxVersion': '3.0.1'}}
+    mesh = _mesh(bodies)
+    http_get_json, http_get = _http(bodies)
+    with pytest.raises(AssertionError, match='dcat_uri'):
+        assert_order_subcomponent_equiv(
+            order,
+            'input_data_sbom',
+            content_mesh=mesh,
+            http_get_json=http_get_json,
+            http_get=http_get,
+        )
+
+
+def test_order_input_data_sbom_missing_spdx_fails():
+    nest_uri = 'http://n/ldp/cas/indatasbom'
+    nest = {'dcat_uri': 'http://n/ldp/cas/dcat'}
+    order = {'input_data_sbom_uri': nest_uri}
+    bodies = {nest_uri: nest, 'http://n/ldp/cas/dcat': {'@type': 'dcat:Catalog'}}
+    mesh = _mesh(bodies)
+    http_get_json, http_get = _http(bodies)
+    with pytest.raises(AssertionError, match='spdx_uri'):
+        assert_order_subcomponent_equiv(
+            order,
+            'input_data_sbom',
+            content_mesh=mesh,
+            http_get_json=http_get_json,
+            http_get=http_get,
+        )
+
+
 def test_order_fetch_mismatch_raises():
     uri = 'http://n/f'
     mesh = _mesh({uri: {'k': 1}})
