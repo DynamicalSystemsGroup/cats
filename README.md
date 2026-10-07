@@ -10,8 +10,8 @@
 
 ### The *Control-Feedback Loop* of CAT Nodes' *Architectural Quantum*:
 
-CATs Chaordic Kernel
-*CAT Node's* **[Architectural Quantum (AQ)](https://martinfowler.com/articles/data-mesh-principles.html#LogicalArchitecturedataProductTheArchitecturalQuantum)** is a *[Minimal* **Federated Operating Model (FOM)](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/)** as the re-executable and exchangable *atomic unit* representating the architectural domain of Data Product contriburion. The AQ is content-addressed within a BOM containing the AQ's components such that organizations can collaborate on a Data Mesh with verifiable provenance of *interoperable AQ compoents*. CAT Node's runtime realization of the *minimal FOM / Quantum Architecture* is the **Ordering** of **Execution** is **Invoiced** into a **Bill-Of-Materials** as the following **Control-Feedback Loop**:
+![CATs Chaordic Kernel](images/CATs_chaordic_kernel.jpeg)
+*CAT Node's* **[Architectural Quantum (AQ)](https://martinfowler.com/articles/data-mesh-principles.html#LogicalArchitecturedataProductTheArchitecturalQuantum)** is a [*Minimal* **Federated Operating Model (FOM)**](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/) as the re-executable and exchangable *atomic unit* representating the architectural domain of Data Product contriburion. The AQ is content-addressed within a BOM containing the AQ's components such that organizations can collaborate on a Data Mesh with verifiable provenance of *interoperable AQ compoents*. CAT Node's runtime realization of the *minimal FOM / Quantum Architecture* is the **Ordering** of **Execution** is **Invoiced** into a **Bill-Of-Materials** as the following **Control-Feedback Loop**:
 
 - **Detailed** *Loop* [here](./docs/ControlFeedbackLoop.md)
 - **Summarized** *Loop* below:
@@ -23,11 +23,11 @@ CATs Chaordic Kernel
       - **a.** *executes* the *AQ components* as **Function [FaaS]** on **Structure [PaaS]**
       - **b.** **Invoices** the *execution of data prcessing* as staged output **Content-Addresses**
   - **B: Content-Addressed Bills-of-Materials (BOMs)** - *BOMs* employ **Content Identifiers (CIDs)** as *Content-Addesable Storage* of CATs to provide a means of [Data Verification](https://en.wikipedia.org/wiki/Data_verification) & location-agnostic **data transportation / retrieval** via a unique identification of CAT content. CATs' use of this content-addressing mechanism establishes a self-service Data Mesh as a heterogeneously scalable Compute Platform deployable on [Kubernetes](https://kubernetes.io/) as CAT Node's execution paradigm (Structure [PaaS]). 
-    - **3.** the *Node's* **Runtime** *emits* a **BOM** as the *Mesh-transportable Data Provenance record* to be *shared* & *re-executed* between Node; a Node-local **BOM registry** indexes verified envelopes so the next Order can be discovered via `bom_cid` / `data_cid` (not only out-of-band `order_cid`) — see `[docs/BomRegistry.md](./docs/BomRegistry.md)` / `[docs/ControlFeedbackLoop.md](./docs/ControlFeedbackLoop.md)`
+    - **3.** the *Node's* **Runtime** *emits* a **BOM** as the *Mesh-transportable Data Provenance record* to be *shared* & *re-executed* between Node; a Node-local **BOM registry** indexes verified envelopes so the next Order can be discovered via `bom_cid` / `data_cid` (not only out-of-band `order_cid`) — see [`docs/BomRegistry.md`](./docs/BomRegistry.md) / [`docs/ControlFeedbackLoop.md`](./docs/ControlFeedbackLoop.md)
 
 ### The sustainment of *Data Initiatives* & *Product Collaboration* on a Data Mesh's Architectural Planes via CATs' *Architectural Quantum*:
 
-CATs BOM Activity
+![CATs BOM Activity](images/CATs_bom_activity_ag.jpeg)
 A *Data Product's **Domain*** is the [Domain-Driven Design's (DDDs) bounded context](https://martinfowler.com/articles/data-monolith-to-mesh.html#DataAndDistributedDomainDrivenArchitectureConvergence) whose cross-functional team owns one or more **architectural quanta**. [Data Products](https://martinfowler.com/articles/data-mesh-principles.html#LogicalArchitecturedataProductTheArchitecturalQuantum) provide access to that context’s analytical data's [Domain](docs/DESIGN.md#example-data-product-design-domains-on-a-cat-node-mesh) — each quantum bundling the code, data/metadata, and infrastructure needed to serve it autonomously, with processing as internal implementations rather than the ownership boundary. Data Product collaborators of participating organizations will employ CATs for rapid policy refinement to manage systems within control-feedback loops of **[Data Initiatives](https://github.com/DynamicalSystemsGroup/cats?tab=readme-ov-file#continuous-data-initiative)**. CATs' **Architectural Quantum (AQ)** is a [Minimal Federated Operating Model](https://www.starburst.io/blog/data-mesh-book-bulletin-principle-of-federated-computational-governance/) employed by CATs' **Architectural Planes** as a *DDD* principle described in **[Data Mesh of Data Products](https://martinfowler.com/articles/data-mesh-principles.html)** to *reify Data Initiatives* (**[Design Description](docs/DESIGN.md)**).
 
 - CATs' **Action Plane** is the *Data Product Management interface* that orchestrates and supervises how virtual resources owned by *Data Product(s)* should be *managed, routed, and processed* in alignment with *Data Initiatives* and is stored “offmesh” (“offline”). CAT Node's realize the AQ's *Control-Feedback Loop* on the Action Plane which supervises the exchange of data between CAT sub-components on the *Data Plane* in adherence to Data Contracting Standards of **Service-Level Aggreements (SLA)** between participating organizations on the Data Mesh.
@@ -55,6 +55,14 @@ make deps-uv-sync
 
 - See [DEPS — uv](./docs/DEPS.md#uv) for the manual steps behind `make deps-uv-sync`.
 - See [ENV.md](./docs/ENV.md) for the full environment workflow, including the `ops` and `mac` extras.
+
+c. Create a local `.env` from the template **only if missing** (never overwrite an existing `.env`):
+
+```bash
+test -f .env || cp .env.example .env
+```
+
+- Operator keys (`CAT_NODE_HOST` / `CAT_NODE_PORT`, optional Kubo / Solid, …) are documented in [ENV.md](./docs/ENV.md). `.env` is gitignored.
 
 #### 1. Installation:
 
@@ -98,10 +106,10 @@ CAT Node is shipped with *Techncal Use-Case CAT Workload Specifications ( Templa
 - Constituent Commands / Utilities: 
   - `code2flow` used to generate *Functional Component Activity Diagram*: 
     - `uv run python utils/code2flow/diagram_c2f.py`
-      - Output: `[images/code2flow/cats_code2flow.png](images/code2flow/cats_code2flow.png)`
+      - Output: [`images/code2flow/cats_code2flow.png`](images/code2flow/cats_code2flow.png)
   - `pyreverse` used to generates *Class & Dependency Diagrams*: 
     - `uv run pyreverse -o png -p CATs -d images/pyreverse cats`
-      - Output: `[images/pyreverse/classes_CATs.png](images/pyreverse/classes_CATs.png)` (classes), `[images/pyreverse/packages_CATs.png](images/pyreverse/packages_CATs.png)` (packages)
+      - Output: [`images/pyreverse/classes_CATs.png`](images/pyreverse/classes_CATs.png) (classes), [`images/pyreverse/packages_CATs.png`](images/pyreverse/packages_CATs.png) (packages)
 
 ### [Contribute!](docs/CONTRIBUTING.md)
 
