@@ -1,0 +1,16 @@
+.git
+.venv
+.cursor
+.agents
+.pytest_cache
+__pycache__
+*.pyc
+*.egg-info
+.env
+tests
+notebooks
+data
+docs
+.github
+local_artifacts
+__marimo__
