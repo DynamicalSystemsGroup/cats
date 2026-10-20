@@ -148,13 +148,23 @@ class Processor:
         # InfraStructure.obj_store_context(), not Runtime fields.
         # Propagate partition count for RayComputePort alignment.
         os.environ['CATS_IO_PARTITIONS'] = str(self.num_partitions)
-        _output, job_handle = self.infraFunction.infrafunction_subproc(
-            self.infraFunction.integrated_subproc,
-            process_input,
-            self.infraFunction.runtime.INTEGRATION_HOME,
-            object_store=object_store,
-            plant=plant,
-        )
+        try:
+            _output, job_handle = self.infraFunction.infrafunction_subproc(
+                self.infraFunction.integrated_subproc,
+                process_input,
+                self.infraFunction.runtime.INTEGRATION_HOME,
+                object_store=object_store,
+                plant=plant,
+            )
+        except RuntimeError as exc:
+            from cats.executor.structure.ray_heal import enrich_ray_wait_error
+
+            raise RuntimeError(
+                enrich_ray_wait_error(
+                    exc,
+                    job_endpoint=getattr(plant, 'job_endpoint', None),
+                )
+            ) from exc
         self.object_store_result_uri = (
             object_store.result_uri(job_handle) if job_handle else None
         )
