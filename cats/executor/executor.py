@@ -8,6 +8,67 @@ from cats.executor.structure import Structure
 from cats.network.cas import content_uri, ref_id, ref_uri, set_ref
 
 
+def _output_getter(outputs: dict):
+    def get_output(name):
+        value = outputs.get(name)
+        if value is None:
+            return ''
+        return str(value)
+
+    return get_output
+
+
+def ports_from_handoff(structure, outputs: dict):
+    """Plant port and object store from a caller map. No Terraform."""
+    if not isinstance(outputs, dict) or not outputs:
+        raise RuntimeError(
+            'structure handoff must be a non-empty JSON object '
+            'of terraform output names'
+        )
+    getter = _output_getter(outputs)
+    plant_utils = structure.plant._load_plant_utils()
+    obj_utils = structure.infraStructure._load_obj_store_module()
+    plant_ctx = plant_utils.PlantContext.from_terraform_outputs(getter)
+    object_store = obj_utils.ObjectStore.from_terraform_outputs(getter)
+    plant = plant_utils.plant_port_from_context(plant_ctx)
+    plant_snapshot = plant_ctx.snapshot(
+        rebuilt=False,
+        applied_structure_id=None,
+    )
+    return object_store, plant, plant_snapshot
+
+
+def open_structure_ports(structure, order_request):
+    """Apply Structure on the peer path. The one-shot path uses the handoff.
+
+    ``apply_structure`` missing or true reconciles and heals. False never
+    calls reconcile, Terraform output, or the Ray-head heal.
+    """
+    if order_request.get('apply_structure', True):
+        plant_snapshot = structure.reconcile()
+        from cats.executor.structure.ray_heal import heal_live_ray_head
+
+        plant_ctx = structure.plant.context()
+        heal_live_ray_head(
+            kube_context=plant_ctx.kubeconfig_context,
+            job_endpoint=plant_ctx.job_endpoint,
+        )
+        object_store = structure.infraStructure.obj_store_context()
+        plant = structure.plant.plant_port()
+    else:
+        handoff = order_request.get('structure_handoff')
+        if not isinstance(handoff, dict):
+            raise RuntimeError(
+                'structure handoff required: '
+                '--structure-handoff or CATS_STRUCTURE_HANDOFF'
+            )
+        object_store, plant, plant_snapshot = ports_from_handoff(
+            structure, handoff
+        )
+    transport = structure.infraStructure.transport_context()
+    return object_store, plant, transport, plant_snapshot
+
+
 class Executor:
     def __init__(self,
         runtime, structure, function
@@ -53,10 +114,9 @@ class Executor:
         self.orderCID = ref_id(
             self.enhanced_bom['invoice'], 'order', cats_home=cats_home
         )
-        plant_snapshot = self.structure.reconcile()
-        object_store = self.structure.infraStructure.obj_store_context()
-        plant = self.structure.plant.plant_port()
-        transport = self.structure.infraStructure.transport_context()
+        object_store, plant, transport, plant_snapshot = open_structure_ports(
+            self.structure, order_request
+        )
         self.ingress_data_id, self.integration_data_id, self.egress_data_id = \
             self.function.execute(
                 object_store=object_store,

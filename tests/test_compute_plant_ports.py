@@ -184,6 +184,44 @@ def test_ray_plant_port_submit_job_stages_landing(tmp_path, monkeypatch):
     ]
 
 
+def test_ray_plant_port_wait_surfaces_job_info_when_logs_empty(monkeypatch):
+    """Empty-log wait() stays logs-only; enrich appends dashboard job info."""
+    from cats.executor.structure.ray_heal import enrich_ray_wait_error
+
+    pu = _load(PLANT_UTILS, 'plant_plant_utils_wait')
+
+    class _FakeClient:
+        def get_job_status(self, job_id):
+            return 'FAILED'
+
+        def get_job_logs(self, job_id):
+            return ''
+
+    port = pu.RayPlantPort(job_endpoint='http://127.0.0.1:8265')
+    monkeypatch.setattr(port, '_client', _FakeClient())
+    try:
+        port.wait('raysubmit_empty')
+    except RuntimeError as exc:
+        raised = exc
+    else:
+        raise AssertionError('expected RuntimeError')
+    bare = str(raised)
+    assert 'ended in FAILED' in bare
+    assert 'JOB_SUPERVISOR_DIED' not in bare
+
+    monkeypatch.setattr(
+        'cats.executor.structure.ray_heal.fetch_job_info',
+        lambda endpoint, job_id: {
+            'error_type': 'JOB_SUPERVISOR_DIED',
+            'message': 'JobSupervisor actor died after OOM',
+            'status': 'FAILED',
+        },
+    )
+    text = enrich_ray_wait_error(raised, job_endpoint=port.job_endpoint)
+    assert 'JOB_SUPERVISOR_DIED' in text
+    assert 'JobSupervisor actor died after OOM' in text
+
+
 def test_infrafunction_subproc_uses_plant_port_and_job_handle(tmp_path, monkeypatch):
     """infrafunction_subproc submits via PlantPort and uses JobHandle scratch."""
     from data.input.function.infrafunction import actuator

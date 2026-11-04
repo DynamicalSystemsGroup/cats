@@ -11,6 +11,8 @@ Node **CAS-over-HTTP** (`GET /ldp/cas/<hex>`). `start` **[soft-probes](W3C.md#6r
 (Kubo optional for [CAS-only Orders](W3C.md#6s-cas-only-node)); `ensure` **heals**/starts Kubo if you want it; `stop` kills
 Flask only — never host Kubo.
 
+`make node-start` / `python -m cats.node start` is the standing Flask peer. The **Executor image** is the one-shot path: `python -m cats.executor.once` loads one Order, runs Factory → `Executor.execute` with `apply_structure` false and a `--structure-handoff` map, signs the BOM, prints the response, and exits. It does not reconcile Structure. The peer still does. It does not bind Flask. Function and Structure come from the Order; they are not baked into the image (`Dockerfile` at the repo root). The Job result is `CAT_RESULT_DIR` (outside `CATS_HOME`); the peer index under `CATS_HOME` is the standing Node only.
+
 ## Quick reference
 
 | Goal | Make | Equivalent CLI |
