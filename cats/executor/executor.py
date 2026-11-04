@@ -117,12 +117,27 @@ class Executor:
         object_store, plant, transport, plant_snapshot = open_structure_ports(
             self.structure, order_request
         )
-        self.ingress_data_id, self.integration_data_id, self.egress_data_id = \
-            self.function.execute(
-                object_store=object_store,
-                plant=plant,
-                transport=transport,
-            )
+        from cats.executor.run_report import (
+            note_failure,
+            note_finished,
+            note_started,
+        )
+
+        report = order_request.get('run_emitter')
+        note_started(report)
+        self.function.processor.run_emitter = report
+        try:
+            self.ingress_data_id, self.integration_data_id, self.egress_data_id = \
+                self.function.execute(
+                    object_store=object_store,
+                    plant=plant,
+                    transport=transport,
+                )
+        except Exception as exc:
+            note_failure(report, exc)
+            raise
+        finally:
+            self.function.processor.run_emitter = None
 
         # function / structure: as-Code; structure_as_executed on the Invoice
         # records what Plant / InfraStructure actually ran.
@@ -242,4 +257,5 @@ class Executor:
         del self.enhanced_bom['bom_json_id']
         self.enhanced_bom.pop('init_data_cid', None)
         self.enhanced_bom.pop('init_data_uri', None)
+        note_finished(order_request.get('run_emitter'))
         return self.enhanced_bom, invoice_id
