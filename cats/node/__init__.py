@@ -28,7 +28,7 @@ if _REPO_ROOT not in sys.path:
 
 logging.basicConfig(level=logging.DEBUG)
 
-from cats.node.app import HOST, PORT, catNode, execute_init_cat
+from cats.node.app import HOST, PORT, catNode, execute_init_cat, run_order
 from cats.node.cli import main
 
 __all__ = [
@@ -36,5 +36,6 @@ __all__ = [
     'PORT',
     'catNode',
     'execute_init_cat',
+    'run_order',
     'main',
 ]

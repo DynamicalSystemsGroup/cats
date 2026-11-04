@@ -24,7 +24,7 @@ from cats.network.bootstrap import (
     _bootstrap_content_store_utils_path,
     _load_bootstrap_content_store_module,
 )
-from cats.network.cas import equality_id, ref_id, ref_uri, set_ref
+from cats.network.cas import equality_id, from_ni, ref_id, ref_uri, set_ref
 from cats.network.named_binds import (
     is_stock_function_callable,
     named_bind_payload,
@@ -321,6 +321,15 @@ class ContentMesh(OrderOps):
         set_ref(pairing, 'plant', plant_id)
         set_ref(pairing, 'infrastructure', infrastructure_id)
         return pairing
+
+    def bundle_digest(self, structure_content_id: str) -> str:
+        """``sha256:`` spelling of a Structure pairing content id.
+
+        ``structure_content_id`` is the ``ni:`` id ``put_json`` returns for
+        the pairing object. The hex is ``from_ni`` of that id, not a second
+        hash. Demo Orders keep the ``ni:`` form.
+        """
+        return 'sha256:' + from_ni(structure_content_id)
 
     def _fetch_ref(self, obj, stem):
         """Load JSON for ``stem`` via ``*_uri`` or legacy ``*_cid`` / equality id."""
