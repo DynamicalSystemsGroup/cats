@@ -3,6 +3,7 @@ import os
 import sys
 
 from cats.executor.function.transport_port import as_transport_port
+from cats.executor.run_report import run_phase
 from cats.utils import wait_for_directory
 
 _TRANSPORT_PORT_HINT = (
@@ -57,6 +58,7 @@ class Processor:
         self.integration_data_id = None
         self.egress_data_id = None
         self.num_partitions = _io_partitions()
+        self.run_emitter = None
 
     def _load_plant_utils(self):
         path = os.path.join(
@@ -205,15 +207,27 @@ class Processor:
         io = self._io_port(plant)
         print("CAT Executing")
         print("CAT Ingress")
-        self.ingress_data_id = self.Ingress(transport=transport, io=io)
+        self.ingress_data_id = run_phase(
+            self.run_emitter,
+            'ingress',
+            lambda: self.Ingress(transport=transport, io=io),
+        )
         print("CAT Integration")
-        self.integration_data_id = self.Integration(
-            object_store=object_store,
-            plant=plant,
-            transport=transport,
+        self.integration_data_id = run_phase(
+            self.run_emitter,
+            'dispatch',
+            lambda: self.Integration(
+                object_store=object_store,
+                plant=plant,
+                transport=transport,
+            ),
         )
         print("CAT Egress")
-        self.egress_data_id = self.Egress(transport=transport, io=io)
+        self.egress_data_id = run_phase(
+            self.run_emitter,
+            'egress',
+            lambda: self.Egress(transport=transport, io=io),
+        )
         print("...")
         print(self.ingress_data_id)
         print(self.integration_data_id)

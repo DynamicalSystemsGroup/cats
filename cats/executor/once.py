@@ -99,11 +99,14 @@ def main(argv=None) -> int:
 
     from cats import CATS_HOME
     from cats.executor.result import write_job_result
+    from cats.executor.run_report import closing_line, open_report
     from cats.node.app import OrderIntakeError, run_order
 
+    report = None
     try:
         body = _body_from_args(args)
         kwargs = {}
+        report = open_report()
         if body:
             kwargs['apply_structure'] = False
             kwargs['structure_handoff'] = load_structure_handoff(
@@ -112,6 +115,8 @@ def main(argv=None) -> int:
             module_digest = _module_digest(args)
             if module_digest is not None:
                 kwargs['module_digest'] = module_digest
+            if report is not None:
+                kwargs['run_emitter'] = report
         bom_response = run_order(body, **kwargs)
         write_job_result(bom_response, cats_home=CATS_HOME)
     except OrderIntakeError as exc:
@@ -121,6 +126,9 @@ def main(argv=None) -> int:
         print(json.dumps({'error': str(exc)}), file=sys.stderr)
         return 1
     print(json.dumps(bom_response, default=str))
+    extra = closing_line(report)
+    if extra is not None:
+        print(json.dumps(extra))
     return 0
 
 
