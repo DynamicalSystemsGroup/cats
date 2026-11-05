@@ -1,7 +1,8 @@
 # Domain-Driven Design: CAT Node's Quantum Architecture Principle:
 
 CAT Node uses the Architectural Quantum Domain-Driven Design principle described in 
-[**Data Mesh of Data Products**](https://martinfowler.com/articles/data-mesh-principles.html)
+[**Data Mesh of Data Products**](https://martinfowler.com/articles/data-mesh-principles.html).
+The Data Product that quantum belongs to is defined in [DataProduct.md](DataProduct.md).
 
 This design principle enables effective cross-domain collaboration on Data Products across business and 
 knowledge domains between cross-functional & multi-disciplinary teams and organizations.
