@@ -94,6 +94,18 @@ def _handoff_file(tmp_path):
     return path
 
 
+def _bom_stdout(capsys):
+    """BOM object from stdout. A later closing line is ignored."""
+    for line in capsys.readouterr().out.splitlines():
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict) and 'content_id' in parsed:
+            return parsed
+    raise AssertionError('BOM JSON missing from stdout')
+
+
 def test_once_main_does_not_bind_flask(monkeypatch, capsys, tmp_path):
     run_called = []
     seen = {}
@@ -125,8 +137,7 @@ def test_once_main_does_not_bind_flask(monkeypatch, capsys, tmp_path):
     assert seen['kwargs']['structure_handoff']['plant_ray_dashboard_address'] == (
         'http://127.0.0.1:8265'
     )
-    lines = capsys.readouterr().out.splitlines()
-    out = json.loads(lines[0])
+    out = _bom_stdout(capsys)
     assert out['content_id'] == 'bom1'
     assert out['locators']['order_uri'] == locator
 
@@ -151,8 +162,7 @@ def test_once_main_writes_job_result(monkeypatch, capsys, tmp_path):
         '--structure-handoff', str(_handoff_file(tmp_path)),
     ]) == 0
     assert seen == ['bom1']
-    lines = capsys.readouterr().out.splitlines()
-    assert json.loads(lines[0])['content_id'] == 'bom1'
+    assert _bom_stdout(capsys)['content_id'] == 'bom1'
 
 
 def test_init_route_does_not_write_job_result():
@@ -394,8 +404,7 @@ def test_once_matching_module_digest_reaches_factory(monkeypatch, capsys, tmp_pa
         '--module-digest', 'sha256:' + hex_digest,
     ]) == 0
     assert [step for step, _ in calls] == ['initFactory', 'execute']
-    lines = capsys.readouterr().out.splitlines()
-    assert json.loads(lines[0])['content_id'] == 'bom1'
+    assert _bom_stdout(capsys)['content_id'] == 'bom1'
 
 
 def test_once_different_module_digest_exits_before_factory(

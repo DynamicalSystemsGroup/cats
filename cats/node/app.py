@@ -220,8 +220,7 @@ def run_order(
     the request body is ignored.
 
     ``run_emitter`` is omitted on the peer path. The one-shot entry passes
-    it only when the Plane set a job environment. An emitter on the request
-    body is ignored.
+    it when a report is open. A report on the request body is ignored.
     """
     runtime = RUNTIME if runtime is None else runtime
     cats_home = CATS_HOME if cats_home is None else cats_home
