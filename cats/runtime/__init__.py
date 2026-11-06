@@ -19,8 +19,9 @@ class Runtime:
     """Data Product process-lifetime ambient: layout, ContentMesh, Order entry.
 
     Long-lived Node substrate under the peer edge (`cats.node`). Owns host paths
-    and ContentMesh; delegates manufacturing to Factory and wraps the BOM
-    envelope. Not the peer, not Factory, not the per-Order Executor.
+    and ContentMesh; delegates Order intake to the CAT Factory, which operates
+    the Assembler, and wraps the BOM envelope. Not the peer, not the Assembler,
+    not the per-Order Executor.
     """
 
     def __init__(self,
@@ -72,7 +73,7 @@ class Runtime:
         Path(self.INPUT_DATA_HOME).mkdir(parents=True, exist_ok=True)
 
     def initFactory(self, order_request, ipfs_uri):
-        """Runtime entry: delegate Order intake to Factory manufacturing cell."""
+        """Runtime entry: Factory.accept operates the Assembler on this Order."""
         factory = Factory(self).accept(order_request, ipfs_uri)
         return factory, order_request
 
