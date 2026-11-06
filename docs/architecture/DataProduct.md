@@ -40,6 +40,6 @@ Contracts for those records: [BOM.md](../provenance/BOM.md), [BomRegistry.md](..
 
 ## One execution
 
-The Node’s manufacturing cell takes one closed Order and produces one **ephemeral Executor**: Function composed on Structure for that Order. The Executor runs that composition, writes the Invoice, and is gone when the run is done. The Data Product does not end with it. The Node remains, and the signed BOM is what the mesh keeps.
+The Node’s manufacturing cell, the CAT Assembler, takes one closed Order and produces one **ephemeral Executor**: Function composed on Structure for that Order. The CAT Factory is the agent line that operates that cell. It is not a [software factory](https://en.wikipedia.org/wiki/Software_factory). The Executor runs that composition, writes the Invoice, and is gone when the run is done. The Data Product does not end with it. The Node remains, and the signed BOM is what the mesh keeps.
 
 Component boundaries for that cell and the Executor are in [COMPONENTS.md](COMPONENTS.md). The loop from Order to signed BOM is in [ControlFeedbackLoop.md](ControlFeedbackLoop.md).
