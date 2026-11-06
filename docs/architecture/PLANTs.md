@@ -4,7 +4,7 @@ CATs' architecture is built around the "Plant" family of engineering analogies r
 
 - **Represented Plants:**
   - [Plant (control theory)](https://en.wikipedia.org/wiki/Plant_(control_theory)) - the combination of process and actuator & analogous to CAT Node's Function [FaaS]
-  - [Manufacturing plant](https://en.wikipedia.org/wiki/Manufacturing_plant) - analogous to CAT Node's (Product) Factory which is also analogous to a [Software Factory](https://en.wikipedia.org/wiki/Software_factory) 
+  - [Manufacturing plant](https://en.wikipedia.org/wiki/Manufacturing_plant) - analogous to the CAT Assembler. That cell is not a [software factory](https://en.wikipedia.org/wiki/Software_factory). The CAT Factory is the agent line that operates the Assembler. 
   - [Power plant](https://en.wikipedia.org/wiki/Power_station) analogous to CAT Node's "Structure" [PaaS]
   - [Physical plant](https://en.wikipedia.org/wiki/Physical_plant) - a facility's infrastructure analogous to CAT Node's Structure's "InfraStructure" [IaaS]
 - **Non-Represented Plants:**
@@ -14,7 +14,7 @@ CATs' architecture is built around the "Plant" family of engineering analogies r
 **Questions:**
 
 - what type of "plant" is the **CAT Node** as a whole, and
-- what type of "plant" is each of its constituent **Architectural Components** ([COMPONENTS.md](COMPONENTS.md): the Factory, the Architectural Quantum, the ephemeral Executor) and their nested sub-components ([ControlFeedbackLoop.md](ControlFeedbackLoop.md): Function/Process/InfraFunction, Structure/Plant/InfraStructure), taken separately.
+- what type of "plant" is each of its constituent **Architectural Components** ([COMPONENTS.md](COMPONENTS.md): the CAT Assembler, the CAT Factory, the Architectural Quantum, the ephemeral Executor) and their nested sub-components ([ControlFeedbackLoop.md](ControlFeedbackLoop.md): Function/Process/InfraFunction, Structure/Plant/InfraStructure), taken separately.
 
 ## Caveat: which "Power plant" article actually applies
 
@@ -46,7 +46,7 @@ The CAT Node doesn't reduce to one single type from the "Heavy industry and engi
 
 | Layer                                                          | Type match                            |
 | -------------------------------------------------------------- | ------------------------------------- |
-| Factory (assembles the Executor from Order components)         | **Manufacturing Plant**               |
+| CAT Assembler (assembles the Executor from Order components)   | **Manufacturing Plant**               |
 | Function [FaaS] (Process [Composed Function] + InfraFunction [Actuator]) | **Plant (control theory)**     |
 | Structure [PaaS] (Plant [SaaS] + InfraStructure [IaaS])        | **Power Plant** (Power Station sense) |
 
@@ -59,14 +59,14 @@ analog anywhere in CATs' architecture.
 Using [COMPONENTS.md](COMPONENTS.md)'s three named Architectural Components, plus the nested components
 [ControlFeedbackLoop.md](ControlFeedbackLoop.md) defines the actual "plant"-like behavior for:
 
-### 1. the Factory
+### 1. the CAT Assembler
 
-[COMPONENTS.md](COMPONENTS.md) itself cites [Factory](https://en.wikipedia.org/wiki/Factory) directly. Among
-the six: **Manufacturing plant**. It takes an Order (raw materials: Input Invoice + Function `function_uri` + Structure
-`structure_uri`, equality `ni:`) and assembles/composes them into a finished product (the ephemeral Executor) - the
-assembly-from-specification pattern is exactly Manufacturing plant's definition.
-Order intake/staging is `Factory.accept` (reached via `Runtime.initFactory`); Runtime remains the
-Node process-lifetime ambient, not the manufacturing logic.
+Among the six: **Manufacturing plant**. The CAT Assembler takes an Order (raw materials: Input Invoice + Function `function_uri` + Structure
+`structure_uri`, equality `ni:`) and assembles/composes them into a finished product (the ephemeral Executor). That
+assembly-from-specification pattern is Manufacturing plant's definition. The cell is not a
+[software factory](https://en.wikipedia.org/wiki/Software_factory).
+Order intake/staging is `Assembler.accept`. `Runtime.initFactory` returns the CAT Factory, the agent line that
+operates the Assembler. Runtime remains the Node process-lifetime ambient, not the manufacturing logic.
 
 ### 2. the Architectural Quantum
 
@@ -102,8 +102,8 @@ the Manufacturing-plant output (a composed Function+Structure pair) and those co
 
 | Component             | Plant (control theory) | Manufacturing plant | Physical plant | Power plant         | Chemical plant | Heavy equipment |
 | --------------------- | ---------------------- | ------------------- | -------------- | ------------------- | -------------- | --------------- |
-| CAT Node (whole)      | ✓ (via Function)       | ✓ (via Factory)     | -              | ✓ (via Structure)   | -              | -               |
-| Factory               | -                      | **✓**               | -              | -                   | -              | -               |
+| CAT Node (whole)      | ✓ (via Function)       | ✓ (via Assembler)   | -              | ✓ (via Structure)   | -              | -               |
+| CAT Assembler         | -                      | **✓**               | -              | -                   | -              | -               |
 | Architectural Quantum | ✓ (Function half)      | -                   | -              | ✓ (Structure half)  | -              | -               |
 | Process [Composed Function] | ✓ ("process" half) | -                   | -              | -                   | -              | -               |
 | InfraFunction [Actuator] | ✓ ("actuator" half) | -                   | -              | -                   | -              | -               |
