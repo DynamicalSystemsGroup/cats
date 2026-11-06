@@ -1,10 +1,10 @@
-"""Unit tests for Factory manufacturing-cell API (accept → assemble → produce)."""
+"""Unit tests for the CAT Assembler (accept → assemble → produce)."""
 from types import SimpleNamespace
 
-from cats.factory import Factory
+from cats.assembler import Assembler
 
 
-def test_factory_accept_stages_bom_then_assembles(monkeypatch):
+def test_assembler_accept_stages_bom_then_assembles(monkeypatch):
     runtime = SimpleNamespace(OUTPUT_HOME='/tmp/cats-out')
     init_calls = []
 
@@ -18,15 +18,15 @@ def test_factory_accept_stages_bom_then_assembles(monkeypatch):
     fake_executor = object()
 
     monkeypatch.setattr(
-        'cats.factory.factory.Structure',
+        'cats.assembler.assembler.Structure',
         lambda svc, cid: fake_structure,
     )
     monkeypatch.setattr(
-        'cats.factory.factory.Function',
+        'cats.assembler.assembler.Function',
         lambda svc, cid: fake_function,
     )
     monkeypatch.setattr(
-        'cats.factory.factory.Executor',
+        'cats.assembler.assembler.Executor',
         lambda svc, structure, function: fake_executor,
     )
 
@@ -39,14 +39,14 @@ def test_factory_accept_stages_bom_then_assembles(monkeypatch):
         },
     }
 
-    factory = Factory(runtime).accept(order_request, 'QmInitData')
+    assembler = Assembler(runtime).accept(order_request, 'QmInitData')
 
     assert len(init_calls) == 1
     assert init_calls[0]['structure_id'] == 'QmStruct'
     assert init_calls[0]['function_id'] == 'QmFn'
     assert init_calls[0]['init_data_id'] == 'QmInitData'
     assert init_calls[0]['order_id'] == 'QmOrder'
-    assert factory.structure is fake_structure
-    assert factory.function is fake_function
-    assert factory.executor is fake_executor
-    assert factory.produce() is fake_executor
+    assert assembler.structure is fake_structure
+    assert assembler.function is fake_function
+    assert assembler.executor is fake_executor
+    assert assembler.produce() is fake_executor

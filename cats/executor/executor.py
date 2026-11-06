@@ -235,7 +235,7 @@ class Executor:
         # (as opposed to the placeholder order ref getEnhancedBom() may
         # have fetched into self.enhanced_bom['order']) is what makes the
         # Invoice point at "the original CID-ed Order" (see
-        # docs/NodeProductFlow.md#2b). Factory.accept threads this same
+        # docs/NodeProductFlow.md#2b). Assembler.accept threads this same
         # order id into the bootstrap Invoice via Runtime.initBOMcar /
         # ContentMesh.initBOMjson, so the locally materialized order.json
         # and this final Invoice's order ref are the exact same id for
