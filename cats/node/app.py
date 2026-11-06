@@ -206,7 +206,7 @@ def run_order(
     module_digest=None,
     run_emitter=None,
 ):
-    """Load one Order, run Factory → Executor, sign the BOM.
+    """Load one Order, run Factory (operates the Assembler) → Executor, sign the BOM.
 
     Function and Structure come from the Order. Missing either fails closed.
     Does not bind Flask.
