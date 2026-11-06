@@ -1,6 +1,6 @@
 # Experiments
 
-Optional demos and prototypes that extend or explore CATs outside the core mesh workflow in [DEMO.md](../docs/DEMO.md).
+Optional demos and prototypes that extend or explore CATs outside the core mesh workflow in [DEMO.md](../docs/guide/DEMO.md).
 
 ## Available experiments
 

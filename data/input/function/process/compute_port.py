@@ -6,7 +6,7 @@ Plant Job Submission APIs.
 
 Demo batch ABI (adapter concern): ``batch_fn`` is
 ``Dict[str, np.ndarray] -> Dict[str, np.ndarray]``; the Plant's ComputePort
-adapter maps engine batches onto that shape (see docs/INTEROP.md §2g).
+adapter maps engine batches onto that shape (see docs/storage/INTEROP.md §2g).
 
 The Ray job entrypoint wires Order-submitted ``RayComputePort`` into the
 hotF so distributed Ray Data stays behind the Plant adapter.

@@ -77,7 +77,7 @@ def write_applied_structure_id(structure_home, structure_id):
 
 
 def terraform_bin(runtime):
-    # `.venv` is uv's managed venv (see docs/DEPS.md).
+    # `.venv` is uv's managed venv (see docs/guide/DEPS.md).
     path = os.path.join(runtime.CATS_HOME, '.venv', 'bin', 'terraform')
     return path if os.path.isfile(path) else 'terraform'
 

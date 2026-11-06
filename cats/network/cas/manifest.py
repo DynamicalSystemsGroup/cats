@@ -37,16 +37,31 @@ def is_directory_manifest(obj: Any) -> bool:
     )
 
 
-def put_tree(store: CasHttpStore, directory: str) -> str:
-    """Put all files under ``directory``; return ``ni:`` of the manifest blob."""
+def put_tree(store: CasHttpStore, directory: str, *, ignore=None) -> str:
+    """Put files under ``directory``; return ``ni:`` of the manifest blob.
+
+    ``ignore(rel_posix) -> bool`` skips apply residue (used for Structure
+    plant/infrastructure trees). Default hashes every file.
+    """
     root = Path(directory).resolve()
     if not root.is_dir():
         raise NotADirectoryError(directory)
     entries: dict[str, str] = {}
-    for dirpath, _dirnames, filenames in os.walk(root):
+    for dirpath, dirnames, filenames in os.walk(root):
+        rel_dir = Path(dirpath).relative_to(root).as_posix()
+        if ignore is not None:
+            dirnames[:] = [
+                name
+                for name in dirnames
+                if not ignore(
+                    name if rel_dir == '.' else f'{rel_dir}/{name}'
+                )
+            ]
         for name in filenames:
             full = Path(dirpath) / name
             rel = full.relative_to(root).as_posix()
+            if ignore is not None and ignore(rel):
+                continue
             entries[rel] = store.put(full.read_bytes())
     manifest = build_manifest_entries(entries)
     return store.put(

@@ -13,25 +13,25 @@
 - **Unit** — the other `tests/test_*.py` modules: mocked / in-process / source guards
   (lineage helpers, named binds, ports, IaaS utils, ContentMesh RPC, Node CLI, etc.).
   No live Node required. [`tests/test_ipfs_client.py`](../tests/test_ipfs_client.py) is thin Kubo smoke (`@requires_kubo`; skips if `:5001` is down).
-  Control-plane Python (§6e) uses `*_id` / `put_dir`; minted JSON stays `*_uri` / `contentId` (§6d).
-  §6f `hl:` resolve/emit/intake: [`tests/test_hl_resolve.py`](../tests/test_hl_resolve.py).
-  §6i Structure marker `.applied-structure.id` (+ plant `applied_structure_id`):
+  [6e](W3C.md#6e-control-plane-python-names) Control-plane Python uses `*_id` / `put_dir`; minted JSON stays `*_uri` / `contentId` ([6d](W3C.md#6d-uri-only-graph)).
+  [6f](W3C.md#6f-hashlink-handoff) `hl:` resolve/emit/intake: [`tests/test_hl_resolve.py`](../tests/test_hl_resolve.py).
+  [6i](W3C.md#6i-structure-applied-marker) Structure marker `.applied-structure.id` (+ plant `applied_structure_id`):
   [`tests/test_structure_root_id.py`](../tests/test_structure_root_id.py) /
   [`tests/test_plant_utils.py`](../tests/test_plant_utils.py).
-  §6j Process/Plant/Ray Order ABI (`input_dir_id`, Ray `input_id`/`layout_id`,
+  [6j](W3C.md#6j-order-abi-ids) Process/Plant/Ray Order ABI (`input_dir_id`, Ray `input_id`/`layout_id`,
   obj_store `structure_id`): [`tests/test_transport_port.py`](../tests/test_transport_port.py) /
   [`tests/test_infrastructure_transport_utils.py`](../tests/test_infrastructure_transport_utils.py) /
   [`tests/test_infrastructure_obj_store_utils.py`](../tests/test_infrastructure_obj_store_utils.py) /
   [`tests/test_ray_io_partitions.py`](../tests/test_ray_io_partitions.py).
-  §6p CAS-native opaque `part-*` partition I/O (no Kubo CAR mint):
+  [6p](W3C.md#6p-opaque-partition-layout) CAS-native opaque `part-*` partition I/O (no Kubo CAR mint):
   [`tests/test_ray_io_partitions.py`](../tests/test_ray_io_partitions.py).
-  §6q legacy CID transport gate (historical; remint retired in §6s):
+  [6q](W3C.md#6q-legacy-cid-transport-gate) legacy CID transport gate (historical; remint retired in [6s](W3C.md#6s-cas-only-node)):
   [`tests/test_infrastructure_transport_utils.py`](../tests/test_infrastructure_transport_utils.py).
-  §6s retire legacy CID read + Docker T&D (fail closed; CAS-only transport):
+  [6s](W3C.md#6s-cas-only-node) retire legacy CID read + Docker T&D (fail closed; CAS-only transport):
   [`tests/test_infrastructure_transport_utils.py`](../tests/test_infrastructure_transport_utils.py) /
   [`tests/test_address_store_cas_only.py`](../tests/test_address_store_cas_only.py) /
   [`tests/test_content_store_ensure_binding.py`](../tests/test_content_store_ensure_binding.py).
-  §6k dual-mode `cat(content_id=)` / drop `cidDir` aliases:
+  [6k](W3C.md#6k-mesh-cat-content-id) dual-mode `cat(content_id=)` / drop `cidDir` aliases:
   [`tests/test_cas_http.py`](../tests/test_cas_http.py) /
   [`tests/test_meshclient_rpc_surface.py`](../tests/test_meshclient_rpc_surface.py) /
   [`tests/test_function_source_id.py`](../tests/test_function_source_id.py).
@@ -53,7 +53,7 @@
 
 1. **[Install CATs](https://github.com/DynamicalSystemsGroup/cats/tree/cats2?tab=readme-ov-file#get-started)** (`uv sync --extra ops --group dev` for mesh demos and tests; `dev` provides `pytest`)
   - **Root Dependency**: see [`NodeLifeCycle.md`](./NodeLifeCycle.md) — `make node-start` soft-probes
-  ContentStore (Kubo optional §6r/§6s). Host Kubo detail: [`IPFS.md`](./IPFS.md).
+  ContentStore (Kubo optional). Host Kubo detail: [`IPFS.md`](./IPFS.md).
 2. **Session 1**
   a. *[Create the environment](./ENV.md)*
   ```bash
@@ -62,7 +62,7 @@
   ```
     - `uv run` (below) uses this `.venv` automatically — no manual activation needed.
   b. **Start Docker daemon** — needed for Structure MinIO scratch + Plant / KubeRay
-     (not Docker Kubo T&D peers, retired §6s). See [`DEMO.md`](./DEMO.md) step 0.
+     (not Docker Kubo T&D peers, retired). See [`DEMO.md`](./DEMO.md) step 0.
      `tests/test_provenance.py` skips if the daemon is down.
   c. **Start CAT Node** — follow [`NodeLifeCycle.md`](./NodeLifeCycle.md).
   ```bash
@@ -117,14 +117,14 @@
   # ContentMesh.linkStructure — Structure lineage twin of linkProcess
   uv run pytest -s tests/test_link_structure.py
 
-  # BOM registry — Node-local data→BOM / init / link* (§6d content_id / bom_ids)
+  # BOM registry — Node-local data→BOM / init / link* ([6d](W3C.md#6d-uri-only-graph) content_id / bom_ids)
   # Contract: docs/BomRegistry.md
   uv run pytest -s tests/test_bom_registry.py
 
   # CAS-over-HTTP — CasHttpStore, ni:/digest, manifests, locators, AddressStore
   uv run pytest -s tests/test_cas_http.py tests/test_address_store_cas_only.py
 
-  # Phase 2b / §6f — URI address + ni:/hl: proof, Order/Invoice LDP, hl: resolve/emit
+  # Phase 2b / [6f](W3C.md#6f-hashlink-handoff) — URI address + ni:/hl: proof, Order/Invoice LDP, hl: resolve/emit
   uv run pytest -s tests/test_phase2b_uri.py tests/test_hl_resolve.py
 
   # ContentMesh CAS + CAT_NODE_* endpoints (no ipfs CLI / legacy CID)
@@ -145,7 +145,7 @@
   # Terraform module-cache readiness (InfraStructure.initialize)
   uv run pytest -s tests/test_structure_modules_installed.py
 
-  # Structure root_id staging + getEnhancedBom materialize (+ §6i marker)
+  # Structure root_id staging + getEnhancedBom materialize (+ [6i](W3C.md#6i-structure-applied-marker) marker)
   uv run pytest -s tests/test_structure_root_id.py
 
   # TransportPort Protocol (Function) + Executor as_transport_port facade

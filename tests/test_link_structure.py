@@ -92,7 +92,7 @@ def test_structure_pairing(monkeypatch, tmp_path):
     client = ContentMesh(ipfsClient=fake, CATS_HOME=str(tmp_path))
     monkeypatch.setattr(client, 'ensure_bootstrap_content_store', lambda: None)
 
-    def _put_dir(path):
+    def _put_dir(path, **_kwargs):
         name = Path(path).name
         return f'Qm{name}', name
 
@@ -120,7 +120,7 @@ def test_link_structure_from_filepath(monkeypatch, tmp_path):
 
     structure = _write_structure_tree(tmp_path)
 
-    def _put_dir(path):
+    def _put_dir(path, **_kwargs):
         name = Path(path).name
         return f'QmNew{name}', name
 

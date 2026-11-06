@@ -8,9 +8,11 @@ import pytest
 from cats.network import (
     STRUCTURE_ROOT_FILES,
     ContentMesh,
+    is_structure_apply_residue,
     materialize_structure_root_files,
     stage_structure_root,
 )
+from cats.network.cas import ref_id
 
 
 def _write_structure_fixture(structure: Path, *, with_noise=True):
@@ -50,6 +52,26 @@ def test_applied_structure_marker_prefers_new_and_falls_back(tmp_path):
     assert (home / APPLIED_STRUCTURE_MARKER).read_text() == 'ni:///sha-256;new'
     assert not (home / LEGACY_APPLIED_STRUCTURE_MARKER).exists()
     assert read_applied_structure_id(str(home)) == 'ni:///sha-256;new'
+
+
+def test_structure_pairing_stable_when_plant_has_apply_residue(tmp_path):
+    """Second mint after terraform apply residue still carries Structure."""
+    clean = tmp_path / 'clean'
+    dirty = tmp_path / 'dirty'
+    _write_structure_fixture(clean, with_noise=False)
+    _write_structure_fixture(dirty, with_noise=False)
+    (dirty / 'plant' / 'terraform.tfstate').write_text('{"serial": 2}\n')
+    (dirty / 'infrastructure' / '.terraform').mkdir()
+    (dirty / 'infrastructure' / '.terraform' / 'x').write_text('y')
+
+    client = ContentMesh(ipfsClient=MagicMock(), CATS_HOME=str(tmp_path / 'cas'))
+    p0 = client.structure_pairing(str(clean))
+    p1 = client.structure_pairing(str(dirty))
+    assert ref_id(p0, 'plant') == ref_id(p1, 'plant')
+    assert ref_id(p0, 'infrastructure') == ref_id(p1, 'infrastructure')
+    assert ref_id(p0, 'root') == ref_id(p1, 'root')
+    assert is_structure_apply_residue('terraform.tfstate')
+    assert is_structure_apply_residue('.terraform/providers')
 
 
 def test_stage_structure_root_copies_allowlist_only(tmp_path):

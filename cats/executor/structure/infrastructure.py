@@ -20,7 +20,7 @@ from cats.executor.structure.plant import Plant
 _DOCKER_REQUIRED = (
     'Docker daemon is not running; Structure apply/destroy needs it for '
     'MinIO scratch and Plant / KubeRay (start Docker Desktop, then retry). '
-    'See docs/DEMO.md.'
+    'See docs/guide/DEMO.md.'
 )
 
 

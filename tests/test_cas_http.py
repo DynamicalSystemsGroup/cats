@@ -19,6 +19,7 @@ from cats.network.cas import (
     sha256_hex,
     to_ni,
 )
+from cats.network.packaging import is_structure_apply_residue
 from cats.network.cas.digest import validate_digest_segment
 from cats.network.ldp.headers import LDP_RESOURCE
 from cats.network.registry import register_registry_routes
@@ -127,6 +128,22 @@ def test_manifest_put_tree_roundtrip(tmp_path):
     addr.get(ni, str(dest))
     assert (dest / 'a.txt').read_text(encoding='utf-8') == 'A'
     assert (dest / 'sub' / 'b.txt').read_text(encoding='utf-8') == 'B'
+
+
+def test_put_tree_ignore_skips_terraform_apply_residue(tmp_path):
+    clean = tmp_path / 'clean'
+    dirty = tmp_path / 'dirty'
+    for root in (clean, dirty):
+        (root / 'main.tf').parent.mkdir(parents=True, exist_ok=True)
+        (root / 'main.tf').write_text('# plant\n', encoding='utf-8')
+    (dirty / 'terraform.tfstate').write_text('{"serial": 9}\n', encoding='utf-8')
+    (dirty / '.terraform').mkdir()
+    (dirty / '.terraform' / 'providers').write_text('x', encoding='utf-8')
+    store = CasHttpStore(str(tmp_path / 'cas'))
+    assert put_tree(
+        store, str(clean), ignore=is_structure_apply_residue
+    ) == put_tree(store, str(dirty), ignore=is_structure_apply_residue)
+    assert put_tree(store, str(clean)) != put_tree(store, str(dirty))
 
 
 def test_validate_digest_rejects_unsafe():

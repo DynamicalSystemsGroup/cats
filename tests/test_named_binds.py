@@ -144,7 +144,7 @@ def test_create_order_request_stock_emits_named_bind_leaves(monkeypatch, tmp_pat
     fake = MagicMock()
     structure, data = _write_order_fixture(tmp_path)
 
-    def _put_dir(path):
+    def _put_dir(path, **_kwargs):
         name = Path(path).name
         return f'Qm{name}', name
 

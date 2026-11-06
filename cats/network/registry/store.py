@@ -108,6 +108,19 @@ def project_record(record: dict[str, Any]) -> dict[str, Any]:
         out['seed_uri'] = record['seed_uri']
     elif record.get('seed') or record.get('seed_cid'):
         out['seed'] = record.get('seed') or record.get('seed_cid')
+    if record.get('runtime_sbom_uri'):
+        out['runtime_sbom_uri'] = record['runtime_sbom_uri']
+    elif record.get('runtime_sbom') or record.get('runtime_sbom_cid'):
+        out['runtime_sbom'] = record.get('runtime_sbom') or record.get(
+            'runtime_sbom_cid'
+        )
+    for stem in ('function_sbom', 'structure_sbom', 'input_data_sbom'):
+        uri_key = f'{stem}_uri'
+        cid_key = f'{stem}_cid'
+        if record.get(uri_key):
+            out[uri_key] = record[uri_key]
+        elif record.get(stem) or record.get(cid_key):
+            out[stem] = record.get(stem) or record.get(cid_key)
     # Drop None values for a cleaner projection.
     return {k: v for k, v in out.items() if v is not None}
 
@@ -159,6 +172,7 @@ def build_record(
     function_id = None
     structure_id = None
     input_data_id = None
+    order: dict[str, Any] | None = None
     try:
         order_locator = ref_uri(invoice, 'order') or order_id
         order = json.loads(content_mesh.cat(order_locator))
@@ -208,6 +222,26 @@ def build_record(
                 if stages.get('data_stages_uri')
                 else {}
             ),
+            **(
+                {'runtime_sbom_uri': ref_uri(invoice, 'runtime_sbom')}
+                if ref_uri(invoice, 'runtime_sbom')
+                else {}
+            ),
+            **(
+                {'function_sbom_uri': ref_uri(order, 'function_sbom')}
+                if isinstance(order, dict) and ref_uri(order, 'function_sbom')
+                else {}
+            ),
+            **(
+                {'structure_sbom_uri': ref_uri(order, 'structure_sbom')}
+                if isinstance(order, dict) and ref_uri(order, 'structure_sbom')
+                else {}
+            ),
+            **(
+                {'input_data_sbom_uri': ref_uri(order, 'input_data_sbom')}
+                if isinstance(order, dict) and ref_uri(order, 'input_data_sbom')
+                else {}
+            ),
         },
         'ingress_data': stages.get('ingress_data_id'),
         'ingress_data_uri': stages.get('ingress_data_uri'),
@@ -217,6 +251,32 @@ def build_record(
         'data_stages_uri': stages.get('data_stages_uri'),
         'seed': ref_id(invoice, 'seed', cats_home=cats_home),
         'seed_uri': ref_uri(invoice, 'seed'),
+        'runtime_sbom': ref_id(invoice, 'runtime_sbom', cats_home=cats_home),
+        'runtime_sbom_uri': ref_uri(invoice, 'runtime_sbom'),
+        'function_sbom': (
+            ref_id(order, 'function_sbom', cats_home=cats_home)
+            if isinstance(order, dict)
+            else None
+        ),
+        'function_sbom_uri': (
+            ref_uri(order, 'function_sbom') if isinstance(order, dict) else None
+        ),
+        'structure_sbom': (
+            ref_id(order, 'structure_sbom', cats_home=cats_home)
+            if isinstance(order, dict)
+            else None
+        ),
+        'structure_sbom_uri': (
+            ref_uri(order, 'structure_sbom') if isinstance(order, dict) else None
+        ),
+        'input_data_sbom': (
+            ref_id(order, 'input_data_sbom', cats_home=cats_home)
+            if isinstance(order, dict)
+            else None
+        ),
+        'input_data_sbom_uri': (
+            ref_uri(order, 'input_data_sbom') if isinstance(order, dict) else None
+        ),
     }
 
 
@@ -285,6 +345,7 @@ class BomRegistry:
             'ingress_data_cid',
             'integration_data_cid',
             'seed_cid',
+            'runtime_sbom_cid',
         ):
             stored.pop(legacy, None)
         stored['content_id'] = bom_id

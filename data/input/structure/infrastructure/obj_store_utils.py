@@ -12,7 +12,7 @@ or this module's CLI. Durable CAT product retrieval remains IPFS
 `integration_data_id` (scratch path); durable MinIO is for Entity
 Relationship lookups across Structure generations.
 
-See docs/MinIO.md and docs/STORAGE.md.
+See docs/storage/MinIO.md and docs/storage/STORAGE.md.
 """
 from __future__ import annotations
 

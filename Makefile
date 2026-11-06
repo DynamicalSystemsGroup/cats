@@ -53,7 +53,7 @@ else
 	PKG_MANAGER :=
 endif
 
-# Minimum versions, kept in sync with docs/DEPS.md's ">=" floors. These are
+# Minimum versions, kept in sync with docs/guide/DEPS.md's ">=" floors. These are
 # NOT pins: every install path below always fetches the latest release from
 # upstream (Homebrew already does this; the Linux binary-download paths query
 # each project's own "latest" endpoint at install time). These constants are
@@ -65,7 +65,7 @@ KUBECTL_MIN_VERSION := 1.27.3
 TERRAFORM_MIN_VERSION := 1.15.7
 IPFS_MIN_VERSION := 0.21.0
 HELM_MIN_VERSION := 3.12.1
-# NOTE: docs/DEPS.md lists Go as ">= v3.13.1", which isn't a real Go release
+# NOTE: docs/guide/DEPS.md lists Go as ">= v3.13.1", which isn't a real Go release
 # (Go versions look like 1.21.x, 1.22.x...). Used only as a last-resort
 # fallback below; the live lookup against go.dev always wins when reachable.
 GO_MIN_VERSION := 1.22.5
@@ -87,7 +87,7 @@ endef
 CONTENT_STORE_UTILS := data/input/structure/infrastructure/content_store_utils.py
 
 help:
-	@echo "CATs dependency installer for macOS & Linux (see docs/DEPS.md for details)"
+	@echo "CATs dependency installer for macOS & Linux (see docs/guide/DEPS.md for details)"
 	@echo "Detected: $(UNAME_S)/$(UNAME_M) -> os=$(OS_NAME) arch=$(ARCH) pkg_manager=$(PKG_MANAGER)"
 	@echo ""
 	@echo "  make deps            Install all required dependencies (Docker check, uv, kind,"
@@ -118,7 +118,7 @@ help:
 	@echo "  make node-status           Flask listen + ContentStore ready"
 	@echo "  make execute-order ORDER_CID=<cid>  In-process Order execute (no Flask)"
 	@echo ""
-	@echo "Diagramming (requires Graphviz \`dot\` on PATH; see docs/DEPS.md):"
+	@echo "Diagramming (requires Graphviz \`dot\` on PATH; see docs/guide/DEPS.md):"
 	@echo "  make diagrams              code2flow + pyreverse PNGs under images/"
 
 deps: deps-docker deps-uv deps-kind deps-kubectl deps-terraform deps-go deps-ipfs
@@ -135,7 +135,7 @@ check-pkg-manager:
 		exit 1; \
 	fi
 
-# 0. Docker (docs/DEPS.md item 0)
+# 0. Docker (docs/guide/DEPS.md item 0)
 deps-docker:
 	@if command -v docker >/dev/null; then \
 		echo "docker already installed: $$(docker --version)"; \
@@ -150,7 +150,7 @@ deps-docker:
 		echo "Added $$(whoami) to the docker group - log out/in (or run 'newgrp docker') for it to take effect."; \
 	fi
 
-# 1. uv (docs/DEPS.md item 1) - install via pip, then let uv install the pinned
+# 1. uv (docs/guide/DEPS.md item 1) - install via pip, then let uv install the pinned
 # Python interpreter from .python-version.
 deps-uv:
 	@if command -v uv >/dev/null; then \
@@ -164,7 +164,7 @@ deps-uv:
 deps-uv-sync: deps-uv
 	uv sync
 
-# 2. kind (docs/DEPS.md item 2) - not reliably packaged across Linux distros,
+# 2. kind (docs/guide/DEPS.md item 2) - not reliably packaged across Linux distros,
 # so Linux always fetches the latest GitHub release (falling back to the
 # documented floor only if that lookup fails); macOS uses Homebrew, which
 # likewise always installs latest.
@@ -188,9 +188,9 @@ deps-kind:
 		$(SUDO) mv /tmp/kind /usr/local/bin/kind; \
 	fi
 
-# 3. kubectl (docs/DEPS.md item 3) - same rationale as kind. Kubernetes
+# 3. kubectl (docs/guide/DEPS.md item 3) - same rationale as kind. Kubernetes
 # publishes a `stable.txt` endpoint specifically for "give me the latest
-# release", which the Linux path uses (mirrors docs/ubuntu2004.md's existing
+# release", which the Linux path uses (mirrors docs/guide/ubuntu2004.md's existing
 # curl-based install, just no longer hardcoded to `stable.txt`'s old value).
 deps-kubectl:
 	@if command -v kubectl >/dev/null; then \
@@ -213,7 +213,7 @@ deps-kubectl:
 		rm -f kubectl; \
 	fi
 
-# 5. Terraform (docs/DEPS.md item 5) - pin HashiCorp binary into the uv-managed
+# 5. Terraform (docs/guide/DEPS.md item 5) - pin HashiCorp binary into the uv-managed
 # .venv/bin (not brew / not "latest"). Requires deps-uv-sync so .venv exists.
 deps-terraform: deps-uv-sync
 	@VER=$(TERRAFORM_MIN_VERSION); \
@@ -229,9 +229,9 @@ deps-terraform: deps-uv-sync
 		.venv/bin/terraform -version; \
 	fi
 
-# 5. Go (docs/DEPS.md item 5) - package manager on both OSes tends to lag
+# 5. Go (docs/guide/DEPS.md item 5) - package manager on both OSes tends to lag
 # upstream; the Linux fallback resolves "latest" via go.dev's own version
-# endpoint (docs/ubuntu2004.md's existing tarball-into-/usr/local approach,
+# endpoint (docs/guide/ubuntu2004.md's existing tarball-into-/usr/local approach,
 # generalized off of a hardcoded version).
 deps-go:
 	@if command -v go >/dev/null; then \
@@ -255,7 +255,7 @@ deps-go:
 		echo "Add Go to PATH: echo 'export PATH=\$$PATH:/usr/local/go/bin' >> ~/.profile && source ~/.profile"; \
 	fi
 
-# 6. IPFS Kubo (docs/DEPS.md item 6) - not reliably packaged on Linux, so the
+# 6. IPFS Kubo (docs/guide/DEPS.md item 6) - not reliably packaged on Linux, so the
 # Linux path resolves "latest" via GitHub's releases API and installs via the
 # official Kubo tarball + install.sh; Homebrew on macOS.
 deps-ipfs:
@@ -279,7 +279,7 @@ deps-ipfs:
 		rm -rf kubo "kubo_v$${LATEST}_linux-$(ARCH).tar.gz"; \
 	fi
 
-# helm (docs/DEPS.md, optional) - not required by `terraform apply`; only
+# helm (docs/guide/DEPS.md, optional) - not required by `terraform apply`; only
 # needed for manually inspecting releases with `helm list` / `helm get`.
 # Helm's own install script already detects OS/arch and installs latest, so
 # it's used on both platforms instead of branching on Homebrew vs. a distro
@@ -299,7 +299,7 @@ deps-helm:
 		rm -f /tmp/get_helm.sh; \
 	fi
 
-# Graphviz (docs/DEPS.md, optional) - provides \`dot\` for code2flow / pyreverse
+# Graphviz (docs/guide/DEPS.md, optional) - provides \`dot\` for code2flow / pyreverse
 # PNG output (`make diagrams`). System package only; not installed by uv.
 deps-graphviz: check-pkg-manager
 	@if command -v dot >/dev/null; then \
@@ -342,7 +342,7 @@ print-versions:
 node-up: content-store-ensure node-start
 
 # Make-only teardown: Flask then host content-store. Does not live in
-# cats.node stop (Node remains a ContentStore client; see docs/NodeLifeCycle.md).
+# cats.node stop (Node remains a ContentStore client; see docs/guide/NodeLifeCycle.md).
 node-down: node-stop content-store-shutdown
 
 node-start:

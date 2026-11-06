@@ -44,6 +44,13 @@ ops = [
     "tqdm>=4.66.5",
     "pyarrow>=18.0.0",
 ]
+rtm = [
+    "rdflib>=7.0",
+    "pyshacl>=0.26",
+]
+
+[tool.setuptools.package-data]
+"cats.network.bom.shapes" = ["*.ttl"]
 
 [dependency-groups]
 dev = [
@@ -51,6 +58,8 @@ dev = [
     "build",
     "code2flow",
     "pylint",
+    "rdflib>=7.0",
+    "pyshacl>=0.26",
 ]
 
 [project.urls]

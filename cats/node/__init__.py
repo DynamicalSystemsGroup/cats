@@ -1,7 +1,10 @@
 """CAT Node peer edge: Flask HTTP API and process lifecycle CLI.
 
-Long-lived substrate is ``cats.runtime``; manufacturing is ``cats.factory``;
-AQ execution is ``cats.executor``. This package is only the peer edge.
+Long-lived substrate is ``cats.runtime``. The manufacturing cell is
+``cats.assembler`` (the CAT Assembler). It is not a Wikipedia software
+factory. ``cats.factory`` is the CAT Factory, the agent line that operates
+the Assembler. AQ execution is ``cats.executor``. This package is only the
+peer edge.
 """
 from __future__ import annotations
 
@@ -28,7 +31,7 @@ if _REPO_ROOT not in sys.path:
 
 logging.basicConfig(level=logging.DEBUG)
 
-from cats.node.app import HOST, PORT, catNode, execute_init_cat
+from cats.node.app import HOST, PORT, catNode, execute_init_cat, run_order
 from cats.node.cli import main
 
 __all__ = [
@@ -36,5 +39,6 @@ __all__ = [
     'PORT',
     'catNode',
     'execute_init_cat',
+    'run_order',
     'main',
 ]

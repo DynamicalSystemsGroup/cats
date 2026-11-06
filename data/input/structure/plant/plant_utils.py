@@ -7,7 +7,7 @@ Plant-specific Terraform/kind stale-state cleanup, and the Ray PlantPort adapter
 keys and TF resource addresses stay here (this Plant's SaaS shape); InfraFunction
 speaks Function-owned ``PlantPort`` only.
 
-See docs/DASHBOARDS.md and docs/BOM.md.
+See docs/guide/DASHBOARDS.md and docs/provenance/BOM.md.
 """
 from __future__ import annotations
 

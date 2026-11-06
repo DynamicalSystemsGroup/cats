@@ -351,12 +351,34 @@ class OrderOps:
 
         order = deepcopy(order)
         order.pop('flat', None)
+        from cats.network.bom import attach_ebom_stems, strip_ebom_stems
+
+        strip_ebom_stems(order)
         set_ref(order, 'function', function_id)
         set_ref(order, 'structure', structure_id)
         set_ref(order, 'invoice', invoice_id)
         if structure_filepath is not None:
             order['structure_filepath'] = structure_filepath
         order['endpoint'] = _node_init_endpoint()
+        function_obj = None
+        structure_obj = None
+        try:
+            function_obj = json.loads(self.cat(function_id))
+        except Exception:
+            function_obj = {}
+        try:
+            structure_obj = json.loads(self.cat(structure_id))
+        except Exception:
+            structure_obj = {}
+        attach_ebom_stems(
+            order,
+            self,
+            function=function_obj if isinstance(function_obj, dict) else {},
+            function_id=function_id,
+            structure=structure_obj if isinstance(structure_obj, dict) else {},
+            structure_id=structure_id,
+            data_id=data_id,
+        )
         order_id = self.put_json(order)
 
         cats_home = self._cats_home()
@@ -724,6 +746,17 @@ class OrderOps:
         set_ref(order, 'function', function_id)
         set_ref(order, 'structure', structure_id)
         set_ref(order, 'invoice', invoice_id)
+        from cats.network.bom import attach_ebom_stems
+
+        attach_ebom_stems(
+            order,
+            self,
+            function=function,
+            function_id=function_id,
+            structure=pairing,
+            structure_id=structure_id,
+            data_id=data_id,
+        )
         order_id = self.put_json(order)
         # Phase 2b: publish Order/Invoice LDP URIs (address of record).
         cats_home = self._cats_home()

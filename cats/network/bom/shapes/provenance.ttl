@@ -1,0 +1,12 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix cats: <https://cats.dynamicalsystemsgroup.com/ns#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+
+cats:ProvenanceEntityShape
+    a sh:NodeShape ;
+    sh:targetClass prov:Entity ;
+    sh:property [
+        sh:path prov:wasGeneratedBy ;
+        sh:minCount 1 ;
+        sh:message "stage entity must name prov:wasGeneratedBy" ;
+    ] .

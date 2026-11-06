@@ -1,68 +1,44 @@
-"""Data Product manufacturing cell (Software / Manufacturing factory).
+"""CAT Factory: the agent line that operates the CAT Assembler.
 
-CAT Node is a Data Product on a Data Mesh. Factory accepts a content-addressed
-Order, stages materials via ContentMesh (through Runtime.initBOMcar), assembles
-Function + Structure (AQ halves), and produces an ephemeral Executor.
+Composition (eBOM) and Release (mBOM) are named stations. They do not read a
+SysML project or a GitHub Issue, and they do not call create_order_request
+or link*. accept and produce delegate to the Assembler, which produces one
+ephemeral Executor.
 
-Not Structure's Plant [SaaS] (compute generation) — see docs/PLANTs.md.
+This class is the skeleton of the AI software factory. It is not a Wikipedia
+software factory, and it is not the manufacturing cell.
 """
 from __future__ import annotations
 
-from cats.executor import Executor, Function, Structure
-from cats.network.cas import ref_id
+from cats.assembler import Assembler
+
+
+class Composition:
+    """eBOM station. A named type only."""
+
+
+class Release:
+    """mBOM station. A named type only."""
 
 
 class Factory:
-    """Data Product manufacturing cell (Software/Manufacturing factory).
+    """Agent line that operates the CAT Assembler.
 
-    Accepts a content-addressed Order, stages materials via ContentMesh,
-    assembles Function+Structure (AQ halves), produces an ephemeral Executor.
-    Not Structure's Plant [SaaS] (compute generation).
+    Holds Composition and Release. accept delegates to Assembler.accept.
+    produce returns that Assembler's ephemeral Executor.
     """
 
     def __init__(self, runtime):
         self.runtime = runtime
-        self.order_request = None
-        self.structure = None
-        self.function = None
-        self.executor = None
+        self.composition = Composition()
+        self.release = Release()
+        self.assembler = Assembler(runtime)
 
     def accept(self, order_request, init_data_id: str) -> Factory:
-        """Receive work order: stage BOM materials, then assemble."""
-        order = order_request['order']
-        cats_home = getattr(self.runtime, 'CATS_HOME', None)
-        structure_id = ref_id(order, 'structure', cats_home=cats_home)
-        function_id = ref_id(order, 'function', cats_home=cats_home)
-        if not structure_id or not function_id:
-            raise RuntimeError(
-                'Order missing structure / function refs '
-                '(structure_uri/structure_cid, function_uri/function_cid)'
-            )
-        self.runtime.initBOMcar(
-            structure_id=structure_id,
-            structure_filepath=order['structure_filepath'],
-            function_id=function_id,
-            init_data_id=init_data_id,
-            init_bom_filename=f"{self.runtime.OUTPUT_HOME}/bom.car",
-            # Real, already-submitted Order content id — threads into bootstrap
-            # Invoice so order.json and Executor Invoice.order ref match
-            # (see docs/NodeProductFlow.md#2b).
-            order_id=order_request['order_id'],
-        )
-        self.order_request = order_request
-        self.assemble()
+        """Operate the Assembler: stage the Order and assemble."""
+        self.assembler.accept(order_request, init_data_id)
         return self
 
-    def assemble(self) -> None:
-        """Compose Function + construct Structure; instantiate Executor."""
-        order = self.order_request['order']
-        cats_home = getattr(self.runtime, 'CATS_HOME', None)
-        structure_id = ref_id(order, 'structure', cats_home=cats_home)
-        function_id = ref_id(order, 'function', cats_home=cats_home)
-        self.structure = Structure(self.runtime, structure_id)
-        self.function = Function(self.runtime, function_id)
-        self.executor = Executor(self.runtime, self.structure, self.function)
-
     def produce(self):
-        """Yield the ephemeral Executor for this Order."""
-        return self.executor
+        """Return the Assembler's ephemeral Executor for this Order."""
+        return self.assembler.produce()

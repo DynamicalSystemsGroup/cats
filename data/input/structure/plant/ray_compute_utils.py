@@ -5,7 +5,7 @@ beside ``entrypoint.py`` by ``RayPlantPort.submit_job`` so Process hotFs
 can call ``ComputePort.run_transfer`` without importing Ray in Function CID.
 
 Maps Ray Data batches onto this demo's batch ABI
-(``Dict[str, np.ndarray]`` — see docs/INTEROP.md §2g). Another Plant ships
+(``Dict[str, np.ndarray]`` — see docs/storage/INTEROP.md §2g). Another Plant ships
 its own ComputePort + entrypoint under its ``plant_cid``.
 
 When ``num_partitions > 1``, reads stable ``part-*`` shard paths and keeps

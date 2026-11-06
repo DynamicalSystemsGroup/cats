@@ -194,6 +194,58 @@ def test_invoice_data_registry_digest_mismatch():
         )
 
 
+def test_invoice_runtime_sbom_fetch_equiv():
+    nest_uri = 'http://n/ldp/cas/rsbom'
+    cdx_uri = 'http://n/ldp/cas/cdx'
+    syft_uri = 'http://n/ldp/cas/syft'
+    nest = {'cyclonedx_uri': cdx_uri, 'syft_uri': syft_uri}
+    cdx = {'bomFormat': 'CycloneDX', 'specVersion': '1.6', 'components': []}
+    syft = {'artifacts': []}
+    invoice = {'runtime_sbom_uri': nest_uri}
+    bodies = {nest_uri: nest, cdx_uri: cdx, syft_uri: syft}
+    mesh = _mesh(bodies)
+    http_get_json, http_get = _http(bodies)
+    out = assert_invoice_subcomponent_equiv(
+        invoice,
+        'runtime_sbom',
+        content_mesh=mesh,
+        http_get_json=http_get_json,
+        http_get=http_get,
+    )
+    assert out == nest
+
+
+def test_invoice_runtime_sbom_missing_cyclonedx_fails():
+    nest_uri = 'http://n/ldp/cas/rsbom'
+    nest = {}
+    invoice = {'runtime_sbom_uri': nest_uri}
+    bodies = {nest_uri: nest}
+    mesh = _mesh(bodies)
+    http_get_json, http_get = _http(bodies)
+    with pytest.raises(AssertionError, match='cyclonedx_uri'):
+        assert_invoice_subcomponent_equiv(
+            invoice,
+            'runtime_sbom',
+            content_mesh=mesh,
+            http_get_json=http_get_json,
+            http_get=http_get,
+        )
+
+
+def test_invoice_runtime_sbom_unfetchable_fails():
+    invoice = {'runtime_sbom_uri': 'http://n/ldp/cas/missing'}
+    mesh = _mesh({})
+    http_get_json, http_get = _http({})
+    with pytest.raises((AssertionError, KeyError)):
+        assert_invoice_subcomponent_equiv(
+            invoice,
+            'runtime_sbom',
+            content_mesh=mesh,
+            http_get_json=http_get_json,
+            http_get=http_get,
+        )
+
+
 def test_invoice_content_equiv_umbrella():
     order_uri = 'http://n/o'
     data_uri = 'http://n/d'

@@ -116,7 +116,7 @@ def test_create_order_request_default_endpoint_is_init(monkeypatch, tmp_path):
     data.mkdir()
     (data / 'f.csv').write_text('a\n')
 
-    def _put_dir(path):
+    def _put_dir(path, **_kwargs):
         from cats.network.cas import sha256_hex, to_ni
 
         name = Path(path).name

@@ -8,6 +8,7 @@ __marimo__/**
 .agents/
 skills-lock.json
 *.pyc
+*.code-workspace
 .cursorignore
 .ipynb_checkpoints
 .pytest_cache

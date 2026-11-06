@@ -71,7 +71,7 @@ def _docker_up() -> bool:
 requires_docker = pytest.mark.skipif(
     not _docker_up(),
     reason=(
-        'Docker daemon not running (Structure MinIO/Plant; see docs/DEMO.md)'
+        'Docker daemon not running (Structure MinIO/Plant; see docs/guide/DEMO.md)'
     ),
 )
 

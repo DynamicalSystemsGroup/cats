@@ -8,6 +8,67 @@ from cats.executor.structure import Structure
 from cats.network.cas import content_uri, ref_id, ref_uri, set_ref
 
 
+def _output_getter(outputs: dict):
+    def get_output(name):
+        value = outputs.get(name)
+        if value is None:
+            return ''
+        return str(value)
+
+    return get_output
+
+
+def ports_from_handoff(structure, outputs: dict):
+    """Plant port and object store from a caller map. No Terraform."""
+    if not isinstance(outputs, dict) or not outputs:
+        raise RuntimeError(
+            'structure handoff must be a non-empty JSON object '
+            'of terraform output names'
+        )
+    getter = _output_getter(outputs)
+    plant_utils = structure.plant._load_plant_utils()
+    obj_utils = structure.infraStructure._load_obj_store_module()
+    plant_ctx = plant_utils.PlantContext.from_terraform_outputs(getter)
+    object_store = obj_utils.ObjectStore.from_terraform_outputs(getter)
+    plant = plant_utils.plant_port_from_context(plant_ctx)
+    plant_snapshot = plant_ctx.snapshot(
+        rebuilt=False,
+        applied_structure_id=None,
+    )
+    return object_store, plant, plant_snapshot
+
+
+def open_structure_ports(structure, order_request):
+    """Apply Structure on the peer path. The one-shot path uses the handoff.
+
+    ``apply_structure`` missing or true reconciles and heals. False never
+    calls reconcile, Terraform output, or the Ray-head heal.
+    """
+    if order_request.get('apply_structure', True):
+        plant_snapshot = structure.reconcile()
+        from cats.executor.structure.ray_heal import heal_live_ray_head
+
+        plant_ctx = structure.plant.context()
+        heal_live_ray_head(
+            kube_context=plant_ctx.kubeconfig_context,
+            job_endpoint=plant_ctx.job_endpoint,
+        )
+        object_store = structure.infraStructure.obj_store_context()
+        plant = structure.plant.plant_port()
+    else:
+        handoff = order_request.get('structure_handoff')
+        if not isinstance(handoff, dict):
+            raise RuntimeError(
+                'structure handoff required: '
+                '--structure-handoff or CATS_STRUCTURE_HANDOFF'
+            )
+        object_store, plant, plant_snapshot = ports_from_handoff(
+            structure, handoff
+        )
+    transport = structure.infraStructure.transport_context()
+    return object_store, plant, transport, plant_snapshot
+
+
 class Executor:
     def __init__(self,
         runtime, structure, function
@@ -53,16 +114,30 @@ class Executor:
         self.orderCID = ref_id(
             self.enhanced_bom['invoice'], 'order', cats_home=cats_home
         )
-        plant_snapshot = self.structure.reconcile()
-        object_store = self.structure.infraStructure.obj_store_context()
-        plant = self.structure.plant.plant_port()
-        transport = self.structure.infraStructure.transport_context()
-        self.ingress_data_id, self.integration_data_id, self.egress_data_id = \
-            self.function.execute(
-                object_store=object_store,
-                plant=plant,
-                transport=transport,
-            )
+        object_store, plant, transport, plant_snapshot = open_structure_ports(
+            self.structure, order_request
+        )
+        from cats.executor.run_report import (
+            note_failure,
+            note_finished,
+            note_started,
+        )
+
+        report = order_request.get('run_emitter')
+        note_started(report)
+        self.function.processor.run_emitter = report
+        try:
+            self.ingress_data_id, self.integration_data_id, self.egress_data_id = \
+                self.function.execute(
+                    object_store=object_store,
+                    plant=plant,
+                    transport=transport,
+                )
+        except Exception as exc:
+            note_failure(report, exc)
+            raise
+        finally:
+            self.function.processor.run_emitter = None
 
         # function / structure: as-Code; structure_as_executed on the Invoice
         # records what Plant / InfraStructure actually ran.
@@ -119,6 +194,15 @@ class Executor:
         data_stages_id = mesh.put_json(data_stages)
         set_ref(invoice, 'data_stages', data_stages_id)
         set_ref(invoice, 'structure_as_executed', structure_as_executed_id)
+        from cats.network.bom import attach_runtime_sbom
+
+        attach_runtime_sbom(
+            invoice,
+            mesh,
+            structure_as_executed=structure_as_executed,
+            structure_as_executed_id=structure_as_executed_id,
+            structure=self.enhanced_bom.get('structure'),
+        )
         log_id = mesh.put_json(self.enhanced_bom['log'])
         set_ref(self.enhanced_bom, 'log', log_id)
         # Prefer explicit content_uri when available (set_ref already sets
@@ -151,7 +235,7 @@ class Executor:
         # (as opposed to the placeholder order ref getEnhancedBom() may
         # have fetched into self.enhanced_bom['order']) is what makes the
         # Invoice point at "the original CID-ed Order" (see
-        # docs/NodeProductFlow.md#2b). Factory.accept threads this same
+        # docs/NodeProductFlow.md#2b). Assembler.accept threads this same
         # order id into the bootstrap Invoice via Runtime.initBOMcar /
         # ContentMesh.initBOMjson, so the locally materialized order.json
         # and this final Invoice's order ref are the exact same id for
@@ -173,4 +257,5 @@ class Executor:
         del self.enhanced_bom['bom_json_id']
         self.enhanced_bom.pop('init_data_cid', None)
         self.enhanced_bom.pop('init_data_uri', None)
+        note_finished(order_request.get('run_emitter'))
         return self.enhanced_bom, invoice_id

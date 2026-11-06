@@ -91,6 +91,10 @@ def assert_handoff_projection_complete(
                 record.get('data_stages') or record.get('data_stages_cid'),
                 record.get('structure_as_executed')
                 or record.get('structure_as_executed_cid'),
+                record.get('runtime_sbom') or record.get('runtime_sbom_cid'),
+                record.get('function_sbom') or record.get('function_sbom_cid'),
+                record.get('structure_sbom') or record.get('structure_sbom_cid'),
+                record.get('input_data_sbom') or record.get('input_data_sbom_cid'),
                 record.get('log') or record.get('log_cid'),
             ]
         for stage_id in stage_ids:
